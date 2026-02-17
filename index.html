@@ -1161,16 +1161,14 @@
         window.getMetroPopulation = getMetroPopulation;
         window.populationToMarketSize = populationToMarketSize;
 
-        // Signal that modules are loaded
-        window._modulesLoaded = true;
-        window.dispatchEvent(new Event('modulesLoaded'));
         console.log('🏀 Modules loaded: PlayerAttributes, CoachEngine, GameState, FinanceEngine');
+
+        // Now boot the game — module scripts are deferred, so DOM is ready
+        if (typeof window._initGame === 'function') window._initGame();
     </script>
 
-    <!-- Main game code (non-module to avoid strict-mode parsing issues with HTML templates) -->
+    <!-- Main game code -->
     <script>
-        // Wait for modules to load before initializing
-        function _bootGame() {
 
 
         // ============================================
@@ -3352,6 +3350,8 @@ class CalendarEngine {
         // → Extracted to src/engines/*.js modules
         // ═══════════════════════════════════════════════════════════════════
         // PlayoffEngine stays inline (contains HTML template literals)
+
+class PlayoffEngine {
     
     /**
      * Get playoff calendar dates for a season
@@ -19025,14 +19025,6 @@ let gmMode = null;
             }
         };
 
-        } // end _bootGame()
-
-        // Boot the game once modules are loaded
-        if (window._modulesLoaded) {
-            _bootGame();
-        } else {
-            window.addEventListener('modulesLoaded', _bootGame);
-        }
     </script>
 </body>
 </html>

@@ -68,7 +68,7 @@ export class SimulationController {
         playerStats.forEach(statLine => {
             const player = team.roster.find(p => p.id === statLine.playerId);
             if (player) {
-                StatEngine.accumulateStats(player, statLine);
+                window.StatEngine.accumulateStats(player, statLine);
                 
                 // Sync minutesThisGame for fatigue system (processFatigueAfterGame reads this)
                 player.minutesThisGame = statLine.minutesPlayed;
@@ -123,7 +123,7 @@ export class SimulationController {
      * @param {Object} team - Team object
      */
     updatePlayerGamesPlayed(team) {
-        // No-op: Player games played now tracked via StatEngine.accumulateStats()
+        // No-op: Player games played now tracked via window.StatEngine.accumulateStats()
         // in accumulatePlayerStats() above. Kept for backward compatibility.
     }
 

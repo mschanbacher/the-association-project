@@ -30,7 +30,7 @@ export const GameEngine = {
                 }
                 
                 // Apply fatigue penalty
-                const fatiguePenalty = getFatiguePenalty(p.fatigue || 0);
+                const fatiguePenalty = window.getFatiguePenalty(p.fatigue || 0);
                 adjustedRating += fatiguePenalty; // Penalty is negative
                 
                 return {
@@ -164,11 +164,11 @@ export const GameEngine = {
      */
     calculateGameOutcome(homeTeam, awayTeam, isPlayoffs = false) {
         const tier = homeTeam.tier || awayTeam.tier || 1;
-        return StatEngine.generateGame(homeTeam, awayTeam, {
+        return window.StatEngine.generateGame(homeTeam, awayTeam, {
             isPlayoffs: isPlayoffs,
             tier: tier,
             homeCourtBonus: this.getHomeCourtAdvantage(tier),
-            getFatiguePenalty: getFatiguePenalty,
+            getFatiguePenalty: window.getFatiguePenalty,
         });
     },
 

@@ -1173,8 +1173,9 @@
         if (typeof window._initGame === 'function') window._initGame();
     </script>
 
-    <!-- Main game code -->
+    <!-- Main game code — wrapped in _initGame, called by module script after imports -->
     <script>
+    window._initGame = function() {
 
 
         // ============================================
@@ -2319,6 +2320,7 @@ const StatEngine = {
         `;
     },
 };
+window.StatEngine = StatEngine;
 
 // ============================================
 // SimulationController → Extracted to src/engines/SimulationController.js
@@ -4190,6 +4192,7 @@ let gmMode = null;
             }
             return '$' + amount.toFixed(0);
         }
+        window.formatCurrency = formatCurrency;
 
         // ========================================
         // TIEBREAKER SYSTEM
@@ -4282,6 +4285,7 @@ let gmMode = null;
                 return total + (player.salary || 0);
             }, 0);
         }
+        window.calculateTeamSalary = calculateTeamSalary;
         
         // ========================================
         // TIEBREAKER SYSTEM
@@ -5730,6 +5734,7 @@ let gmMode = null;
             if (fatigue <= 75) return -5 - Math.floor((fatigue - 50) / 5); // -6 to -10
             return -10 - Math.floor((fatigue - 75) / 5); // -11 to -15 (max -15 at 100%)
         }
+        window.getFatiguePenalty = getFatiguePenalty;
         
         // Get fatigue color for UI display
         function getFatigueColor(fatigue) {
@@ -6799,6 +6804,7 @@ let gmMode = null;
                 return Math.floor(1 + Math.random() * 2); // 1-2 years
             }
         }
+        window.determineContractLength = determineContractLength;
         
         // Generate salary based on player rating
         function generateSalary(rating, tier = 2) {
@@ -6892,7 +6898,7 @@ let gmMode = null;
                 }
             }
         }
-
+        window.generateSalary = generateSalary;
         // ═══════════════════════════════════════════════════════════════════
         // Determine the highest tier a player is qualified to play in
         // ═══════════════════════════════════════════════════════════════════
@@ -8318,6 +8324,7 @@ let gmMode = null;
             if (gameState.currentTier === 2) return gameState.tier2Teams;
             return gameState.tier3Teams;
         }
+        window.getCurrentTeams = getCurrentTeams;
 
         // Helper function to get user's team
         function getUserTeam() {
@@ -17936,8 +17943,27 @@ let gmMode = null;
         window.showUserDraftPicks = showUserDraftPicks;
         window.closeDraftResults = closeDraftResults;
 
-        // Initialize on load
-        window.onload = function() {
+        // ═══════════════════════════════════════════════════════════════════
+        // WINDOW EXPOSURES — Functions called from HTML onclick handlers
+        // Must be on window since game code runs inside _initGame wrapper
+        // ═══════════════════════════════════════════════════════════════════
+        // Note: simDay, simWeek, simNextGame, finishSeason are wired by GMMode constructor
+        // via btn.onclick = () => this.simulateDay() etc. No global functions needed.
+        window.simAllChampionshipRounds = simAllChampionshipRounds;
+        window.skipChampionshipPlayoffs = skipChampionshipPlayoffs;
+        window.closeRosterManagementDynamic = closeRosterManagementDynamic;
+        window.openRosterManagementHub = openRosterManagementHub;
+        window.openTradeScreenFromRoster = openTradeScreenFromRoster;
+        window.renderScannerTab = renderScannerTab;
+        window.removeFromWatchList = removeFromWatchList;
+        window.addToWatchList = addToWatchList;
+        window.showPlayerScoutDetail = showPlayerScoutDetail;
+        window.applyScoutFilter = applyScoutFilter;
+        window.switchScoutTab = switchScoutTab;
+        window.renderWatchListTab = renderWatchListTab;
+
+        // Initialize immediately — _initGame is called by module script after DOM is ready
+        (function() {
             try {
                 console.log('🏀 The Association v4.0 - Phase 3');
                 console.log('Initializing GameState class...');
@@ -18025,7 +18051,9 @@ let gmMode = null;
                 console.error('Load error:', error);
                 console.error('Stack:', error.stack);
             }
-        };
+        })(); // end init IIFE
+
+    }; // end window._initGame
 
     </script>
 </body>

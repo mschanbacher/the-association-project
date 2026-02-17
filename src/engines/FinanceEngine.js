@@ -554,9 +554,9 @@ export const FinanceEngine = {
                     team.roster.splice(idx, 1);
                     // Mark them for FA pool (salary adjusted to their natural tier market)
                     player.previousTeamId = team.id;
-                    player.contractYears = determineContractLength(player.age, player.rating);
+                    player.contractYears = window.determineContractLength(player.age, player.rating);
                     player.originalContractLength = player.contractYears;
-                    player.salary = generateSalary(player.rating, fromTier); // They command their old tier's rates
+                    player.salary = window.generateSalary(player.rating, fromTier); // They command their old tier's rates
                     player.relegationRelease = false; // Clause is spent
                     releasedPlayers.push(player);
                     console.log(`🚪 ${player.name} (${player.rating} OVR) activated relegation release clause — leaving ${team.name}`);
@@ -564,8 +564,8 @@ export const FinanceEngine = {
             });
             
             // Add released players to free agent pool
-            if (releasedPlayers.length > 0 && gameState.freeAgents) {
-                gameState.freeAgents.push(...releasedPlayers);
+            if (releasedPlayers.length > 0 && window.gameState.freeAgents) {
+                window.gameState.freeAgents.push(...releasedPlayers);
             }
             
             // Store for transition briefing display
@@ -603,8 +603,8 @@ export const FinanceEngine = {
             const currentSalary = team.roster.reduce((sum, p) => sum + (p.salary || 0), 0);
             
             console.log(`📉 ${team.name}: Pre-restructuring salary check`);
-            console.log(`   Current salary: ${formatCurrency(currentSalary)}`);
-            console.log(`   New tier spending limit: ${formatCurrency(spendingLimit)}`);
+            console.log(`   Current salary: ${window.formatCurrency(currentSalary)}`);
+            console.log(`   New tier spending limit: ${window.formatCurrency(spendingLimit)}`);
             
             if (currentSalary > spendingLimit) {
                 // Target: 85% of spending limit, giving some cap space
@@ -624,7 +624,7 @@ export const FinanceEngine = {
                     
                     // New salary is old salary minus their share of the reduction
                     // But never below the minimum for their rating in the new tier
-                    const minSalary = generateSalary(Math.max(player.rating - 10, 50), toTier);
+                    const minSalary = window.generateSalary(Math.max(player.rating - 10, 50), toTier);
                     const newSalary = Math.max(minSalary, Math.round((player.salary || 0) - playerReduction));
                     
                     // Store old salary for reference
@@ -633,13 +633,13 @@ export const FinanceEngine = {
                 });
                 
                 const newTotal = team.roster.reduce((sum, p) => sum + (p.salary || 0), 0);
-                console.log(`   Restructured: ${formatCurrency(currentSalary)} → ${formatCurrency(newTotal)}`);
-                console.log(`   Cap Space: ${formatCurrency(spendingLimit - newTotal)}`);
+                console.log(`   Restructured: ${window.formatCurrency(currentSalary)} → ${window.formatCurrency(newTotal)}`);
+                console.log(`   Cap Space: ${window.formatCurrency(spendingLimit - newTotal)}`);
             }
         }
         
         console.log(`📉 ${team.name} relegated T${fromTier}→T${toTier}`);
-        console.log(`   Revenue: ${formatCurrency(this.getTotalRevenue(team))} | Spending Limit: ${formatCurrency(this.getSpendingLimit(team))}`);
+        console.log(`   Revenue: ${window.formatCurrency(this.getTotalRevenue(team))} | Spending Limit: ${window.formatCurrency(this.getSpendingLimit(team))}`);
         console.log(`   Fanbase: ${team.finances.fanbase.toLocaleString()}`);
     },
     
@@ -672,7 +672,7 @@ export const FinanceEngine = {
         }
         
         console.log(`📈 ${team.name} promoted T${fromTier}→T${toTier}`);
-        console.log(`   Revenue: ${formatCurrency(this.getTotalRevenue(team))} | Spending Limit: ${formatCurrency(this.getSpendingLimit(team))}`);
+        console.log(`   Revenue: ${window.formatCurrency(this.getTotalRevenue(team))} | Spending Limit: ${window.formatCurrency(this.getSpendingLimit(team))}`);
         console.log(`   Fanbase: ${team.finances.fanbase.toLocaleString()}`);
     },
     
@@ -785,7 +785,7 @@ export const FinanceEngine = {
         
         // ─── FINANCIAL STABILITY CHECK ───
         const spendingLimit = this.getSpendingLimit(team);
-        const currentSalary = calculateTeamSalary(team);
+        const currentSalary = window.calculateTeamSalary(team);
         const usagePct = currentSalary / spendingLimit;
         
         if (usagePct > 0.95) {
@@ -811,7 +811,7 @@ export const FinanceEngine = {
             team.finances.revenueHistory = team.finances.revenueHistory.slice(-10);
         }
         
-        console.log(`💰 ${team.name} (T${tier}): Revenue ${formatCurrency(this.getTotalRevenue(team))} | Limit ${formatCurrency(spendingLimit)} | Fans ${team.finances.fanbase.toLocaleString()} | ${team.finances.financialStability}`);
+        console.log(`💰 ${team.name} (T${tier}): Revenue ${window.formatCurrency(this.getTotalRevenue(team))} | Limit ${window.formatCurrency(spendingLimit)} | Fans ${team.finances.fanbase.toLocaleString()} | ${team.finances.financialStability}`);
     },
     
     // ═══════════════════════════════════════════════════════════════
@@ -871,7 +871,7 @@ export const FinanceEngine = {
                         const scaleFactor = neededRevenue / currentRevenue;
                         team.finances.revenue.matchday = Math.round(team.finances.revenue.matchday * scaleFactor);
                         team.finances.revenue.commercial = Math.round(team.finances.revenue.commercial * scaleFactor);
-                        console.log(`💰 ${team.name}: Scaled revenue up ${scaleFactor.toFixed(2)}x to cover existing roster salary (${formatCurrency(currentSalary)} salary vs ${formatCurrency(spendingLimit)} old limit)`);
+                        console.log(`💰 ${team.name}: Scaled revenue up ${scaleFactor.toFixed(2)}x to cover existing roster salary (${window.formatCurrency(currentSalary)} salary vs ${window.formatCurrency(spendingLimit)} old limit)`);
                     }
                 }
             }
@@ -888,7 +888,7 @@ export const FinanceEngine = {
         const totalRevenue = this.getTotalRevenue(team);
         const spendingLimit = this.getSpendingLimit(team);
         const salaryFloor = this.getSalaryFloor(team);
-        const currentSalary = calculateTeamSalary(team);
+        const currentSalary = window.calculateTeamSalary(team);
         const capSpace = Math.max(0, spendingLimit - currentSalary);
         
         return {

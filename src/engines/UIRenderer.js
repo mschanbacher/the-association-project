@@ -22,10 +22,14 @@ export class UIRenderer {
     // ═══════════════════════════════════════════════════════════════
 
     static rankSuffix(n) {
-        if (!n) return '';
-        const s = ['th', 'st', 'nd', 'rd'];
+        if (!n && n !== 0) return '';
         const v = n % 100;
-        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        if (v >= 11 && v <= 13) return n + 'th';
+        const last = n % 10;
+        if (last === 1) return n + 'st';
+        if (last === 2) return n + 'nd';
+        if (last === 3) return n + 'rd';
+        return n + 'th';
     }
 
     static pct(wins, losses) {
@@ -437,7 +441,7 @@ export class UIRenderer {
         `;
 
         const sorted = [...history].sort((a, b) => b.season - a.season);
-        const rsFn = getRankSuffix || UIRenderer.rankSuffix;
+        const rsFn = UIRenderer.rankSuffix;
 
         for (const season of sorted) {
             const ut = season.userTeam;

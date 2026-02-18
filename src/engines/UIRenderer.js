@@ -508,4 +508,522 @@ export class UIRenderer {
             </div>
         `;
     }
+
+
+    // ═══════════════════════════════════════════════════════════════
+    // DEVELOPMENT & OFFSEASON
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Player rating change row (shared by multiple screens)
+     */
+    static ratingChangeRow(log, index) {
+        const isImprovement = log.change > 0;
+        const color = isImprovement ? '#34a853' : '#ea4335';
+        const bgColor = isImprovement ? 'rgba(52,168,83,0.1)' : 'rgba(234,67,53,0.1)';
+        return `
+            <div style="background: ${bgColor}; padding: 12px; margin-bottom: 8px; border-radius: 6px; border-left: 4px solid ${color};">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${log.name}</strong>
+                        <span style="opacity: 0.8; margin-left: 10px;">${log.position || ''} · ${log.age} years old</span>
+                    </div>
+                    <div>
+                        <span style="color: #999;">${log.oldRating}</span>
+                        <span style="margin: 0 10px;">→</span>
+                        <span style="color: ${color}; font-weight: bold;">${log.newRating}</span>
+                        <span style="color: ${color}; margin-left: 10px;">(${isImprovement ? '+' : ''}${log.change})</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Retirement row for notable retirements table
+     */
+    static retirementTableRow(r) {
+        const peakColor = r.peakRating >= 90 ? '#fbbc04' : r.peakRating >= 85 ? '#34a853' : '#8ab4f8';
+        const hofBadge = r.peakRating >= 93 ? ' 🏅' : r.peakRating >= 88 && r.careerLength >= 12 ? ' ⭐' : '';
+        return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 8px 6px;"><strong>${r.name}</strong>${hofBadge}</td>
+                <td style="padding: 8px 6px; text-align: center;">${r.position}</td>
+                <td style="padding: 8px 6px; text-align: center;">${r.age}</td>
+                <td style="padding: 8px 6px; text-align: center; color: ${peakColor}; font-weight: bold;">${r.peakRating}</td>
+                <td style="padding: 8px 6px; text-align: center;">${r.careerLength}yr</td>
+                <td style="padding: 8px 6px; opacity: 0.8;">T${r.tier} ${r.teamName}</td>
+            </tr>
+        `;
+    }
+
+    /**
+     * Development summary with improvements, declines, retirements
+     */
+    static developmentSummaryFull({ improvements, declines, userRetirements, notableRetirements, allRetirementsCount }) {
+        let html = '';
+
+        if (userRetirements && userRetirements.length > 0) {
+            html += `
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: #fbbc04; margin-bottom: 15px;">👴 Retirements from Your Team (${userRetirements.length})</h3>
+                    ${userRetirements.map(r => `
+                        <div style="background: rgba(251,188,4,0.1); padding: 12px; margin-bottom: 8px; border-radius: 6px; border-left: 4px solid #fbbc04;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${r.name}</strong>
+                                    <span style="opacity: 0.8; margin-left: 8px;">${r.position} · Age ${r.age}</span>
+                                    ${r.college ? `<span style="opacity: 0.6; margin-left: 8px;">🎓 ${r.college}</span>` : ''}
+                                </div>
+                                <div style="text-align: right;">
+                                    <span style="color: #fbbc04;">Final ${r.rating} OVR</span>
+                                    <span style="opacity: 0.6; margin-left: 8px;">· Peak ${r.peakRating} · ${r.careerLength}yr career</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        if (improvements && improvements.length > 0) {
+            html += `
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: #34a853; margin-bottom: 15px;">⬆️ Improvements (${improvements.length})</h3>
+                    ${improvements.map((log, i) => UIRenderer.ratingChangeRow(log, i)).join('')}
+                </div>
+            `;
+        }
+
+        if (declines && declines.length > 0) {
+            html += `
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: #ea4335; margin-bottom: 15px;">⬇️ Declines (${declines.length})</h3>
+                    ${declines.map((log, i) => UIRenderer.ratingChangeRow(log, i)).join('')}
+                </div>
+            `;
+        }
+
+        if (notableRetirements && notableRetirements.length > 0) {
+            html += `
+                <div style="margin-bottom: 20px;">
+                    <h3 style="color: #9aa0a6; margin-bottom: 15px;">🏆 Notable League Retirements (${allRetirementsCount || notableRetirements.length} total)</h3>
+                    <div style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 12px;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="opacity: 0.6; font-size: 0.85em;">
+                                    <th style="padding: 6px; text-align: left;">Player</th>
+                                    <th style="padding: 6px; text-align: center;">Pos</th>
+                                    <th style="padding: 6px; text-align: center;">Age</th>
+                                    <th style="padding: 6px; text-align: center;">Peak</th>
+                                    <th style="padding: 6px; text-align: center;">Career</th>
+                                    <th style="padding: 6px; text-align: left;">Last Team</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${notableRetirements.map(r => UIRenderer.retirementTableRow(r)).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="text-align: center; margin-top: 8px; font-size: 0.85em; opacity: 0.5;">
+                        🏅 = Legendary career · ⭐ = Hall of Fame candidate
+                    </div>
+                </div>
+            `;
+        }
+
+        if ((!improvements || improvements.length === 0) && (!declines || declines.length === 0) &&
+            (!userRetirements || userRetirements.length === 0) && (!notableRetirements || notableRetirements.length === 0)) {
+            html = '<p style="text-align: center; opacity: 0.7; padding: 40px;">No significant changes this season.</p>';
+        }
+
+        return html;
+    }
+
+    /**
+     * Expired contract player card with re-sign/release buttons
+     */
+    static expiredContractCard({ player, canAfford, ratingColor }) {
+        return `
+            <div id="expired_${player.id}" style="background: rgba(255,255,255,0.05); padding: 12px; margin-bottom: 8px; border-radius: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1;">
+                        <div>
+                            <strong>${player.name}</strong>
+                            <span style="opacity: 0.8; margin-left: 10px;">${player.position}</span>
+                            <span style="opacity: 0.8; margin-left: 10px;">${player.age} years old</span>
+                        </div>
+                        <div style="margin-top: 4px;">
+                            <span style="color: ${ratingColor}; font-weight: bold;">⭐ ${player.rating}</span>
+                            <span style="opacity: 0.7; margin-left: 15px;">💰 ${UIRenderer.formatCurrency(player.salary)}/yr</span>
+                            ${!canAfford ? '<span style="color: #ea4335; margin-left: 10px;">⚠️ Can\'t afford</span>' : ''}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="resignExpiredPlayer(${player.id})" ${!canAfford ? 'disabled' : ''} class="success" style="padding: 8px 16px; font-size: 0.9em; ${!canAfford ? 'opacity: 0.5; cursor: not-allowed;' : ''}">✅ Re-sign</button>
+                        <button onclick="releaseExpiredPlayer(${player.id})" class="danger" style="padding: 8px 16px; font-size: 0.9em;">❌ Release</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Contract decision card (for contract decisions modal)
+     */
+    static contractDecisionCard({ player, canAfford, newContractYears, ratingColor }) {
+        return `
+            <div id="contract_${player.id}" style="background: rgba(255,255,255,0.05); padding: 15px; margin-bottom: 12px; border-radius: 8px; border: 2px solid transparent; transition: all 0.2s;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <div style="margin-bottom: 8px;">
+                            <strong style="font-size: 1.1em;">${player.name}</strong>
+                            <span style="opacity: 0.8; margin-left: 10px;">${player.position}</span>
+                            <span style="opacity: 0.8; margin-left: 10px;">Age ${player.age}</span>
+                        </div>
+                        <div>
+                            <span style="color: ${ratingColor}; font-weight: bold;">⭐ ${player.rating}</span>
+                            <span style="opacity: 0.7; margin-left: 15px;">💰 ${UIRenderer.formatCurrency(player.salary)}/yr</span>
+                            <span style="color: #fbbc04; margin-left: 15px;">📝 New: ${newContractYears} year${newContractYears > 1 ? 's' : ''}</span>
+                            ${!canAfford ? '<span style="color: #ea4335; margin-left: 10px;">⚠️ Can\'t afford</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button id="resign_${player.id}" onclick="makeContractDecision(${player.id}, 'resign')" ${!canAfford ? 'disabled' : ''} style="padding: 10px; border-radius: 6px; background: rgba(52,168,83,0.2); border: 2px solid transparent; cursor: pointer; ${!canAfford ? 'opacity: 0.3; cursor: not-allowed;' : ''}">
+                        <strong style="color: #34a853;">✅ Re-sign (${newContractYears}yr)</strong>
+                    </button>
+                    <button id="release_${player.id}" onclick="makeContractDecision(${player.id}, 'release')" style="padding: 10px; border-radius: 6px; background: rgba(234,67,53,0.2); border: 2px solid transparent; cursor: pointer;">
+                        <strong style="color: #ea4335;">❌ Release to FA</strong>
+                    </button>
+                </div>
+                <div id="decision_status_${player.id}" style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; text-align: center; opacity: 0; transition: opacity 0.2s;"></div>
+            </div>
+        `;
+    }
+
+    /**
+     * Lottery results
+     */
+    static lotteryResults({ lotteryResults, userTeamId }) {
+        let html = `
+            <div style="text-align: center; margin-bottom: 30px;">
+                <p style="font-size: 1.1em; opacity: 0.9;">14 teams competed for the top 4 picks...</p>
+            </div>
+        `;
+
+        html += '<div style="background: rgba(255,215,0,0.1); padding: 20px; border-radius: 8px; margin-bottom: 20px;">';
+        html += '<h2 style="text-align: center; margin-bottom: 20px; color: #ffd700;">🎰 Lottery Winners (Picks 1-4)</h2>';
+
+        const top4 = lotteryResults.slice(0, 4);
+        top4.forEach(result => {
+            const isUser = result.team.id === userTeamId;
+            const bgColor = isUser ? 'rgba(251,188,4,0.3)' : 'rgba(255,255,255,0.05)';
+            const jumpIndicator = result.jumped ? `<span style="color: #34a853; margin-left: 10px;">⬆️ Jumped from #${result.originalPosition}!</span>` : '';
+            const promotedBadge = result.isPromoted ? '<span style="color: #fbbc04; margin-left: 10px;">👑 Promoted</span>' : '';
+            html += `
+                <div style="background: ${bgColor}; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 5px solid ${isUser ? '#fbbc04' : '#ffd700'};">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div style="font-size: 2em; font-weight: bold; color: #ffd700; min-width: 50px;">#${result.pick}</div>
+                            <div>
+                                <div style="font-size: 1.3em; font-weight: bold;">${result.team.name}</div>
+                                <div style="font-size: 0.9em; opacity: 0.8; margin-top: 5px;">${result.team.wins}-${result.team.losses} record ${promotedBadge} ${jumpIndicator}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+
+        html += '<div style="margin-top: 20px;"><h3 style="text-align: center; margin-bottom: 15px;">Remaining Lottery Picks (5-14)</h3><div style="display: grid; gap: 6px;">';
+        lotteryResults.slice(4).forEach(result => {
+            const isUser = result.team.id === userTeamId;
+            const bgColor = isUser ? 'rgba(251,188,4,0.2)' : 'rgba(255,255,255,0.03)';
+            html += `
+                <div style="background: ${bgColor}; padding: 8px 12px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-weight: bold; opacity: 0.7;">Pick ${result.pick}</span>
+                        <span>${result.team.name}</span>
+                    </div>
+                    <span style="opacity: 0.6; font-size: 0.9em;">${result.team.wins}-${result.team.losses}</span>
+                </div>
+            `;
+        });
+        html += '</div></div>';
+
+        const userResult = lotteryResults.find(r => r.team.id === userTeamId);
+        if (userResult) {
+            const message = userResult.pick <= 4 ? `🎉 You won the #${userResult.pick} pick!` : `You have the #${userResult.pick} pick.`;
+            html += `<div style="margin-top: 25px; padding: 20px; background: rgba(251,188,4,0.2); border-radius: 8px; text-align: center;"><p style="font-size: 1.3em; font-weight: bold;">${message}</p></div>`;
+        }
+
+        return html;
+    }
+
+    /**
+     * Draft round results
+     */
+    static draftRoundResults({ roundResults, roundTitle, userTeamId, getRatingColor }) {
+        let html = `<h2 style="text-align: center; margin-bottom: 20px;">${roundTitle}</h2>`;
+
+        if (!roundResults || roundResults.length === 0) {
+            html += '<p style="text-align: center; opacity: 0.7; padding: 40px;">No picks in this round.</p>';
+            return html;
+        }
+
+        html += '<div style="display: grid; gap: 8px;">';
+        roundResults.forEach(result => {
+            const isUserPick = result.teamId === userTeamId;
+            const bgColor = isUserPick ? 'rgba(251,188,4,0.2)' : 'rgba(255,255,255,0.05)';
+            const borderColor = isUserPick ? '#fbbc04' : result.isCompensatory ? '#34a853' : 'transparent';
+            const wasTraded = result.originalTeamId && result.originalTeamId !== result.teamId;
+            const tradedIndicator = wasTraded ? `<span style="color: #667eea; margin-left: 8px; font-size: 0.85em;">(via ${result.originalTeamName})</span>` : '';
+            const ratingColor = getRatingColor ? getRatingColor(result.player.rating) : '#fff';
+            html += `
+                <div style="background: ${bgColor}; padding: 12px; border-radius: 6px; border-left: 4px solid ${borderColor}; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="font-size: 1.2em; font-weight: bold; opacity: 0.6; min-width: 40px;">#${result.pick}</div>
+                        <div>
+                            <div style="font-weight: bold;">${result.player.name}</div>
+                            <div style="font-size: 0.9em; opacity: 0.8; margin-top: 3px;">${result.player.position} | Age ${result.player.age}</div>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: ${ratingColor}; font-weight: bold; font-size: 1.1em;">⭐ ${result.player.rating}</div>
+                        <div style="font-size: 0.85em; opacity: 0.7; margin-top: 3px;">${result.teamName} ${tradedIndicator}</div>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        return html;
+    }
+
+    /**
+     * User's draft picks summary
+     */
+    static userDraftPicks({ picks, teamName, getRatingColor }) {
+        let html = `<h2 style="text-align: center; margin-bottom: 20px;">Your Picks: ${teamName}</h2>`;
+        if (!picks || picks.length === 0) {
+            html += '<p style="text-align: center; opacity: 0.7; padding: 40px;">You had no picks in this draft.</p>';
+            return html;
+        }
+        html += '<div style="display: grid; gap: 10px;">';
+        picks.forEach(result => {
+            const roundLabel = result.round === 'Comp' ? 'Comp' : `Rd ${result.round}`;
+            const ratingColor = getRatingColor ? getRatingColor(result.player.rating) : '#fff';
+            html += `
+                <div style="background: rgba(251,188,4,0.15); padding: 15px; border-radius: 8px; border-left: 5px solid #fbbc04;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div style="font-size: 1.2em; font-weight: bold; color: #fbbc04;">${roundLabel} #${result.pick}</div>
+                            <div>
+                                <div style="font-weight: bold; font-size: 1.1em;">${result.player.name}</div>
+                                <div style="font-size: 0.9em; opacity: 0.8;">${result.player.position} | Age ${result.player.age}</div>
+                            </div>
+                        </div>
+                        <div style="color: ${ratingColor}; font-weight: bold; font-size: 1.3em;">⭐ ${result.player.rating}</div>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        return html;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // STANDINGS
+    // ═══════════════════════════════════════════════════════════════
+
+    static standingsTable({ teams, userTeamId, title, showTier, getRatingColor }) {
+        if (!teams || teams.length === 0) return '<p style="opacity: 0.7;">No teams.</p>';
+
+        let html = '';
+        if (title) html += `<h3 style="margin-bottom: 10px;">${title}</h3>`;
+        html += '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">';
+        html += `<thead><tr style="opacity: 0.6; border-bottom: 2px solid rgba(255,255,255,0.1);">
+            <th style="padding: 8px; text-align: left;">#</th>
+            <th style="padding: 8px; text-align: left;">Team</th>
+            <th style="padding: 8px; text-align: center;">W</th>
+            <th style="padding: 8px; text-align: center;">L</th>
+            <th style="padding: 8px; text-align: center;">PCT</th>
+            <th style="padding: 8px; text-align: center;">DIFF</th>
+            ${showTier ? '<th style="padding: 8px; text-align: center;">RTG</th>' : ''}
+        </tr></thead><tbody>`;
+
+        teams.forEach((team, i) => {
+            const isUser = team.id === userTeamId;
+            const bg = isUser ? 'background: rgba(102,126,234,0.2);' : (i % 2 === 0 ? 'background: rgba(255,255,255,0.02);' : '');
+            const winPct = ((team.wins || 0) / Math.max(1, (team.wins || 0) + (team.losses || 0))).toFixed(3);
+            const diff = (team.pointDiff || 0);
+            const diffColor = diff > 0 ? '#4ecdc4' : diff < 0 ? '#ff6b6b' : '';
+            html += `
+                <tr style="${bg}">
+                    <td style="padding: 6px 8px;">${i + 1}</td>
+                    <td style="padding: 6px 8px; ${isUser ? 'font-weight: bold; color: #667eea;' : ''}">${team.city || ''} ${team.name}</td>
+                    <td style="padding: 6px 8px; text-align: center;">${team.wins || 0}</td>
+                    <td style="padding: 6px 8px; text-align: center;">${team.losses || 0}</td>
+                    <td style="padding: 6px 8px; text-align: center;">${winPct}</td>
+                    <td style="padding: 6px 8px; text-align: center; ${diffColor ? 'color:' + diffColor + ';' : ''}">${diff > 0 ? '+' : ''}${diff}</td>
+                    ${showTier ? `<td style="padding: 6px 8px; text-align: center;">${Math.round(team.rating || 0)}</td>` : ''}
+                </tr>
+            `;
+        });
+        html += '</tbody></table></div>';
+        return html;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FREE AGENCY
+    // ═══════════════════════════════════════════════════════════════
+
+    static freeAgentCard({ player, capSpace, ratingColor, canAfford }) {
+        return `
+            <div style="background: rgba(255,255,255,0.05); padding: 12px; margin-bottom: 8px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>${player.name}</strong>
+                    <span style="opacity: 0.8; margin-left: 10px;">${player.position} · Age ${player.age}</span>
+                    <span style="color: ${ratingColor}; margin-left: 10px; font-weight: bold;">⭐ ${player.rating}</span>
+                    <span style="opacity: 0.7; margin-left: 10px;">💰 ${UIRenderer.formatCurrency(player.salary)}/yr</span>
+                </div>
+                <button onclick="signFreeAgent(${player.id})" ${!canAfford ? 'disabled' : ''} class="success" style="padding: 6px 16px; ${!canAfford ? 'opacity: 0.4; cursor: not-allowed;' : ''}">Sign</button>
+            </div>
+        `;
+    }
+
+    /**
+     * Free agency results summary
+     */
+    static freeAgencyResults({ signings, userTeamSignings, notableSignings }) {
+        let html = '';
+
+        if (userTeamSignings && userTeamSignings.length > 0) {
+            html += '<div style="margin-bottom: 20px;">';
+            html += '<h3 style="color: #34a853; margin-bottom: 10px;">✅ Your Signings</h3>';
+            userTeamSignings.forEach(s => {
+                html += `<div style="background: rgba(52,168,83,0.1); padding: 10px; margin-bottom: 6px; border-radius: 6px;">
+                    <strong>${s.playerName}</strong> <span style="opacity: 0.8;">${s.position} · ${s.rating} OVR · ${UIRenderer.formatCurrency(s.salary)}/yr</span>
+                </div>`;
+            });
+            html += '</div>';
+        }
+
+        if (notableSignings && notableSignings.length > 0) {
+            html += '<div style="margin-bottom: 20px;">';
+            html += `<h3 style="opacity: 0.8; margin-bottom: 10px;">📋 Notable League Signings (${signings ? signings.length : 0} total)</h3>`;
+            notableSignings.slice(0, 15).forEach(s => {
+                html += `<div style="background: rgba(255,255,255,0.03); padding: 8px; margin-bottom: 4px; border-radius: 4px; font-size: 0.9em;">
+                    <strong>${s.playerName}</strong> → ${s.teamName} <span style="opacity: 0.7;">(${s.position}, ${s.rating} OVR)</span>
+                </div>`;
+            });
+            html += '</div>';
+        }
+
+        if ((!userTeamSignings || userTeamSignings.length === 0) && (!notableSignings || notableSignings.length === 0)) {
+            html = '<p style="text-align: center; opacity: 0.7; padding: 20px;">No significant signings this period.</p>';
+        }
+
+        return html;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // TRADE SCREEN
+    // ═══════════════════════════════════════════════════════════════
+
+    static tradePlayerRow({ player, side, ratingColor }) {
+        const action = side === 'user' ? 'addToTradeFromUser' : 'addToTradeFromAI';
+        return `
+            <div style="background: rgba(255,255,255,0.05); padding: 8px 10px; margin-bottom: 6px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="${action}(${player.id})">
+                <div>
+                    <strong>${player.name}</strong>
+                    <span style="opacity: 0.8; margin-left: 8px;">${player.position}</span>
+                </div>
+                <div>
+                    <span style="color: ${ratingColor}; font-weight: bold;">${player.rating}</span>
+                    <span style="opacity: 0.7; margin-left: 10px;">${UIRenderer.formatCurrency(player.salary)}</span>
+                    <span style="opacity: 0.5; margin-left: 8px;">Age ${player.age}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ALL-STAR MODAL
+    // ═══════════════════════════════════════════════════════════════
+
+    static allStarPlayerRow(p) {
+        return `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: rgba(255,255,255,0.03); border-radius: 4px; margin-bottom: 4px;">
+                <div>
+                    <strong>${p.player.name}</strong>
+                    <span style="opacity: 0.7; margin-left: 8px;">${p.player.position} · ${p.team.name}</span>
+                </div>
+                <div style="opacity: 0.8; font-size: 0.9em;">
+                    ${p.avgs ? `${p.avgs.pointsPerGame} PPG · ${p.avgs.reboundsPerGame} RPG · ${p.avgs.assistsPerGame} APG` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SCOUTING
+    // ═══════════════════════════════════════════════════════════════
+
+    static scoutPlayerCard({ player, isWatchlisted, ratingColor }) {
+        return `
+            <div style="background: rgba(255,255,255,0.05); padding: 12px; margin-bottom: 8px; border-radius: 6px; cursor: pointer;" onclick="showPlayerScoutDetail(${player.id})">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${player.name}</strong>
+                        <span style="opacity: 0.8; margin-left: 10px;">${player.position} · Age ${player.age}</span>
+                        ${isWatchlisted ? '<span style="color: #fbbc04; margin-left: 8px;">⭐</span>' : ''}
+                    </div>
+                    <div>
+                        <span style="color: ${ratingColor}; font-weight: bold;">${player.rating} OVR</span>
+                        <span style="opacity: 0.7; margin-left: 10px;">${player.team || ''}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // COACHING
+    // ═══════════════════════════════════════════════════════════════
+
+    static coachCard({ coach, isCurrent, canAfford }) {
+        return `
+            <div style="background: rgba(255,255,255,0.05); padding: 15px; margin-bottom: 10px; border-radius: 8px; ${isCurrent ? 'border: 2px solid #667eea;' : ''}">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong style="font-size: 1.1em;">${coach.name}</strong>
+                        <span style="opacity: 0.7; margin-left: 10px;">${coach.archetype || 'Standard'}</span>
+                        ${isCurrent ? '<span style="color: #667eea; margin-left: 10px;">Current Coach</span>' : ''}
+                    </div>
+                    <div>
+                        <span style="font-weight: bold;">⭐ ${coach.rating || 'N/A'}</span>
+                        <span style="opacity: 0.7; margin-left: 10px;">💰 ${UIRenderer.formatCurrency(coach.salary || 0)}/yr</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CALENDAR
+    // ═══════════════════════════════════════════════════════════════
+
+    static calendarGameRow({ game, userTeamId }) {
+        const isUserGame = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
+        const bg = isUserGame ? 'background: rgba(102,126,234,0.15);' : '';
+        const result = game.played ? `${game.homeScore}-${game.awayScore}` : 'Upcoming';
+        return `
+            <div style="padding: 6px 10px; ${bg} border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 0.9em;">
+                <span>${game.awayTeamName || 'Away'} @ ${game.homeTeamName || 'Home'}</span>
+                <span style="opacity: 0.8;">${result}</span>
+            </div>
+        `;
+    }
 }

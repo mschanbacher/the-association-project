@@ -1171,6 +1171,7 @@
         import { CalendarEngine } from './src/engines/CalendarEngine.js';
         import { EventBus, GameEvents, eventBus } from './src/engines/EventBus.js';
         import { StorageEngine } from './src/engines/StorageEngine.js';
+        import { UIRenderer } from './src/engines/UIRenderer.js';
 
         window.PlayerAttributes = PlayerAttributes;
         window.CoachEngine = CoachEngine;
@@ -1186,6 +1187,7 @@
         window.GameEvents = GameEvents;
         window.eventBus = eventBus;
         window.StorageEngine = StorageEngine;
+        window.UIRenderer = UIRenderer;
 
         console.log('🏀 Modules loaded: PlayerAttributes, CoachEngine, GameState, FinanceEngine, GameEngine, SimulationController, CalendarEngine, EventBus, StorageEngine');
 
@@ -13023,151 +13025,14 @@ let gmMode = null;
         
         function openFranchiseHistory() {
             const history = gameState._fullSeasonHistory || gameState.fullSeasonHistory || [];
-            const content = document.getElementById('franchiseHistoryContent');
-            
-            if (history.length === 0) {
-                content.innerHTML = `
-                    <div style="text-align: center; padding: 40px; opacity: 0.7;">
-                        <div style="font-size: 3em; margin-bottom: 15px;">📋</div>
-                        <p style="font-size: 1.1em;">No completed seasons yet.</p>
-                        <p>Complete your first season to start building your franchise history!</p>
-                    </div>
-                `;
-                document.getElementById('franchiseHistoryModal').classList.remove('hidden');
-                return;
-            }
-            
-            // Summary banner
-            const totalWins = history.reduce((sum, s) => sum + (s.userTeam ? s.userTeam.wins : 0), 0);
-            const totalLosses = history.reduce((sum, s) => sum + (s.userTeam ? s.userTeam.losses : 0), 0);
-            const championships = history.filter(s => {
-                if (!s.champions || !s.userTeam) return false;
-                const tier = s.userTeam.tier;
-                const champ = tier === 1 ? s.champions.tier1 : tier === 2 ? s.champions.tier2 : s.champions.tier3;
-                return champ && champ.id === s.userTeam.id;
-            }).length;
-            const bestSeason = history.reduce((best, s) => {
-                if (!s.userTeam) return best;
-                const pct = s.userTeam.wins / Math.max(1, s.userTeam.wins + s.userTeam.losses);
-                return pct > best.pct ? { season: s, pct } : best;
-            }, { season: null, pct: 0 });
-            
-            let html = `
-                <div style="background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15)); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(102,126,234,0.2);">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; text-align: center;">
-                        <div>
-                            <div style="font-size: 2em; font-weight: bold; color: #667eea;">${history.length}</div>
-                            <div style="opacity: 0.7; font-size: 0.85em;">Seasons</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 2em; font-weight: bold; color: #4ecdc4;">${totalWins}-${totalLosses}</div>
-                            <div style="opacity: 0.7; font-size: 0.85em;">All-Time Record</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 2em; font-weight: bold; color: #ffd700;">${championships}</div>
-                            <div style="opacity: 0.7; font-size: 0.85em;">Championships</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 2em; font-weight: bold; color: #f9d56e;">${totalWins > 0 ? ((totalWins / (totalWins + totalLosses)) * 100).toFixed(1) : '0.0'}%</div>
-                            <div style="opacity: 0.7; font-size: 0.85em;">Win Pct</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            // Season-by-season cards (newest first)
-            const sorted = [...history].sort((a, b) => b.season - a.season);
-            
-            for (const season of sorted) {
-                const ut = season.userTeam;
-                if (!ut) continue;
-                
-                const tierLabel = ut.tier === 1 ? 'Tier 1 — NAPL' : ut.tier === 2 ? 'Tier 2 — NARBL' : 'Tier 3 — MBL';
-                const winPct = ut.wins / Math.max(1, ut.wins + ut.losses);
-                
-                // Did user win championship?
-                const userChamp = season.champions && (() => {
-                    const champ = ut.tier === 1 ? season.champions.tier1 : ut.tier === 2 ? season.champions.tier2 : season.champions.tier3;
-                    return champ && champ.id === ut.id;
-                })();
-                
-                // Was user promoted or relegated?
-                let promoRelStatus = '';
-                if (season.promotions) {
-                    const promoted = [...(season.promotions.toT1 || []), ...(season.promotions.toT2 || [])];
-                    if (promoted.some(t => t.id === ut.id)) promoRelStatus = '⬆️ Promoted';
-                }
-                if (season.relegations) {
-                    const relegated = [...(season.relegations.fromT1 || []), ...(season.relegations.fromT2 || [])];
-                    if (relegated.some(t => t.id === ut.id)) promoRelStatus = '⬇️ Relegated';
-                }
-                
-                // Awards for user's tier
-                const tierAwards = season.awards ? (ut.tier === 1 ? season.awards.tier1 : ut.tier === 2 ? season.awards.tier2 : season.awards.tier3) : null;
-                
-                // Check if any user team player won an award
-                let userAwards = [];
-                if (tierAwards) {
-                    ['mvp', 'dpoy', 'roy', 'sixthMan', 'mostImproved'].forEach(award => {
-                        if (tierAwards[award] && tierAwards[award].teamId === ut.id) {
-                            const labels = { mvp: 'MVP', dpoy: 'DPOY', roy: 'ROY', sixthMan: '6MOY', mostImproved: 'MIP' };
-                            userAwards.push(`${labels[award]}: ${tierAwards[award].name}`);
-                        }
-                    });
-                }
-                
-                // Champions for all tiers
-                const champLine = season.champions ? [
-                    season.champions.tier1 ? `T1: ${season.champions.tier1.name}` : null,
-                    season.champions.tier2 ? `T2: ${season.champions.tier2.name}` : null,
-                    season.champions.tier3 ? `T3: ${season.champions.tier3.name}` : null
-                ].filter(Boolean).join(' · ') : '';
-                
-                html += `
-                    <div style="background: rgba(255,255,255,0.04); border-radius: 10px; padding: 18px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.08); ${userChamp ? 'border-color: rgba(255,215,0,0.4); background: rgba(255,215,0,0.05);' : ''}">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <div>
-                                <span style="font-size: 1.3em; font-weight: bold;">${season.seasonLabel}</span>
-                                <span style="opacity: 0.6; margin-left: 10px; font-size: 0.9em;">${tierLabel}</span>
-                                ${userChamp ? '<span style="color: #ffd700; margin-left: 10px;">🏆 CHAMPION</span>' : ''}
-                                ${promoRelStatus ? `<span style="margin-left: 10px; font-size: 0.9em;">${promoRelStatus}</span>` : ''}
-                            </div>
-                            <div style="font-size: 1.2em; font-weight: bold; ${winPct >= 0.6 ? 'color: #4ecdc4;' : winPct <= 0.4 ? 'color: #ff6b6b;' : ''}">${ut.wins}-${ut.losses}</div>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 0.88em; opacity: 0.85;">
-                            <div>📊 Finished ${ut.rank}${getRankSuffix(ut.rank)} of ${ut.tier === 1 ? 30 : ut.tier === 2 ? 86 : 144}</div>
-                            <div>👨‍💼 Coach: ${ut.coachName}</div>
-                            ${ut.topPlayer ? `<div>⭐ Best: ${ut.topPlayer.name} (${ut.topPlayer.rating} OVR, ${ut.topPlayer.position})</div>` : ''}
-                        </div>
-                        
-                        ${userAwards.length > 0 ? `
-                            <div style="margin-top: 8px; font-size: 0.88em;">
-                                🏅 ${userAwards.join(' · ')}
-                            </div>
-                        ` : ''}
-                        
-                        ${tierAwards && tierAwards.mvp ? `
-                            <div style="margin-top: 8px; font-size: 0.85em; opacity: 0.7;">
-                                League MVP: ${tierAwards.mvp.name} (${tierAwards.mvp.team}) — ${tierAwards.mvp.ppg.toFixed(1)} PPG, ${tierAwards.mvp.rpg.toFixed(1)} RPG, ${tierAwards.mvp.apg.toFixed(1)} APG
-                            </div>
-                        ` : ''}
-                        
-                        ${champLine ? `
-                            <div style="margin-top: 6px; font-size: 0.82em; opacity: 0.6;">
-                                🏆 ${champLine}
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-            }
-            
-            content.innerHTML = html;
+            document.getElementById('franchiseHistoryContent').innerHTML = UIRenderer.franchiseHistory({
+                history,
+                getRankSuffix
+            });
             document.getElementById('franchiseHistoryModal').classList.remove('hidden');
         }
         
         window.openFranchiseHistory = openFranchiseHistory;
-        
         function resetGame() {
             if (confirm('Are you sure you want to reset? All progress will be lost.')) {
                 StorageEngine.clearAll().then(() => {
@@ -15283,12 +15148,12 @@ let gmMode = null;
         
         // Show modal forcing user to fix roster issues
         function showRosterComplianceModal(isOverCap, isUnderMinimum, isOverMaximum, totalSalary, salaryCap, rosterSize) {
+            const userTeam = getUserTeam();
             let message = '<div style="padding: 20px;">';
             message += '<h2 style="text-align: center; color: #ea4335; margin-bottom: 20px;">⚠️ Roster Compliance Required</h2>';
             message += '<p style="font-size: 1.1em; margin-bottom: 20px;">You must fix the following issues before continuing to next season:</p>';
             
             if (isOverCap) {
-                const userTeam = getUserTeam();
                 const limitLabel = userTeam && userTeam.tier !== 1 ? 'Spending Limit' : 'Salary Cap';
                 const overAmount = totalSalary - salaryCap;
                 message += `
@@ -15297,7 +15162,6 @@ let gmMode = null;
                         <p><strong>Current Salary:</strong> ${formatCurrency(totalSalary)}</p>
                         <p><strong>${limitLabel}:</strong> ${formatCurrency(salaryCap)}</p>
                         <p><strong>Amount Over:</strong> <span style="color: #ea4335; font-weight: bold;">${formatCurrency(overAmount)}</span></p>
-                        <p style="margin-top: 10px; opacity: 0.9;">You must drop players to get under the ${limitLabel.toLowerCase()}.</p>
                     </div>
                 `;
             }
@@ -15306,11 +15170,8 @@ let gmMode = null;
                 const excess = rosterSize - 15;
                 message += `
                     <div style="background: rgba(234,67,53,0.2); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 2px solid #ea4335;">
-                        <h3 style="color: #ea4335; margin-bottom: 10px;">👥 Over Maximum Roster Size</h3>
-                        <p><strong>Current Roster:</strong> ${rosterSize} players</p>
-                        <p><strong>Maximum Allowed:</strong> 15 players</p>
-                        <p><strong>Need to Cut:</strong> <span style="color: #ea4335; font-weight: bold;">${excess} player${excess > 1 ? 's' : ''}</span></p>
-                        <p style="margin-top: 10px; opacity: 0.9;">You must drop players to get to 15 or fewer.</p>
+                        <h3 style="color: #ea4335; margin-bottom: 10px;">👥 Over Maximum (${rosterSize}/15)</h3>
+                        <p>Need to cut <span style="color: #ea4335; font-weight: bold;">${excess} player${excess > 1 ? 's' : ''}</span></p>
                     </div>
                 `;
             }
@@ -15319,11 +15180,8 @@ let gmMode = null;
                 const needed = 12 - rosterSize;
                 message += `
                     <div style="background: rgba(251,188,4,0.2); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 2px solid #fbbc04;">
-                        <h3 style="color: #fbbc04; margin-bottom: 10px;">👥 Below Minimum Roster</h3>
-                        <p><strong>Current Roster:</strong> ${rosterSize} players</p>
-                        <p><strong>Minimum Required:</strong> 12 players</p>
-                        <p><strong>Need to Sign:</strong> <span style="color: #fbbc04; font-weight: bold;">${needed} player${needed > 1 ? 's' : ''}</span></p>
-                        <p style="margin-top: 10px; opacity: 0.9;">You must sign free agents to reach minimum roster size.</p>
+                        <h3 style="color: #fbbc04; margin-bottom: 10px;">👥 Below Minimum (${rosterSize}/12)</h3>
+                        <p>Need to sign <span style="color: #fbbc04; font-weight: bold;">${needed} player${needed > 1 ? 's' : ''}</span></p>
                     </div>
                 `;
             }

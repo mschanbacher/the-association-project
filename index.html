@@ -985,6 +985,7 @@
             <button onclick="openCalendarView()" id="calendarBtn" style="background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);">📅 Calendar</button>
             <button onclick="openFinanceDashboard()" id="financeBtn" style="background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);">💰 Finances</button>
             <button onclick="openScoutingModal()" id="scoutingBtn" style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">🔍 Scouting</button>
+            <button onclick="openFranchiseHistory()" id="historyBtn" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);">📜 History</button>
             <button onclick="resetGame()" class="danger">🔄 Reset Game</button>
         </div>
 
@@ -1073,6 +1074,19 @@
         </div>
     </div>
 
+    <!-- Franchise History Modal -->
+    <div id="franchiseHistoryModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;">
+            <h2 style="text-align: center; margin-bottom: 20px;">📜 Franchise History</h2>
+            <div id="franchiseHistoryContent">
+                <!-- Populated by JavaScript -->
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button onclick="document.getElementById('franchiseHistoryModal').classList.add('hidden')" class="success" style="font-size: 1.1em; padding: 12px 35px;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Roster Compliance Modal -->
     <div id="complianceModal" class="modal hidden">
         <div class="modal-content" style="max-width: 800px;">
@@ -1156,6 +1170,7 @@
         import { SimulationController } from './src/engines/SimulationController.js';
         import { CalendarEngine } from './src/engines/CalendarEngine.js';
         import { EventBus, GameEvents, eventBus } from './src/engines/EventBus.js';
+        import { StorageEngine } from './src/engines/StorageEngine.js';
 
         window.PlayerAttributes = PlayerAttributes;
         window.CoachEngine = CoachEngine;
@@ -1170,11 +1185,14 @@
         window.EventBus = EventBus;
         window.GameEvents = GameEvents;
         window.eventBus = eventBus;
+        window.StorageEngine = StorageEngine;
 
-        console.log('🏀 Modules loaded: PlayerAttributes, CoachEngine, GameState, FinanceEngine, GameEngine, SimulationController, CalendarEngine');
+        console.log('🏀 Modules loaded: PlayerAttributes, CoachEngine, GameState, FinanceEngine, GameEngine, SimulationController, CalendarEngine, EventBus, StorageEngine');
 
-        // Now boot the game — module scripts are deferred, so DOM is ready
-        if (typeof window._initGame === 'function') window._initGame();
+        // Initialize StorageEngine (async), then boot the game
+        StorageEngine.init().then(() => {
+            if (typeof window._initGame === 'function') window._initGame();
+        });
     </script>
 
     <!-- Main game code — wrapped in _initGame, called by module script after imports -->
@@ -3884,21 +3902,9 @@ class GMMode {
      * Save game state
      */
     saveGameState() {
-        try {
-            // Clean up old save key if it exists
-            if (localStorage.getItem('gbslMultiTierGameState')) {
-                localStorage.removeItem('gbslMultiTierGameState');
-            }
-            const saveData = this.gameState.serialize();
-            localStorage.setItem('gbslSaveData', saveData);
-        } catch (error) {
-            console.error('Save failed:', error.message);
-            // If still too big, log size info for debugging
-            try {
-                const testData = this.gameState.serialize();
-                console.error('Save data size:', (testData.length / 1024).toFixed(0), 'KB');
-            } catch(e) {}
-        }
+        StorageEngine.save(this.gameState).catch(err => {
+            console.error('Save failed:', err.message);
+        });
     }
     
     /**
@@ -3985,6 +3991,7 @@ let gmMode = null;
             newState._pendingTradeProposal = oldGameState.pendingTradeProposal || null;
             newState._seasonHistory = oldGameState.seasonHistory || [];
             newState._championshipHistory = oldGameState.championshipHistory || [];
+            newState._fullSeasonHistory = oldGameState.fullSeasonHistory || [];
             
             return newState;
         }
@@ -8546,6 +8553,36 @@ let gmMode = null;
             const tier2Awards = StatEngine.calculateAwards(gameState.tier2Teams, tier2GamesMin, 2);
             const tier3Awards = StatEngine.calculateAwards(gameState.tier3Teams, tier3GamesMin, 3);
             
+            // Store for season history snapshot (captured when SEASON_ENDED fires)
+            gameState._seasonEndData = {
+                season: gameState.currentSeason,
+                seasonLabel: `${gameState.currentSeason}-${String((gameState.currentSeason + 1) % 100).padStart(2, '0')}`,
+                userTeamId: gameState.userTeamId,
+                userTier: gameState.currentTier,
+                standings: {
+                    tier1: tier1Sorted.map((t, i) => ({
+                        rank: i + 1, id: t.id, name: t.name, city: t.city,
+                        wins: t.wins, losses: t.losses, pointDiff: t.pointDiff,
+                        rating: Math.round(t.rating)
+                    })),
+                    tier2: tier2Sorted.map((t, i) => ({
+                        rank: i + 1, id: t.id, name: t.name, city: t.city,
+                        wins: t.wins, losses: t.losses, pointDiff: t.pointDiff,
+                        rating: Math.round(t.rating)
+                    })),
+                    tier3: tier3Sorted.map((t, i) => ({
+                        rank: i + 1, id: t.id, name: t.name, city: t.city,
+                        wins: t.wins, losses: t.losses, pointDiff: t.pointDiff,
+                        rating: Math.round(t.rating)
+                    }))
+                },
+                awards: {
+                    tier1: StorageEngine._compactAwards(tier1Awards),
+                    tier2: StorageEngine._compactAwards(tier2Awards),
+                    tier3: StorageEngine._compactAwards(tier3Awards)
+                }
+            };
+            
             // Generate awards HTML for each tier
             const tier1AwardsHTML = StatEngine.generateAwardsHTML(tier1Awards, 'Tier 1 — Premier League');
             const tier2AwardsHTML = StatEngine.generateAwardsHTML(tier2Awards, 'Tier 2 — Regional League');
@@ -9774,6 +9811,66 @@ let gmMode = null;
         
         function continueAfterPostseason() {
             document.getElementById('championshipPlayoffModal').classList.add('hidden');
+            
+            // ═══ CAPTURE SEASON HISTORY SNAPSHOT ═══
+            // This is the moment we have ALL season data: standings, awards, champions, promo/rel
+            const postseason = gameState.postseasonResults;
+            if (gameState._seasonEndData && postseason) {
+                const snapshot = gameState._seasonEndData;
+                
+                // Add championship results
+                snapshot.champions = {
+                    tier1: postseason.t1 && postseason.t1.champion ? { id: postseason.t1.champion.id, name: postseason.t1.champion.name, city: postseason.t1.champion.city } : null,
+                    tier2: postseason.t2 && postseason.t2.champion ? { id: postseason.t2.champion.id, name: postseason.t2.champion.name, city: postseason.t2.champion.city } : null,
+                    tier3: postseason.t3 && postseason.t3.champion ? { id: postseason.t3.champion.id, name: postseason.t3.champion.name, city: postseason.t3.champion.city } : null
+                };
+                
+                // Add promotion/relegation
+                snapshot.promotions = {
+                    toT1: (postseason.promoted && postseason.promoted.toT1 || []).map(t => ({ id: t.id, name: t.name })),
+                    toT2: (postseason.promoted && postseason.promoted.toT2 || []).map(t => ({ id: t.id, name: t.name }))
+                };
+                snapshot.relegations = {
+                    fromT1: (postseason.relegated && postseason.relegated.fromT1 || []).map(t => ({ id: t.id, name: t.name })),
+                    fromT2: (postseason.relegated && postseason.relegated.fromT2 || []).map(t => ({ id: t.id, name: t.name }))
+                };
+                
+                // Add user team summary
+                const userTeamSnap = getUserTeam();
+                if (userTeamSnap) {
+                    const userTier = gameState.currentTier;
+                    const tierStandings = userTier === 1 ? snapshot.standings.tier1 : userTier === 2 ? snapshot.standings.tier2 : snapshot.standings.tier3;
+                    const userStanding = tierStandings.find(t => t.id === userTeamSnap.id);
+                    snapshot.userTeam = {
+                        id: userTeamSnap.id,
+                        name: userTeamSnap.name,
+                        city: userTeamSnap.city,
+                        tier: userTier,
+                        wins: userTeamSnap.wins,
+                        losses: userTeamSnap.losses,
+                        rank: userStanding ? userStanding.rank : null,
+                        coachName: userTeamSnap.coach ? userTeamSnap.coach.name : 'None',
+                        rosterSize: userTeamSnap.roster ? userTeamSnap.roster.length : 0,
+                        topPlayer: userTeamSnap.roster && userTeamSnap.roster.length > 0 
+                            ? (() => { const best = [...userTeamSnap.roster].sort((a,b) => b.rating - a.rating)[0]; return { name: best.name, rating: best.rating, position: best.position }; })()
+                            : null
+                    };
+                }
+                
+                // Store in gameState history (persists in save data)
+                if (!gameState._fullSeasonHistory) gameState._fullSeasonHistory = [];
+                // Avoid duplicates
+                if (!gameState._fullSeasonHistory.some(h => h.season === snapshot.season)) {
+                    gameState._fullSeasonHistory.push(snapshot);
+                    console.log(`📜 Season ${snapshot.seasonLabel} snapshot captured (${JSON.stringify(snapshot).length} bytes)`);
+                }
+                
+                // Also store in StorageEngine history (IndexedDB on http)
+                StorageEngine.saveSeasonSnapshot(snapshot.season, snapshot);
+                
+                // Clean up temp data
+                delete gameState._seasonEndData;
+            }
             
             // Execute promotion/relegation based on PlayoffEngine results
             // Track tier before promotion/relegation
@@ -12920,36 +13017,199 @@ let gmMode = null;
             content.innerHTML = html;
         }
 
+        // ═══════════════════════════════════════════════════════════════════
+        // FRANCHISE HISTORY
+        // ═══════════════════════════════════════════════════════════════════
+        
+        function openFranchiseHistory() {
+            const history = gameState._fullSeasonHistory || gameState.fullSeasonHistory || [];
+            const content = document.getElementById('franchiseHistoryContent');
+            
+            if (history.length === 0) {
+                content.innerHTML = `
+                    <div style="text-align: center; padding: 40px; opacity: 0.7;">
+                        <div style="font-size: 3em; margin-bottom: 15px;">📋</div>
+                        <p style="font-size: 1.1em;">No completed seasons yet.</p>
+                        <p>Complete your first season to start building your franchise history!</p>
+                    </div>
+                `;
+                document.getElementById('franchiseHistoryModal').classList.remove('hidden');
+                return;
+            }
+            
+            // Summary banner
+            const totalWins = history.reduce((sum, s) => sum + (s.userTeam ? s.userTeam.wins : 0), 0);
+            const totalLosses = history.reduce((sum, s) => sum + (s.userTeam ? s.userTeam.losses : 0), 0);
+            const championships = history.filter(s => {
+                if (!s.champions || !s.userTeam) return false;
+                const tier = s.userTeam.tier;
+                const champ = tier === 1 ? s.champions.tier1 : tier === 2 ? s.champions.tier2 : s.champions.tier3;
+                return champ && champ.id === s.userTeam.id;
+            }).length;
+            const bestSeason = history.reduce((best, s) => {
+                if (!s.userTeam) return best;
+                const pct = s.userTeam.wins / Math.max(1, s.userTeam.wins + s.userTeam.losses);
+                return pct > best.pct ? { season: s, pct } : best;
+            }, { season: null, pct: 0 });
+            
+            let html = `
+                <div style="background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15)); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(102,126,234,0.2);">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; text-align: center;">
+                        <div>
+                            <div style="font-size: 2em; font-weight: bold; color: #667eea;">${history.length}</div>
+                            <div style="opacity: 0.7; font-size: 0.85em;">Seasons</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 2em; font-weight: bold; color: #4ecdc4;">${totalWins}-${totalLosses}</div>
+                            <div style="opacity: 0.7; font-size: 0.85em;">All-Time Record</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 2em; font-weight: bold; color: #ffd700;">${championships}</div>
+                            <div style="opacity: 0.7; font-size: 0.85em;">Championships</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 2em; font-weight: bold; color: #f9d56e;">${totalWins > 0 ? ((totalWins / (totalWins + totalLosses)) * 100).toFixed(1) : '0.0'}%</div>
+                            <div style="opacity: 0.7; font-size: 0.85em;">Win Pct</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Season-by-season cards (newest first)
+            const sorted = [...history].sort((a, b) => b.season - a.season);
+            
+            for (const season of sorted) {
+                const ut = season.userTeam;
+                if (!ut) continue;
+                
+                const tierLabel = ut.tier === 1 ? 'Tier 1 — NAPL' : ut.tier === 2 ? 'Tier 2 — NARBL' : 'Tier 3 — MBL';
+                const winPct = ut.wins / Math.max(1, ut.wins + ut.losses);
+                
+                // Did user win championship?
+                const userChamp = season.champions && (() => {
+                    const champ = ut.tier === 1 ? season.champions.tier1 : ut.tier === 2 ? season.champions.tier2 : season.champions.tier3;
+                    return champ && champ.id === ut.id;
+                })();
+                
+                // Was user promoted or relegated?
+                let promoRelStatus = '';
+                if (season.promotions) {
+                    const promoted = [...(season.promotions.toT1 || []), ...(season.promotions.toT2 || [])];
+                    if (promoted.some(t => t.id === ut.id)) promoRelStatus = '⬆️ Promoted';
+                }
+                if (season.relegations) {
+                    const relegated = [...(season.relegations.fromT1 || []), ...(season.relegations.fromT2 || [])];
+                    if (relegated.some(t => t.id === ut.id)) promoRelStatus = '⬇️ Relegated';
+                }
+                
+                // Awards for user's tier
+                const tierAwards = season.awards ? (ut.tier === 1 ? season.awards.tier1 : ut.tier === 2 ? season.awards.tier2 : season.awards.tier3) : null;
+                
+                // Check if any user team player won an award
+                let userAwards = [];
+                if (tierAwards) {
+                    ['mvp', 'dpoy', 'roy', 'sixthMan', 'mostImproved'].forEach(award => {
+                        if (tierAwards[award] && tierAwards[award].teamId === ut.id) {
+                            const labels = { mvp: 'MVP', dpoy: 'DPOY', roy: 'ROY', sixthMan: '6MOY', mostImproved: 'MIP' };
+                            userAwards.push(`${labels[award]}: ${tierAwards[award].name}`);
+                        }
+                    });
+                }
+                
+                // Champions for all tiers
+                const champLine = season.champions ? [
+                    season.champions.tier1 ? `T1: ${season.champions.tier1.name}` : null,
+                    season.champions.tier2 ? `T2: ${season.champions.tier2.name}` : null,
+                    season.champions.tier3 ? `T3: ${season.champions.tier3.name}` : null
+                ].filter(Boolean).join(' · ') : '';
+                
+                html += `
+                    <div style="background: rgba(255,255,255,0.04); border-radius: 10px; padding: 18px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.08); ${userChamp ? 'border-color: rgba(255,215,0,0.4); background: rgba(255,215,0,0.05);' : ''}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div>
+                                <span style="font-size: 1.3em; font-weight: bold;">${season.seasonLabel}</span>
+                                <span style="opacity: 0.6; margin-left: 10px; font-size: 0.9em;">${tierLabel}</span>
+                                ${userChamp ? '<span style="color: #ffd700; margin-left: 10px;">🏆 CHAMPION</span>' : ''}
+                                ${promoRelStatus ? `<span style="margin-left: 10px; font-size: 0.9em;">${promoRelStatus}</span>` : ''}
+                            </div>
+                            <div style="font-size: 1.2em; font-weight: bold; ${winPct >= 0.6 ? 'color: #4ecdc4;' : winPct <= 0.4 ? 'color: #ff6b6b;' : ''}">${ut.wins}-${ut.losses}</div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 0.88em; opacity: 0.85;">
+                            <div>📊 Finished ${ut.rank}${getRankSuffix(ut.rank)} of ${ut.tier === 1 ? 30 : ut.tier === 2 ? 86 : 144}</div>
+                            <div>👨‍💼 Coach: ${ut.coachName}</div>
+                            ${ut.topPlayer ? `<div>⭐ Best: ${ut.topPlayer.name} (${ut.topPlayer.rating} OVR, ${ut.topPlayer.position})</div>` : ''}
+                        </div>
+                        
+                        ${userAwards.length > 0 ? `
+                            <div style="margin-top: 8px; font-size: 0.88em;">
+                                🏅 ${userAwards.join(' · ')}
+                            </div>
+                        ` : ''}
+                        
+                        ${tierAwards && tierAwards.mvp ? `
+                            <div style="margin-top: 8px; font-size: 0.85em; opacity: 0.7;">
+                                League MVP: ${tierAwards.mvp.name} (${tierAwards.mvp.team}) — ${tierAwards.mvp.ppg.toFixed(1)} PPG, ${tierAwards.mvp.rpg.toFixed(1)} RPG, ${tierAwards.mvp.apg.toFixed(1)} APG
+                            </div>
+                        ` : ''}
+                        
+                        ${champLine ? `
+                            <div style="margin-top: 6px; font-size: 0.82em; opacity: 0.6;">
+                                🏆 ${champLine}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            content.innerHTML = html;
+            document.getElementById('franchiseHistoryModal').classList.remove('hidden');
+        }
+        
+        window.openFranchiseHistory = openFranchiseHistory;
+        
         function resetGame() {
             if (confirm('Are you sure you want to reset? All progress will be lost.')) {
-                localStorage.removeItem('gbslMultiTierGameState');
-                localStorage.removeItem('gbslSaveData');
-                location.reload();
+                StorageEngine.clearAll().then(() => {
+                    location.reload();
+                }).catch(() => {
+                    // Fallback: clear localStorage manually and reload
+                    localStorage.removeItem('gbslMultiTierGameState');
+                    localStorage.removeItem('gbslSaveData');
+                    location.reload();
+                });
             }
         }
 
         // Save game state to localStorage
         function saveGameState() {
-            try {
-                // Use GameState.serialize() if available for compressed data
-                if (gameState && typeof gameState.serialize === 'function') {
-                    const data = gameState.serialize();
-                    const sizeKB = Math.round(data.length / 1024);
-                    localStorage.setItem('gbslSaveData', data);
-                    if (sizeKB > 3000) {
-                        console.warn(`⚠️ Save data is ${sizeKB}KB — approaching localStorage limit`);
-                    }
-                    eventBus.emit(GameEvents.GAME_SAVED, { sizeKB });
+            // Use StorageEngine (IndexedDB with localStorage fallback)
+            StorageEngine.save(gameState).then(result => {
+                if (result.success) {
+                    console.log(`💾 Saved (${result.sizeKB}KB via ${result.storage})`);
+                    eventBus.emit(GameEvents.GAME_SAVED, { sizeKB: result.sizeKB, storage: result.storage });
                 } else {
-                    localStorage.setItem('gbslMultiTierGameState', JSON.stringify(gameState));
-                    eventBus.emit(GameEvents.GAME_SAVED, {});
+                    console.error('❌ Save returned failure');
+                    // Emergency fallback: write directly to localStorage
+                    try {
+                        const data = gameState.serialize ? gameState.serialize() : JSON.stringify(gameState);
+                        localStorage.setItem('gbslSaveData', data);
+                        console.log('🆘 Emergency save to localStorage:', Math.round(data.length/1024), 'KB');
+                    } catch(e) {
+                        console.error('Emergency save also failed:', e);
+                    }
                 }
-            } catch(e) {
-                console.error('Save failed:', e.message);
-                if (e.message.includes('quota')) {
-                    alert('⚠️ Save failed — storage is full. Try starting a new game or clearing browser data.');
+            }).catch(err => {
+                console.error('❌ Save error:', err);
+                // Emergency fallback
+                try {
+                    const data = gameState.serialize ? gameState.serialize() : JSON.stringify(gameState);
+                    localStorage.setItem('gbslSaveData', data);
+                    console.log('🆘 Emergency save to localStorage:', Math.round(data.length/1024), 'KB');
+                } catch(e) {
+                    console.error('Emergency save also failed:', e);
                 }
-            }
+            });
         }
 
         // Load game state from localStorage
@@ -18095,13 +18355,15 @@ let gmMode = null;
         window.renderWatchListTab = renderWatchListTab;
 
         // Initialize immediately — _initGame is called by module script after DOM is ready
-        (function() {
+        (async function() {
             try {
                 console.log('🏀 The Association v4.0 - Phase 3');
                 console.log('Initializing GameState class...');
                 
-                // Check for saved game FIRST
-                const savedData = localStorage.getItem('gbslSaveData');
+                // Load saved game via StorageEngine (IndexedDB → localStorage fallback)
+                console.log('📂 Attempting to load save via StorageEngine...');
+                const savedData = await StorageEngine.load();
+                console.log('📂 StorageEngine.load() returned:', savedData ? `${Math.round(savedData.length/1024)}KB of data` : 'null (no save found)');
                 
                 if (savedData) {
                     // Load saved game
@@ -18124,21 +18386,21 @@ let gmMode = null;
                     // Fresh initialization for team selection
                     gameState = createGameStateProxy(new GameState());
                 }
-                // ALWAYS initialize all tier teams first (needed for new games and old saves)
-                gameState.tier1Teams = initializeTier1Teams();
-                console.log('After T1 init: T1=' + gameState.tier1Teams.length);
                 
-                gameState.tier2Teams = initializeTier2Teams();
-                console.log('After T2 init: T2=' + gameState.tier2Teams.length);
+                // Determine if we have an existing game
+                const hasExistingGame = !!(savedData && gameState.userTeamId);
                 
-                gameState.tier3Teams = initializeTier3Teams();
-                console.log('After T3 init: T3=' + gameState.tier3Teams.length);
+                // Only initialize fresh teams for NEW games — loaded saves already have them
+                if (!hasExistingGame) {
+                    console.log('🆕 New game — generating fresh teams...');
+                    gameState.tier1Teams = initializeTier1Teams();
+                    gameState.tier2Teams = initializeTier2Teams();
+                    gameState.tier3Teams = initializeTier3Teams();
+                }
                 
-                console.log('Teams initialized: T1=' + gameState.tier1Teams.length + 
+                console.log('Teams: T1=' + gameState.tier1Teams.length + 
                            ', T2=' + gameState.tier2Teams.length + 
                            ', T3=' + gameState.tier3Teams.length);
-                
-                const hasExistingGame = loadGameState();
                 
                 // CRITICAL: Validate tier counts after loading
                 if (hasExistingGame) {

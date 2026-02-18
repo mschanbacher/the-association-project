@@ -44,6 +44,7 @@ class GameState {
         // === HISTORY ===
         this._seasonHistory = [];
         this._championshipHistory = [];
+        this._fullSeasonHistory = []; // Detailed season snapshots (standings, awards, champions)
         
         // === METADATA ===
         this._lastSaveTime = null;
@@ -118,6 +119,7 @@ class GameState {
     set pendingTradeProposal(value) { this._pendingTradeProposal = value; }
     get seasonHistory() { return this._seasonHistory; }
     get championshipHistory() { return this._championshipHistory; }
+    get fullSeasonHistory() { return this._fullSeasonHistory; }
     
     // ============================================
     // TEAM MANAGEMENT
@@ -598,6 +600,7 @@ class GameState {
             pendingTradeProposal: this._pendingTradeProposal,
             seasonHistory: this._seasonHistory,
             championshipHistory: this._championshipHistory,
+            fullSeasonHistory: this._fullSeasonHistory,
             lastSaveTime: new Date().toISOString(),
             gameVersion: this._gameVersion
         });
@@ -722,6 +725,7 @@ class GameState {
         state._pendingTradeProposal = data.pendingTradeProposal || null;
         state._seasonHistory = data.seasonHistory || [];
         state._championshipHistory = data.championshipHistory || [];
+        state._fullSeasonHistory = data.fullSeasonHistory || [];
         state._lastSaveTime = data.lastSaveTime;
         state._gameVersion = data.gameVersion || '3.0';
         

@@ -1155,6 +1155,7 @@
         import { GameEngine } from './src/engines/GameEngine.js';
         import { SimulationController } from './src/engines/SimulationController.js';
         import { CalendarEngine } from './src/engines/CalendarEngine.js';
+        import { EventBus, GameEvents, eventBus } from './src/engines/EventBus.js';
 
         window.PlayerAttributes = PlayerAttributes;
         window.CoachEngine = CoachEngine;
@@ -1166,6 +1167,9 @@
         window.GameEngine = GameEngine;
         window.SimulationController = SimulationController;
         window.CalendarEngine = CalendarEngine;
+        window.EventBus = EventBus;
+        window.GameEvents = GameEvents;
+        window.eventBus = eventBus;
 
         console.log('🏀 Modules loaded: PlayerAttributes, CoachEngine, GameState, FinanceEngine, GameEngine, SimulationController, CalendarEngine');
 
@@ -9672,6 +9676,8 @@ let gmMode = null;
         window.dismissTransitionBriefing = dismissTransitionBriefing;
 
         function proceedToDraftOrDevelopment() {
+            eventBus.emit(GameEvents.OFFSEASON_STARTED, { season: gameState.season });
+            
             // Step 3: Run draft (only if user is now in Tier 1)
             if (gameState.currentTier === 1) {
                 console.log('🎓 Step 3: User is in Tier 1, running draft...');
@@ -9689,6 +9695,12 @@ let gmMode = null;
         // Advance to next season
         function advanceToNextSeason(action) {
             console.log('🎬 advanceToNextSeason called with action:', action);
+            
+            eventBus.emit(GameEvents.SEASON_ENDED, {
+                season: gameState.season,
+                userTeamId: gameState.userTeamId,
+                userPlayoffResult: action
+            });
             
             document.getElementById('seasonEndModal').classList.add('hidden');
             document.getElementById('playoffModal').classList.add('hidden');
@@ -9739,9 +9751,20 @@ let gmMode = null;
             
             if (tierChanged && userTeam) {
                 const action = tierAfter > tierBefore ? 'relegated' : 'promoted';
+                eventBus.emit(tierAfter < tierBefore ? GameEvents.TEAM_PROMOTED : GameEvents.TEAM_RELEGATED, {
+                    teamId: userTeam.id,
+                    teamName: userTeam.name,
+                    fromTier: tierBefore,
+                    toTier: tierAfter
+                });
                 showFinancialTransitionBriefing(userTeam, action);
                 return; // Briefing modal will continue the flow when dismissed
             }
+            
+            eventBus.emit(GameEvents.PROMO_REL_COMPLETED, {
+                season: gameState.season,
+                tierChanged: false
+            });
             
             // No tier change — continue to draft/development flow
             console.log('Proceeding to draft/development...');
@@ -9944,6 +9967,7 @@ let gmMode = null;
         
         function startCollegeGraduateFA() {
             console.log('🎓 Step 3b: College Graduate Free Agency...');
+            eventBus.emit(GameEvents.COLLEGE_FA_STARTED, { season: gameState.season });
             
             // Generate this year's graduating class
             const graduates = generateCollegeGraduateClass();
@@ -10317,6 +10341,7 @@ let gmMode = null;
                 console.warn('⚠️ Player development already in progress, skipping duplicate call');
                 return;
             }
+            eventBus.emit(GameEvents.DEVELOPMENT_STARTED, { season: gameState.season });
             
             playerDevelopmentInProgress = true;
             console.log('🌟 Step 4: Applying player development...');
@@ -12874,8 +12899,10 @@ let gmMode = null;
                     if (sizeKB > 3000) {
                         console.warn(`⚠️ Save data is ${sizeKB}KB — approaching localStorage limit`);
                     }
+                    eventBus.emit(GameEvents.GAME_SAVED, { sizeKB });
                 } else {
                     localStorage.setItem('gbslMultiTierGameState', JSON.stringify(gameState));
+                    eventBus.emit(GameEvents.GAME_SAVED, {});
                 }
             } catch(e) {
                 console.error('Save failed:', e.message);
@@ -13810,6 +13837,10 @@ let gmMode = null;
         
         function startFreeAgencyPeriod() {
             console.log('🤝 Free Agency Period Starting...');
+            eventBus.emit(GameEvents.FREE_AGENCY_STARTED, {
+                season: gameState.season,
+                freeAgentCount: gameState.freeAgents ? gameState.freeAgents.length : 0
+            });
             console.log('  Free agents available:', gameState.freeAgents.length);
             
             // Clear any cached market values from previous sessions
@@ -16402,6 +16433,15 @@ let gmMode = null;
             // Clear pending proposal
             gameState.pendingTradeProposal = null;
             
+            eventBus.emit(GameEvents.TRADE_ACCEPTED, {
+                userTeamId: userTeam.id,
+                aiTeamId: aiTeam.id,
+                aiTeamName: proposal.aiTeamName,
+                userGave: proposal.userGives.map(p => p.name),
+                userReceived: proposal.aiGives.map(p => p.name),
+                source: 'ai_proposal'
+            });
+            
             // Close modal and update UI
             document.getElementById('aiTradeProposalModal').classList.add('hidden');
             updateUI();
@@ -17797,6 +17837,7 @@ let gmMode = null;
         // Step 5: Continue to Season Setup
         function continueToSeasonSetup() {
             console.log('🏁 Step 5: Final season setup...');
+            eventBus.emit(GameEvents.OFFSEASON_COMPLETED, { season: gameState.season });
             
             // Reset development flag for next season
             playerDevelopmentInProgress = false;

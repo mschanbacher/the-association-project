@@ -2,9 +2,6 @@
 // The Association Project — Module Index
 // ═══════════════════════════════════════════════════════════════════
 //
-// This file documents the extracted modules. The actual imports
-// happen in the <script type="module"> block in index.html.
-//
 // Migration status:
 // ✅ PlayerAttributes  — Player generation, attributes, measurables
 // ✅ CoachEngine       — Coach traits, archetypes, game modifiers
@@ -13,12 +10,10 @@
 // ✅ GameEngine        — Pure basketball simulation functions
 // ✅ SimulationController — Game simulation orchestration
 // ✅ CalendarEngine    — Season schedule, dates, event tracking
+// ✅ EventBus          — Central event system + GameEvents catalog
 // 🔲 PlayoffEngine    — Stays inline (HTML templates)
 // 🔲 StatEngine       — Stays inline (HTML templates)
 // 🔲 GMMode           — Stays inline (HTML templates)
-// 🔲 ScoutingEngine   — Future extraction
-// 🔲 DraftEngine      — Future extraction
-// 🔲 UI Modals        — Future extraction
 //
 
 export { PlayerAttributes } from './engines/PlayerAttributes.js';
@@ -28,3 +23,4 @@ export { FinanceEngine, METRO_POPULATIONS, getMetroPopulation, populationToMarke
 export { GameEngine } from './engines/GameEngine.js';
 export { SimulationController } from './engines/SimulationController.js';
 export { CalendarEngine } from './engines/CalendarEngine.js';
+export { EventBus, GameEvents, eventBus } from './engines/EventBus.js';

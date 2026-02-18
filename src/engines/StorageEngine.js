@@ -425,14 +425,22 @@ export class StorageEngine {
             };
         };
 
+        // allLeague teams are objects {G1, G2, F1, F2, C}, not arrays
+        const compactAllLeague = (team) => {
+            if (!team) return [];
+            if (Array.isArray(team)) return team.map(compactTeamPlayer);
+            // Object format: {G1: {...}, G2: {...}, F1: {...}, F2: {...}, C: {...}}
+            return Object.values(team).filter(Boolean).map(compactTeamPlayer);
+        };
+
         return {
             mvp: compactPlayer(awards.mvp),
             dpoy: compactPlayer(awards.dpoy),
             roy: compactPlayer(awards.roy),
             sixthMan: compactPlayer(awards.sixthMan),
             mostImproved: compactPlayer(awards.mostImproved),
-            allLeagueFirst: (awards.allLeagueFirst || []).map(compactTeamPlayer),
-            allLeagueSecond: (awards.allLeagueSecond || []).map(compactTeamPlayer),
+            allLeagueFirst: compactAllLeague(awards.allLeagueFirst),
+            allLeagueSecond: compactAllLeague(awards.allLeagueSecond),
             statLeaders: awards.statLeaders ? {
                 points: awards.statLeaders.points ? { name: awards.statLeaders.points.player?.name, team: awards.statLeaders.points.team?.name, value: awards.statLeaders.points.avgs?.pointsPerGame } : null,
                 rebounds: awards.statLeaders.rebounds ? { name: awards.statLeaders.rebounds.player?.name, team: awards.statLeaders.rebounds.team?.name, value: awards.statLeaders.rebounds.avgs?.reboundsPerGame } : null,

@@ -3325,6 +3325,11 @@ class GMMode {
         const currentDate = this.gameState.currentDate;
         if (!currentDate) return;
         
+        eventBus.emit(GameEvents.SEASON_DAY_SIMULATED, {
+            date: currentDate,
+            season: this.gameState.season
+        });
+        
         // Check for All-Star Weekend trigger
         const seasonDates = this.gameState.seasonDates;
         const allStarStart = CalendarEngine.toDateString(seasonDates.allStarStart);
@@ -3499,6 +3504,20 @@ class GMMode {
                 // Simulate
                 this.sim.simulateFullGame(homeTeam, awayTeam);
                 game.played = true;
+                
+                // Emit game completed event
+                eventBus.emit(GameEvents.SEASON_GAME_COMPLETED, {
+                    date: dateStr,
+                    homeTeamId: homeTeam.id,
+                    awayTeamId: awayTeam.id,
+                    homeScore: homeTeam.lastGameScore || 0,
+                    awayScore: awayTeam.lastGameScore || 0,
+                    isUserGame: isUserGame,
+                    homeWins: homeTeam.wins,
+                    homeLosses: homeTeam.losses,
+                    awayWins: awayTeam.wins,
+                    awayLosses: awayTeam.losses
+                });
                 
                 // Process fatigue
                 processFatigueAfterGame(homeTeam, awayTeam, false);
@@ -5521,6 +5540,15 @@ let gmMode = null;
                 player.injury.gamesRemaining = player.injury.gamesRemainingIfPlaying;
             }
             
+            eventBus.emit(GameEvents.PLAYER_INJURED, {
+                playerId: player.id,
+                playerName: player.name,
+                injuryName: injury.name,
+                severity: injury.severity,
+                decision: decision,
+                gamesOut: injury.gamesRemaining
+            });
+            
             console.log(`🚑 ${player.name} injured: ${injury.name} (${injury.severity}) - Decision: ${decision}`);
         }
         
@@ -6663,6 +6691,17 @@ let gmMode = null;
             });
             
             console.log(`  Pick ${pick.pick}: ${userTeam.name} (USER) → ${selectedProspect.name} (${selectedProspect.rating} OVR, ${selectedProspect.position})`);
+            
+            eventBus.emit(GameEvents.DRAFT_PICK_MADE, {
+                pickNumber: pick.pick,
+                round: pick.round,
+                teamId: pick.teamId,
+                teamName: pick.teamName,
+                playerName: selectedProspect.name,
+                playerRating: selectedProspect.rating,
+                position: selectedProspect.position,
+                isUserPick: true
+            });
             
             // Close modal
             document.getElementById('userDraftPickModal').classList.add('hidden');
@@ -11384,6 +11423,7 @@ let gmMode = null;
         
         function runAllStarWeekend() {
             console.log('⭐ Running All-Star Weekend...');
+            eventBus.emit(GameEvents.SEASON_ALL_STAR, { season: gameState.season });
             
             const tierConfigs = [
                 { teams: gameState.tier1Teams, tier: 1, label: 'Tier 1 — NAPL', minPct: 0.4, color: '#ffd700' },
@@ -13552,6 +13592,16 @@ let gmMode = null;
             
             console.log(`Signed ${signedPlayer.name} for ${formatCurrency(signedPlayer.salary)}`);
             
+            eventBus.emit(GameEvents.PLAYER_CONTRACT_SIGNED, {
+                playerId: signedPlayer.id,
+                playerName: signedPlayer.name,
+                teamId: userTeam.id,
+                teamName: userTeam.name,
+                salary: signedPlayer.salary,
+                rating: signedPlayer.rating,
+                source: 'free_agency'
+            });
+            
             // Update display
             updateRosterDisplay();
             displayFreeAgents();
@@ -15279,6 +15329,15 @@ let gmMode = null;
             
             console.log(`✅ Hired coach: ${newCoach.name} (${newCoach.overall} OVR) for ${userTeam.name}`);
             
+            eventBus.emit(GameEvents.TEAM_COACH_HIRED, {
+                teamId: userTeam.id,
+                teamName: userTeam.name,
+                coachName: newCoach.name,
+                coachOverall: newCoach.overall,
+                archetype: newCoach.archetype,
+                isPoach: isPoach
+            });
+            
             saveGameState();
             updateUI();
             openCoachManagement(); // Refresh the modal
@@ -15294,6 +15353,15 @@ let gmMode = null;
             if (!confirm(`Fire ${coach.name}?\n\nSeverance cost: ${formatCurrency(severance)}\nRemaining contract: ${coach.contractYears} year(s)\n\nYour team will operate without a head coach until you hire a replacement, which will negatively affect performance.`)) return;
             
             console.log(`🚪 Fired coach: ${coach.name}`);
+            
+            eventBus.emit(GameEvents.TEAM_COACH_FIRED, {
+                teamId: userTeam.id,
+                teamName: userTeam.name,
+                coachName: coach.name,
+                coachOverall: coach.overall,
+                severance: severance
+            });
+            
             coach.teamId = null;
             userTeam.coach = null;
             
@@ -16121,6 +16189,15 @@ let gmMode = null;
             console.log(`  ${userTeam.name} roster: ${userTeam.roster.length} players`);
             console.log(`  ${aiTeam.name} roster: ${aiTeam.roster.length} players`);
             
+            eventBus.emit(GameEvents.TRADE_ACCEPTED, {
+                userTeamId: userTeam.id,
+                aiTeamId: aiTeam.id,
+                aiTeamName: aiTeam.name,
+                userGave: playersToAi.map(p => p.name),
+                userReceived: playersToUser.map(p => p.name),
+                source: 'user_proposed'
+            });
+            
             // Update displays
             updateUI();
         }
@@ -16173,6 +16250,10 @@ let gmMode = null;
             if (proposal) {
                 gameState.pendingTradeProposal = proposal;
                 gameState.lastAiTradeCheck = userGamesPlayed;
+                eventBus.emit(GameEvents.TRADE_AI_PROPOSAL, {
+                    aiTeamName: proposal.aiTeamName,
+                    aiTeamId: proposal.aiTeamId
+                });
                 showAiTradeProposal();
             } else {
                 gameState.lastAiTradeCheck = userGamesPlayed;
@@ -16469,6 +16550,10 @@ let gmMode = null;
             const proposal = gameState.pendingTradeProposal;
             if (proposal) {
                 console.log(`❌ User rejected trade from ${proposal.aiTeamName}`);
+                eventBus.emit(GameEvents.TRADE_REJECTED, {
+                    aiTeamName: proposal.aiTeamName,
+                    aiTeamId: proposal.aiTeamId
+                });
             }
             
             gameState.pendingTradeProposal = null;
@@ -17973,6 +18058,12 @@ let gmMode = null;
             console.log('Current game:', gameState.currentGame);
             console.log('Season:', gameState.currentSeason);
             console.log('User tier:', gameState.currentTier);
+            
+            eventBus.emit(GameEvents.SEASON_STARTED, {
+                season: gameState.currentSeason,
+                userTeamId: gameState.userTeamId,
+                userTier: gameState.currentTier
+            });
             
             updateUI();
         }

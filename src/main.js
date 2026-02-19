@@ -24,6 +24,7 @@ export { GameState } from './engines/GameState.js';
 export { FinanceEngine, METRO_POPULATIONS, getMetroPopulation, populationToMarketSize } from './engines/FinanceEngine.js';
 export { GameEngine } from './engines/GameEngine.js';
 export { SimulationController } from './engines/SimulationController.js';
+export { GamePipeline } from './engines/GamePipeline.js';
 export { CalendarEngine } from './engines/CalendarEngine.js';
 export { EventBus, GameEvents, eventBus } from './engines/EventBus.js';
 export { StorageEngine } from './engines/StorageEngine.js';

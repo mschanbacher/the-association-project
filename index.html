@@ -18342,6 +18342,220 @@ let gmMode = null;
 
     }; // end window._initGame
 
+    // ═══════════════════════════════════════════════════════════════
+    // SIM BENCHMARK — Compare StatEngine (fast) vs GamePipeline
+    // Run from console: SimBenchmark.run() or SimBenchmark.run({gamesPerEngine: 50})
+    // ═══════════════════════════════════════════════════════════════
+    window.SimBenchmark = {
+        /**
+         * Run benchmark comparing both engines across all tiers
+         * @param {Object} opts - { gamesPerEngine: 30, showModal: true }
+         */
+        run(opts = {}) {
+            const gamesPerEngine = opts.gamesPerEngine || 30;
+            const showModal = opts.showModal !== false;
+            
+            if (!window.gameState) {
+                console.error('SimBenchmark: No gameState. Start a game first.');
+                return;
+            }
+
+            const gs = window.gameState;
+            const tiers = [
+                { tier: 1, teams: gs.tier1Teams, label: 'Tier 1 (NBA)' },
+                { tier: 2, teams: gs.tier2Teams, label: 'Tier 2 (G-League)' },
+                { tier: 3, teams: gs.tier3Teams, label: 'Tier 3 (Semi-Pro)' }
+            ].filter(t => t.teams && t.teams.length >= 2);
+
+            const results = [];
+            const csvRows = ['Tier,Engine,Game,HomeTeam,AwayTeam,HomeScore,AwayScore,TotalPts,HomeFGM,HomeFGA,HomeFGPct,Home3PM,Home3PA,Home3Pct,HomeFTM,HomeFTA,HomeTO,AwayFGM,AwayFGA,AwayFGPct,Away3PM,Away3PA,Away3Pct,AwayFTM,AwayFTA,AwayTO'];
+
+            console.log(`SimBenchmark: Running ${gamesPerEngine} games × 2 engines × ${tiers.length} tiers = ${gamesPerEngine * 2 * tiers.length} total games...`);
+            const startTime = performance.now();
+
+            for (const { tier, teams, label } of tiers) {
+                const fastGames = [];
+                const pipeGames = [];
+
+                for (let g = 0; g < gamesPerEngine; g++) {
+                    // Pick two random teams
+                    const i1 = Math.floor(Math.random() * teams.length);
+                    let i2 = Math.floor(Math.random() * (teams.length - 1));
+                    if (i2 >= i1) i2++;
+                    const home = teams[i1];
+                    const away = teams[i2];
+
+                    // --- Fast sim (StatEngine) ---
+                    const fastResult = window.StatEngine.generateGame(home, away, {
+                        isPlayoffs: false, tier: tier,
+                        homeCourtBonus: tier === 1 ? 3 : tier === 2 ? 2.5 : 2,
+                        getFatiguePenalty: window.getFatiguePenalty || (() => 0)
+                    });
+                    const fHS = fastResult.homePlayerStats || [];
+                    const fAS = fastResult.awayPlayerStats || [];
+                    const fHome = SimBenchmark._sumTeam(fHS);
+                    const fAway = SimBenchmark._sumTeam(fAS);
+                    fastGames.push({ homeScore: fastResult.homeScore, awayScore: fastResult.awayScore, home: fHome, away: fAway, homeName: home.name, awayName: away.name });
+                    csvRows.push(`${tier},StatEngine,${g+1},${home.name},${away.name},${fastResult.homeScore},${fastResult.awayScore},${fastResult.homeScore+fastResult.awayScore},${fHome.fgm},${fHome.fga},${fHome.fgPct},${fHome.tpm},${fHome.tpa},${fHome.tpPct},${fHome.ftm},${fHome.fta},${fHome.to},${fAway.fgm},${fAway.fga},${fAway.fgPct},${fAway.tpm},${fAway.tpa},${fAway.tpPct},${fAway.ftm},${fAway.fta},${fAway.to}`);
+
+                    // --- Pipeline sim ---
+                    const pipeResult = GamePipeline.resolve(home, away, { isPlayoffs: false, tier: tier });
+                    const pHS = pipeResult.homePlayerStats || [];
+                    const pAS = pipeResult.awayPlayerStats || [];
+                    const pHome = SimBenchmark._sumTeam(pHS);
+                    const pAway = SimBenchmark._sumTeam(pAS);
+                    pipeGames.push({ homeScore: pipeResult.homeScore, awayScore: pipeResult.awayScore, home: pHome, away: pAway, homeName: home.name, awayName: away.name });
+                    csvRows.push(`${tier},Pipeline,${g+1},${home.name},${away.name},${pipeResult.homeScore},${pipeResult.awayScore},${pipeResult.homeScore+pipeResult.awayScore},${pHome.fgm},${pHome.fga},${pHome.fgPct},${pHome.tpm},${pHome.tpa},${pHome.tpPct},${pHome.ftm},${pHome.fta},${pHome.to},${pAway.fgm},${pAway.fga},${pAway.fgPct},${pAway.tpm},${pAway.tpa},${pAway.tpPct},${pAway.ftm},${pAway.fta},${pAway.to}`);
+                }
+
+                results.push({
+                    label, tier,
+                    fast: SimBenchmark._aggregate(fastGames),
+                    pipe: SimBenchmark._aggregate(pipeGames)
+                });
+            }
+
+            const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+            console.log(`SimBenchmark: Complete in ${elapsed}s`);
+
+            // Console table
+            console.log('\n=== BENCHMARK RESULTS ===');
+            for (const r of results) {
+                console.log(`\n--- ${r.label} ---`);
+                console.table({
+                    'StatEngine (fast)': r.fast,
+                    'Pipeline': r.pipe
+                });
+            }
+
+            // Store CSV for download
+            window._benchmarkCSV = csvRows.join('\n');
+            window._benchmarkResults = results;
+            console.log('Download CSV: SimBenchmark.downloadCSV()');
+            console.log('Show modal:   SimBenchmark.showReport()');
+
+            if (showModal) SimBenchmark.showReport();
+            return results;
+        },
+
+        _sumTeam(playerStats) {
+            const s = playerStats.reduce((t, p) => ({
+                fgm: t.fgm + (p.fieldGoalsMade || 0), fga: t.fga + (p.fieldGoalsAttempted || 0),
+                tpm: t.tpm + (p.threePointersMade || 0), tpa: t.tpa + (p.threePointersAttempted || 0),
+                ftm: t.ftm + (p.freeThrowsMade || 0), fta: t.fta + (p.freeThrowsAttempted || 0),
+                pts: t.pts + (p.points || 0), reb: t.reb + (p.rebounds || 0),
+                ast: t.ast + (p.assists || 0), to: t.to + (p.turnovers || 0),
+                stl: t.stl + (p.steals || 0), blk: t.blk + (p.blocks || 0)
+            }), { fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0, pts:0, reb:0, ast:0, to:0, stl:0, blk:0 });
+            s.fgPct = s.fga > 0 ? (s.fgm / s.fga * 100).toFixed(1) : '0.0';
+            s.tpPct = s.tpa > 0 ? (s.tpm / s.tpa * 100).toFixed(1) : '0.0';
+            s.ftPct = s.fta > 0 ? (s.ftm / s.fta * 100).toFixed(1) : '0.0';
+            return s;
+        },
+
+        _aggregate(games) {
+            const n = games.length;
+            if (n === 0) return {};
+            const avg = (arr) => (arr.reduce((s, v) => s + v, 0) / n).toFixed(1);
+            const scores = games.map(g => g.homeScore + g.awayScore);
+            const teamScores = games.flatMap(g => [g.homeScore, g.awayScore]);
+            const fgPcts = games.flatMap(g => [parseFloat(g.home.fgPct), parseFloat(g.away.fgPct)]);
+            const tpPcts = games.flatMap(g => [parseFloat(g.home.tpPct), parseFloat(g.away.tpPct)]);
+            const ftPcts = games.flatMap(g => [parseFloat(g.home.ftPct), parseFloat(g.away.ftPct)]);
+            const fgas = games.flatMap(g => [g.home.fga, g.away.fga]);
+            const tpas = games.flatMap(g => [g.home.tpa, g.away.tpa]);
+            const ftas = games.flatMap(g => [g.home.fta, g.away.fta]);
+            const tos = games.flatMap(g => [g.home.to, g.away.to]);
+            const rebs = games.flatMap(g => [g.home.reb, g.away.reb]);
+            const asts = games.flatMap(g => [g.home.ast, g.away.ast]);
+
+            return {
+                'Avg Score': avg(teamScores),
+                'Avg Total': avg(scores),
+                'FG%': avg(fgPcts),
+                '3P%': avg(tpPcts),
+                'FT%': avg(ftPcts),
+                'Avg FGA': avg(fgas),
+                'Avg 3PA': avg(tpas),
+                'Avg FTA': avg(ftas),
+                'Avg TO': avg(tos),
+                'Avg REB': avg(rebs),
+                'Avg AST': avg(asts),
+                'Min Score': Math.min(...teamScores),
+                'Max Score': Math.max(...teamScores),
+                'Games': n
+            };
+        },
+
+        showReport() {
+            const results = window._benchmarkResults;
+            if (!results) { console.log('No benchmark data. Run SimBenchmark.run() first.'); return; }
+
+            const statKeys = ['Avg Score', 'Avg Total', 'FG%', '3P%', 'FT%', 'Avg FGA', 'Avg 3PA', 'Avg FTA', 'Avg TO', 'Avg REB', 'Avg AST', 'Min Score', 'Max Score'];
+
+            let html = `<div style="padding: 20px; max-height: 85vh; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">🔬 Sim Benchmark Report</h2>
+                    <div>
+                        <button onclick="SimBenchmark.downloadCSV()" style="padding: 8px 16px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(78,205,196,0.3); color: #fff; cursor: pointer; margin-right: 8px;">📥 Download CSV</button>
+                        <button onclick="document.getElementById('benchmarkModal').classList.add('hidden')" style="padding: 8px 16px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer;">✕ Close</button>
+                    </div>
+                </div>`;
+
+            for (const r of results) {
+                html += `<h3 style="color: #ffd700; margin: 20px 0 10px;">${r.label} (${r.fast.Games} games each)</h3>`;
+                html += `<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.85em;">
+                    <thead><tr style="border-bottom: 2px solid rgba(255,255,255,0.15);">
+                        <th style="padding: 6px 10px; text-align: left;">Stat</th>
+                        <th style="padding: 6px 10px; text-align: center; color: #4ecdc4;">StatEngine</th>
+                        <th style="padding: 6px 10px; text-align: center; color: #ff6b6b;">Pipeline</th>
+                        <th style="padding: 6px 10px; text-align: center; opacity: 0.6;">Delta</th>
+                    </tr></thead><tbody>`;
+
+                for (const key of statKeys) {
+                    const fv = parseFloat(r.fast[key]) || 0;
+                    const pv = parseFloat(r.pipe[key]) || 0;
+                    const delta = (pv - fv).toFixed(1);
+                    const deltaColor = Math.abs(pv - fv) < 2 ? 'rgba(78,205,196,0.8)' : Math.abs(pv - fv) < 5 ? 'rgba(255,215,0,0.8)' : 'rgba(255,107,107,0.8)';
+                    html += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <td style="padding: 5px 10px; opacity: 0.8;">${key}</td>
+                        <td style="padding: 5px 10px; text-align: center; font-weight: bold;">${r.fast[key]}</td>
+                        <td style="padding: 5px 10px; text-align: center; font-weight: bold;">${r.pipe[key]}</td>
+                        <td style="padding: 5px 10px; text-align: center; color: ${deltaColor};">${delta > 0 ? '+' : ''}${delta}</td>
+                    </tr>`;
+                }
+                html += '</tbody></table></div>';
+            }
+
+            html += '</div>';
+
+            // Create or reuse benchmark modal
+            let modal = document.getElementById('benchmarkModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'benchmarkModal';
+                modal.className = 'modal';
+                modal.style.zIndex = '1050';
+                modal.innerHTML = '<div class="modal-content" style="max-width: 800px; padding: 0;"><div id="benchmarkContent"></div></div>';
+                document.body.appendChild(modal);
+            }
+            document.getElementById('benchmarkContent').innerHTML = html;
+            modal.classList.remove('hidden');
+        },
+
+        downloadCSV() {
+            if (!window._benchmarkCSV) { console.log('No data. Run SimBenchmark.run() first.'); return; }
+            const blob = new Blob([window._benchmarkCSV], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sim_benchmark_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            console.log('CSV downloaded.');
+        }
+    };
+
     </script>
 </body>
 </html>

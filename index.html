@@ -1346,9 +1346,9 @@ const StatEngine = {
     },
 
     TIER_PACE: {
-        1: { targetPoints: 108, variance: 8 },
-        2: { targetPoints: 101, variance: 7 },
-        3: { targetPoints: 94,  variance: 7 },
+        1: { targetPoints: 108, variance: 8 },  // NBA caliber: high efficiency, fast pace
+        2: { targetPoints: 90,  variance: 9 },   // G-League/top college: lower efficiency, more variance
+        3: { targetPoints: 76,  variance: 10 },   // Low college/semi-pro: lowest efficiency, highest variance
     },
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1781,16 +1781,19 @@ const StatEngine = {
 
         const teamStrength = this._quickTeamStrength(playerStats);
         const strengthDelta = teamStrength - 75;
-        const strengthBonus = strengthDelta * 0.3;
+        // Lower tiers: strength differences matter more
+        const strengthMult = tier === 1 ? 0.3 : tier === 2 ? 0.5 : 0.7;
+        const strengthBonus = strengthDelta * strengthMult;
         const targetBase = pace.targetPoints + strengthBonus;
         const target = targetBase + (Math.random() - 0.5) * pace.variance * 2;
         const scaleFactor = target / rawTotal;
 
-        // Always normalize to keep scores realistic
+        // Normalize to keep scores realistic — lower tiers allow wider swing
+        const clampRange = tier === 1 ? 0.25 : tier === 2 ? 0.35 : 0.45;
         return playerStats.map(stat => {
             if (stat.minutesPlayed === 0) return stat;
             const scaled = { ...stat };
-            const pointScale = Math.max(0.75, Math.min(1.30, scaleFactor));
+            const pointScale = Math.max(1 - clampRange, Math.min(1 + clampRange, scaleFactor));
 
             scaled.fieldGoalsAttempted = Math.max(1, Math.round(stat.fieldGoalsAttempted * pointScale));
             scaled.threePointersAttempted = Math.max(0, Math.round(stat.threePointersAttempted * pointScale));
@@ -11424,7 +11427,8 @@ let gmMode = null;
                     home: game.boxScore.home,
                     away: game.boxScore.away,
                     date: CalendarEngine.formatDateDisplay(dateStr),
-                    hasDetailedStats: true
+                    hasDetailedStats: true,
+                    quarterScores: game.boxScore.quarterScores || null
                 });
             } else {
                 // Score only (non-user game)

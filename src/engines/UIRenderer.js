@@ -1102,7 +1102,7 @@ export class UIRenderer {
     // FULL BOX SCORE (from calendar deep-dive)
     // ═══════════════════════════════════════════════════════════════
 
-    static boxScore({ home, away, date, hasDetailedStats }) {
+    static boxScore({ home, away, date, hasDetailedStats, quarterScores }) {
         const winner = home.score > away.score ? 'home' : 'away';
         let html = `
             <div style="text-align: center; margin-bottom: 20px;">
@@ -1117,9 +1117,28 @@ export class UIRenderer {
                         <div style="font-size: 0.95em; opacity: 0.8;">${UIRenderer._tn(home)}</div>
                         <div style="font-size: 2.5em; font-weight: bold; ${winner === 'home' ? 'color: #4ecdc4;' : ''}">${home.score}</div>
                     </div>
-                </div>
-            </div>
-        `;
+                </div>`;
+        
+        // Quarter scores if available
+        if (quarterScores && quarterScores.home) {
+            html += '<div style="margin-top: 12px;"><table style="margin: 0 auto; border-collapse: collapse; font-size: 0.8em;">';
+            html += '<tr style="opacity: 0.5;"><td style="padding: 3px 8px;"></td>';
+            for (let i = 0; i < quarterScores.home.length; i++) {
+                const label = i < 4 ? `Q${i+1}` : `OT${i-3}`;
+                html += `<td style="padding: 3px 10px; text-align: center;">${label}</td>`;
+            }
+            html += '<td style="padding: 3px 10px; text-align: center; font-weight: bold;">F</td></tr>';
+            // Away row
+            html += `<tr><td style="padding: 3px 8px; opacity: 0.7;">${UIRenderer._tn(away)}</td>`;
+            quarterScores.away.forEach(q => { html += `<td style="padding: 3px 10px; text-align: center;">${q}</td>`; });
+            html += `<td style="padding: 3px 10px; text-align: center; font-weight: bold;">${away.score}</td></tr>`;
+            // Home row
+            html += `<tr><td style="padding: 3px 8px; opacity: 0.7;">${UIRenderer._tn(home)}</td>`;
+            quarterScores.home.forEach(q => { html += `<td style="padding: 3px 10px; text-align: center;">${q}</td>`; });
+            html += `<td style="padding: 3px 10px; text-align: center; font-weight: bold;">${home.score}</td></tr>`;
+            html += '</table></div>';
+        }
+        html += '</div>';
 
         if (!hasDetailedStats) {
             html += '<p style="text-align: center; opacity: 0.6; padding: 20px;">Detailed box score available for your team\'s games only.</p>';
@@ -1145,6 +1164,8 @@ export class UIRenderer {
             ftm: t.ftm + p.ftm, fta: t.fta + p.fta
         }), { pts:0, reb:0, ast:0, stl:0, blk:0, to:0, fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0 });
 
+        const pct = (m, a) => a > 0 ? (m / a * 100).toFixed(1) : '-';
+
         const renderRow = (p, i) => {
             const bg = i % 2 === 0 ? 'background: rgba(255,255,255,0.02);' : '';
             return `<tr style="${bg}">
@@ -1157,13 +1178,21 @@ export class UIRenderer {
                 <td style="padding: 5px 4px; text-align: center;">${p.blk}</td>
                 <td style="padding: 5px 4px; text-align: center;">${p.to}</td>
                 <td style="padding: 5px 4px; text-align: center;">${p.fgm}-${p.fga}</td>
+                <td style="padding: 5px 4px; text-align: center;">${pct(p.fgm, p.fga)}</td>
                 <td style="padding: 5px 4px; text-align: center;">${p.tpm}-${p.tpa}</td>
+                <td style="padding: 5px 4px; text-align: center;">${pct(p.tpm, p.tpa)}</td>
                 <td style="padding: 5px 4px; text-align: center;">${p.ftm}-${p.fta}</td>
             </tr>`;
         };
 
         let html = `<div style="margin-bottom: 25px;">
-            <h3 style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid rgba(255,255,255,0.1);">${UIRenderer._tn(team)} — ${team.score}</h3>
+            <h3 style="margin-bottom: 5px; padding-bottom: 8px; border-bottom: 2px solid rgba(255,255,255,0.1);">${UIRenderer._tn(team)} — ${team.score}</h3>
+            <div style="display: flex; gap: 20px; margin-bottom: 10px; font-size: 0.82em; opacity: 0.7;">
+                <span>FG: ${totals.fgm}-${totals.fga} (${pct(totals.fgm, totals.fga)}%)</span>
+                <span>3PT: ${totals.tpm}-${totals.tpa} (${pct(totals.tpm, totals.tpa)}%)</span>
+                <span>FT: ${totals.ftm}-${totals.fta} (${pct(totals.ftm, totals.fta)}%)</span>
+                <span>TO: ${totals.to}</span>
+            </div>
             <div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.82em; white-space: nowrap;">
                 <thead><tr style="opacity: 0.6; border-bottom: 1px solid rgba(255,255,255,0.15);">
                     <th style="padding: 5px 8px; text-align: left;">Player</th>
@@ -1175,13 +1204,15 @@ export class UIRenderer {
                     <th style="padding: 5px 4px; text-align: center;">BLK</th>
                     <th style="padding: 5px 4px; text-align: center;">TO</th>
                     <th style="padding: 5px 4px; text-align: center;">FG</th>
+                    <th style="padding: 5px 4px; text-align: center;">FG%</th>
                     <th style="padding: 5px 4px; text-align: center;">3PT</th>
+                    <th style="padding: 5px 4px; text-align: center;">3P%</th>
                     <th style="padding: 5px 4px; text-align: center;">FT</th>
                 </tr></thead><tbody>`;
 
         starters.forEach((p, i) => { html += renderRow(p, i); });
         if (bench.length > 0) {
-            html += '<tr><td colspan="11" style="padding: 3px 8px; font-size: 0.85em; opacity: 0.5; border-top: 1px solid rgba(255,255,255,0.08);">Bench</td></tr>';
+            html += '<tr><td colspan="13" style="padding: 3px 8px; font-size: 0.85em; opacity: 0.5; border-top: 1px solid rgba(255,255,255,0.08);">Bench</td></tr>';
             bench.forEach((p, i) => { html += renderRow(p, i); });
         }
 
@@ -1194,7 +1225,9 @@ export class UIRenderer {
             <td style="padding: 5px 4px; text-align: center;">${totals.blk}</td>
             <td style="padding: 5px 4px; text-align: center;">${totals.to}</td>
             <td style="padding: 5px 4px; text-align: center;">${totals.fgm}-${totals.fga}</td>
+            <td style="padding: 5px 4px; text-align: center;">${pct(totals.fgm, totals.fga)}</td>
             <td style="padding: 5px 4px; text-align: center;">${totals.tpm}-${totals.tpa}</td>
+            <td style="padding: 5px 4px; text-align: center;">${pct(totals.tpm, totals.tpa)}</td>
             <td style="padding: 5px 4px; text-align: center;">${totals.ftm}-${totals.fta}</td>
         </tr></tbody></table></div></div>`;
         return html;

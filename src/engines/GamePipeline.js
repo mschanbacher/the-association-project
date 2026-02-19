@@ -81,7 +81,8 @@ class GameState {
     _getPossessionsPerQuarter() {
         // Total possessions per quarter (both teams combined, alternating)
         // NBA averages ~100 possessions per team per game = ~200 total = ~50 per quarter
-        const base = { 1: 50, 2: 48, 3: 46 };
+        // Lower tiers have slightly slower pace (fewer fast breaks, more half-court)
+        const base = { 1: 50, 2: 46, 3: 42 };
         return (base[this.tier] || 50) + Math.floor(Math.random() * 4) - 2;
     }
 

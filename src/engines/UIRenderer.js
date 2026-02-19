@@ -1379,4 +1379,159 @@ export class UIRenderer {
         html += '<div id="calendarDayDetail" style="margin-top: 15px; display: none;"></div>';
         return html;
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // WATCH GAME — Live game view layout
+    // ═══════════════════════════════════════════════════════════════
+
+    static watchGameLayout({ homeName, awayName }) {
+        return `
+        <div style="display: flex; flex-direction: column; height: 90vh; background: #0a0a1a; color: #fff; font-family: system-ui, sans-serif;">
+            <!-- Scoreboard -->
+            <div id="wg-scoreboard" style="background: linear-gradient(135deg, #1a1a3e 0%, #0d0d2b 100%); padding: 15px 20px; border-bottom: 2px solid rgba(255,255,255,0.1); flex-shrink: 0;">
+                <div style="display: flex; justify-content: center; align-items: center; gap: 30px;">
+                    <div style="text-align: center; min-width: 180px;">
+                        <div style="font-size: 0.85em; opacity: 0.7; margin-bottom: 4px;" id="wg-away-name">${awayName}</div>
+                        <div style="font-size: 3em; font-weight: bold; line-height: 1;" id="wg-away-score">0</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 1.4em; font-weight: bold; color: #ffd700;" id="wg-clock">Q1 12:00</div>
+                        <div style="font-size: 0.75em; opacity: 0.5; margin-top: 3px;" id="wg-quarter-scores"></div>
+                    </div>
+                    <div style="text-align: center; min-width: 180px;">
+                        <div style="font-size: 0.85em; opacity: 0.7; margin-bottom: 4px;" id="wg-home-name">${homeName}</div>
+                        <div style="font-size: 3em; font-weight: bold; line-height: 1;" id="wg-home-score">0</div>
+                    </div>
+                </div>
+                <!-- Momentum bar -->
+                <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; justify-content: center;">
+                    <span style="font-size: 0.7em; opacity: 0.4;">AWY</span>
+                    <div style="width: 200px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; position: relative; overflow: hidden;">
+                        <div id="wg-momentum" style="position: absolute; top: 0; height: 100%; background: #4ecdc4; border-radius: 2px; transition: left 0.3s, width 0.3s; left: 50%; width: 0;"></div>
+                    </div>
+                    <span style="font-size: 0.7em; opacity: 0.4;">HME</span>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div style="display: flex; justify-content: center; align-items: center; gap: 10px; padding: 10px 20px; background: rgba(255,255,255,0.03); flex-shrink: 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <button id="wg-speed-1" onclick="watchGameSetSpeed(1)" style="padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(102,126,234,0.6); color: #fff; cursor: pointer; font-size: 0.85em;">1x</button>
+                <button id="wg-speed-3" onclick="watchGameSetSpeed(3)" style="padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; font-size: 0.85em;">3x</button>
+                <button id="wg-speed-10" onclick="watchGameSetSpeed(10)" style="padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; font-size: 0.85em;">10x</button>
+                <button id="wg-speed-max" onclick="watchGameSetSpeed(999)" style="padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; font-size: 0.85em;">⏩ Max</button>
+                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.15); margin: 0 5px;"></div>
+                <button id="wg-pause" onclick="watchGameTogglePause()" style="padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; font-size: 0.85em;">⏸ Pause</button>
+                <button onclick="watchGameSkip()" style="padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; font-size: 0.85em;">⏭ Skip to End</button>
+            </div>
+
+            <!-- Main area: play-by-play + box score tabs -->
+            <div style="flex: 1; display: flex; overflow: hidden;">
+                <!-- Play-by-play feed -->
+                <div style="flex: 1; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.06);">
+                    <div style="padding: 8px 15px; font-weight: bold; font-size: 0.85em; opacity: 0.6; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;">PLAY-BY-PLAY</div>
+                    <div id="wg-plays" style="flex: 1; overflow-y: auto; padding: 10px 15px; display: flex; flex-direction: column-reverse;"></div>
+                </div>
+                <!-- Box score sidebar -->
+                <div style="width: 320px; display: flex; flex-direction: column; flex-shrink: 0;">
+                    <div style="padding: 8px 15px; font-weight: bold; font-size: 0.85em; opacity: 0.6; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;">LEADERS</div>
+                    <div id="wg-leaders" style="flex: 1; overflow-y: auto; padding: 10px 15px;"></div>
+                </div>
+            </div>
+
+            <!-- Game over bar (hidden until complete) -->
+            <div id="wg-gameover" style="display: none; padding: 15px 20px; text-align: center; background: linear-gradient(135deg, #1a1a3e 0%, #0d0d2b 100%); border-top: 2px solid rgba(255,215,0,0.3); flex-shrink: 0;">
+                <div id="wg-final-text" style="font-size: 1.3em; font-weight: bold; margin-bottom: 10px;"></div>
+                <button onclick="watchGameClose()" class="success" style="padding: 10px 30px; font-size: 1em;">Continue</button>
+            </div>
+        </div>`;
+    }
+
+    static watchGamePlayEntry(event) {
+        const sideColor = event.side === 'home' ? '#4ecdc4' : '#ff6b6b';
+        const sideLabel = event.side === 'home' ? 'HME' : 'AWY';
+        let icon = '';
+        let text = '';
+        let highlight = false;
+
+        switch (event.type) {
+            case 'made_shot':
+                icon = event.shotType === '3pt' ? '🎯' : '🏀';
+                text = `<strong>${event.player}</strong> ${event.shotType === '3pt' ? 'three-pointer' : 'scores'}`;
+                highlight = event.shotType === '3pt';
+                break;
+            case 'missed_shot':
+                icon = '❌';
+                text = `<strong>${event.player}</strong> misses ${event.shotType === '3pt' ? 'three' : 'shot'}`;
+                break;
+            case 'turnover':
+                icon = '💨';
+                text = `<strong>${event.player}</strong> turnover`;
+                break;
+            case 'steal':
+                icon = '🤚';
+                text = `<strong>${event.player}</strong> steal`;
+                break;
+            case 'foul_shooting':
+                icon = '🎯';
+                text = `<strong>${event.shooter}</strong> ${event.ftMade}/${event.ftAttempted} FT`;
+                break;
+            case 'foul':
+                icon = '🫳';
+                text = `Foul on <strong>${event.fouler}</strong>`;
+                break;
+            case 'and_one':
+                icon = '💪';
+                text = `<strong>${event.player}</strong> AND ONE!`;
+                highlight = true;
+                break;
+            case 'run':
+                icon = '🔥';
+                text = `<strong>${event.run}-0 run!</strong>`;
+                highlight = true;
+                break;
+            case 'quarter_end':
+                return `<div style="text-align: center; padding: 8px; margin: 4px 0; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.85em; opacity: 0.6;">End of Q${event.quarter} — ${event.awayScore}-${event.homeScore}</div>`;
+            case 'overtime':
+                return `<div style="text-align: center; padding: 8px; margin: 4px 0; background: rgba(255,215,0,0.1); border-radius: 6px; color: #ffd700; font-weight: bold;">⚡ OVERTIME</div>`;
+            case 'timeout':
+                return `<div style="text-align: center; padding: 6px; margin: 3px 0; opacity: 0.5; font-size: 0.82em;">⏱️ Timeout — ${event.side === 'home' ? 'Home' : 'Away'}</div>`;
+            case 'game_end':
+                return '';
+            default:
+                return '';
+        }
+
+        const bg = highlight ? 'background: rgba(255,215,0,0.08);' : '';
+        return `
+            <div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; margin: 1px 0; border-radius: 4px; font-size: 0.85em; ${bg}">
+                <span style="font-size: 1.1em; flex-shrink: 0;">${icon}</span>
+                <span style="color: ${sideColor}; font-size: 0.7em; opacity: 0.7; flex-shrink: 0; width: 28px;">${sideLabel}</span>
+                <span style="flex: 1;">${text}</span>
+                <span style="opacity: 0.4; font-size: 0.78em; flex-shrink: 0;">${event.clock || ''}</span>
+            </div>
+        `;
+    }
+
+    static watchGameLeaders(homeStats, awayStats, homeName, awayName) {
+        const topN = (stats, n) => [...stats]
+            .filter(s => s.points > 0)
+            .sort((a, b) => b.points - a.points)
+            .slice(0, n);
+
+        let html = '';
+        [{stats: awayStats, name: awayName, color: '#ff6b6b'}, {stats: homeStats, name: homeName, color: '#4ecdc4'}].forEach(({stats, name, color}) => {
+            html += `<div style="margin-bottom: 15px;">
+                <div style="font-size: 0.8em; font-weight: bold; color: ${color}; margin-bottom: 6px;">${name}</div>`;
+            topN(stats, 4).forEach(p => {
+                const fgPct = p.fieldGoalsAttempted > 0 ? Math.round(p.fieldGoalsMade / p.fieldGoalsAttempted * 100) : 0;
+                html += `
+                    <div style="padding: 4px 0; font-size: 0.82em; display: flex; justify-content: space-between;">
+                        <span><strong>${p.playerName}</strong></span>
+                        <span style="opacity: 0.8;">${p.points} pts ${p.rebounds} reb ${p.assists} ast</span>
+                    </div>`;
+            });
+            html += '</div>';
+        });
+        return html;
+    }
 }

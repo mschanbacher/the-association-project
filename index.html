@@ -978,6 +978,7 @@
 
         <div class="controls">
             <button onclick="simNextGame()" id="simNextBtn">▶️ Sim Next Game</button>
+            <button onclick="watchNextGame()" id="watchNextBtn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">👁️ Watch Game</button>
             <button onclick="simDay()" id="simDayBtn">📅 Sim Day</button>
             <button onclick="simWeek()" id="simWeekBtn">⏩ Sim Week</button>
             <button onclick="finishSeason()" id="finishBtn">⏭️ Finish Season</button>
@@ -1071,6 +1072,13 @@
             <div id="historyList">
                 <!-- Populated by JavaScript -->
             </div>
+        </div>
+    </div>
+
+    <!-- Watch Game Modal -->
+    <div id="watchGameModal" class="modal hidden" style="z-index: 1020;">
+        <div class="modal-content" style="max-width: 1000px; max-height: 95vh; overflow: hidden; padding: 0;">
+            <div id="watchGameContent"></div>
         </div>
     </div>
 
@@ -3957,6 +3965,8 @@ class GMMode {
         if (simDayBtn) simDayBtn.disabled = seasonComplete;
         if (simWeekBtn) simWeekBtn.disabled = seasonComplete;
         if (finishBtn) finishBtn.disabled = seasonComplete;
+        const watchBtn = document.getElementById('watchNextBtn');
+        if (watchBtn) watchBtn.disabled = seasonComplete;
     }
     
     /**
@@ -11429,6 +11439,412 @@ let gmMode = null;
             document.getElementById('boxScoreModal').classList.remove('hidden');
         }
         window.showBoxScore = showBoxScore;
+
+        // ============================================
+        // WATCH GAME MODE
+        // ============================================
+        
+        let _watchGame = null;      // GamePipeline game handle
+        let _watchTimer = null;     // setInterval handle
+        let _watchSpeed = 1;        // 1 = slow, 3, 10, 999 = instant
+        let _watchPaused = false;
+        let _watchHomeName = '';
+        let _watchAwayName = '';
+        let _watchHomeTeam = null;
+        let _watchAwayTeam = null;
+        let _watchDate = null;
+        
+        function watchNextGame() {
+            if (!gameState || !gameState.currentDate) return;
+            
+            const currentDate = gameState.currentDate;
+            const nextUserDate = CalendarEngine.getNextUserGameDate(currentDate, gameState);
+            if (!nextUserDate) {
+                alert('No upcoming games found.');
+                return;
+            }
+            
+            // Sim intervening days silently (same as simulateNextGame)
+            let simDate = CalendarEngine.addDays(currentDate, 1);
+            while (simDate < nextUserDate) {
+                gmMode._simulateAllGamesOnDate(simDate, true);
+                simDate = CalendarEngine.addDays(simDate, 1);
+            }
+            gameState.currentDate = nextUserDate;
+            
+            // Sim all NON-user games on this date
+            const todaysGames = CalendarEngine.getGamesForDate(nextUserDate, gameState);
+            const userTeamId = gameState.userTeamId;
+            const allTeams = [...(gameState.tier1Teams || []), ...(gameState.tier2Teams || []), ...(gameState.tier3Teams || [])];
+            
+            const tierSchedules = [
+                { schedule: todaysGames.tier1, teams: gameState.tier1Teams },
+                { schedule: todaysGames.tier2, teams: gameState.tier2Teams },
+                { schedule: todaysGames.tier3, teams: gameState.tier3Teams }
+            ];
+            
+            let userGame = null;
+            let homeTeam = null, awayTeam = null;
+            
+            for (const { schedule, teams } of tierSchedules) {
+                if (!schedule) continue;
+                for (const game of schedule) {
+                    if (game.played) continue;
+                    const home = teams.find(t => t.id === game.homeTeamId);
+                    const away = teams.find(t => t.id === game.awayTeamId);
+                    if (!home || !away) continue;
+                    
+                    const isUser = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
+                    if (isUser) {
+                        userGame = game;
+                        homeTeam = home;
+                        awayTeam = away;
+                    } else {
+                        // Sim non-user game normally
+                        applyFatigueAutoRest(home, false);
+                        applyFatigueAutoRest(away, false);
+                        const result = simulationController.simulateFullGame(home, away);
+                        game.played = true;
+                        game.homeScore = result.homeScore;
+                        game.awayScore = result.awayScore;
+                        game.winnerId = result.winner.id;
+                        processFatigueAfterGame(home, away, false);
+                        updateInjuries(home);
+                        updateInjuries(away);
+                        const userGamesPlayed = getUserTeam() ? (getUserTeam().wins + getUserTeam().losses) : 0;
+                        const injuries = checkForInjuries(home, away, userGamesPlayed, false);
+                        injuries.forEach(({team, player, injury}) => {
+                            const aiDecision = injury.canPlayThrough && Math.random() < 0.3 ? 'playThrough' : 'rest';
+                            applyInjury(player, injury, aiDecision);
+                        });
+                    }
+                }
+            }
+            
+            if (!userGame || !homeTeam || !awayTeam) {
+                alert('Could not find user game.');
+                return;
+            }
+            
+            _watchDate = nextUserDate;
+            _watchHomeTeam = homeTeam;
+            _watchAwayTeam = awayTeam;
+            _watchHomeName = homeTeam.name;
+            _watchAwayName = awayTeam.name;
+            
+            // Apply fatigue
+            applyFatigueAutoRest(homeTeam, false);
+            applyFatigueAutoRest(awayTeam, false);
+            
+            // Create pipeline game
+            _watchGame = GamePipeline.create(homeTeam, awayTeam, {
+                isPlayoffs: false,
+                tier: gameState.currentTier
+            });
+            
+            // Render the layout
+            const modal = document.getElementById('watchGameModal');
+            document.getElementById('watchGameContent').innerHTML = UIRenderer.watchGameLayout({
+                homeName: _watchHomeName, awayName: _watchAwayName
+            });
+            modal.classList.remove('hidden');
+            
+            // Start the game loop
+            _watchPaused = false;
+            _watchSpeed = 1;
+            watchGameSetSpeed(1);
+            _startWatchTimer();
+        }
+        
+        function _startWatchTimer() {
+            if (_watchTimer) clearInterval(_watchTimer);
+            if (!_watchGame || _watchGame.isComplete) return;
+            
+            const delays = { 1: 800, 3: 250, 10: 60, 999: 1 };
+            const delay = delays[_watchSpeed] || 800;
+            
+            _watchTimer = setInterval(() => {
+                if (_watchPaused || !_watchGame) return;
+                
+                if (_watchSpeed === 999) {
+                    // Max speed: run 20 possessions per tick
+                    for (let i = 0; i < 20 && !_watchGame.isComplete; i++) {
+                        const events = _watchGame.step();
+                        // Only render scoring/key events at max speed
+                        const keyEvents = events.filter(e => 
+                            ['made_shot', 'and_one', 'run', 'quarter_end', 'overtime', 'game_end', 'foul_shooting'].includes(e.type)
+                        );
+                        _renderWatchEvents(keyEvents);
+                    }
+                } else {
+                    const events = _watchGame.step();
+                    _renderWatchEvents(events);
+                }
+                
+                _updateWatchScoreboard();
+                
+                if (_watchGame.isComplete) {
+                    clearInterval(_watchTimer);
+                    _watchTimer = null;
+                    _onWatchGameEnd();
+                }
+            }, delay);
+        }
+        
+        function _renderWatchEvents(events) {
+            const container = document.getElementById('wg-plays');
+            if (!container) return;
+            
+            for (const event of events) {
+                const html = UIRenderer.watchGamePlayEntry(event);
+                if (html) {
+                    const div = document.createElement('div');
+                    div.innerHTML = html;
+                    container.prepend(div.firstElementChild || div);
+                }
+            }
+            
+            // Keep feed from getting too long
+            while (container.children.length > 200) {
+                container.removeChild(container.lastChild);
+            }
+        }
+        
+        function _updateWatchScoreboard() {
+            if (!_watchGame) return;
+            const state = _watchGame.getState();
+            
+            const homeEl = document.getElementById('wg-home-score');
+            const awayEl = document.getElementById('wg-away-score');
+            if (homeEl) homeEl.textContent = state.homeScore;
+            if (awayEl) awayEl.textContent = state.awayScore;
+            
+            const clockEl = document.getElementById('wg-clock');
+            if (clockEl) clockEl.textContent = state.clock.display;
+            
+            // Quarter scores
+            const qEl = document.getElementById('wg-quarter-scores');
+            if (qEl && state.quarterScores) {
+                const qs = state.quarterScores;
+                let qText = '';
+                for (let i = 0; i < qs.home.length; i++) {
+                    const label = i < 4 ? `Q${i+1}` : `OT${i-3}`;
+                    qText += `${label}: ${qs.away[i]}-${qs.home[i]}  `;
+                }
+                qEl.textContent = qText.trim();
+            }
+            
+            // Momentum bar
+            const mEl = document.getElementById('wg-momentum');
+            if (mEl) {
+                const m = state.momentum; // -10 to +10
+                const normalized = m / 10; // -1 to +1
+                if (normalized >= 0) {
+                    mEl.style.left = '50%';
+                    mEl.style.width = `${normalized * 50}%`;
+                    mEl.style.background = '#4ecdc4';
+                } else {
+                    const width = Math.abs(normalized) * 50;
+                    mEl.style.left = `${50 - width}%`;
+                    mEl.style.width = `${width}%`;
+                    mEl.style.background = '#ff6b6b';
+                }
+            }
+            
+            // Leaders (throttle at high speeds)
+            const leadersEl = document.getElementById('wg-leaders');
+            if (leadersEl && (_watchSpeed <= 3 || Math.random() < 0.1)) {
+                const result = _watchGame.getResult();
+                leadersEl.innerHTML = UIRenderer.watchGameLeaders(
+                    result.homePlayerStats, result.awayPlayerStats,
+                    _watchHomeName, _watchAwayName
+                );
+            }
+        }
+        
+        function _onWatchGameEnd() {
+            const result = _watchGame.getResult();
+            const userTeam = getUserTeam();
+            const userWon = result.winner.id === userTeam.id;
+            
+            const finalEl = document.getElementById('wg-final-text');
+            if (finalEl) {
+                finalEl.innerHTML = `<span style="color: ${userWon ? '#4ecdc4' : '#ff6b6b'};">${userWon ? '🎉 VICTORY' : '😤 DEFEAT'}</span> — FINAL${result.isOvertime ? ' (OT)' : ''}: ${result.awayScore} - ${result.homeScore}`;
+            }
+            document.getElementById('wg-gameover').style.display = 'block';
+        }
+        
+        function watchGameSetSpeed(speed) {
+            _watchSpeed = speed;
+            // Update button styling
+            ['1', '3', '10', 'max'].forEach(s => {
+                const btn = document.getElementById(`wg-speed-${s}`);
+                if (btn) btn.style.background = 'rgba(255,255,255,0.1)';
+            });
+            const key = speed === 999 ? 'max' : String(speed);
+            const activeBtn = document.getElementById(`wg-speed-${key}`);
+            if (activeBtn) activeBtn.style.background = 'rgba(102,126,234,0.6)';
+            
+            // Restart timer with new speed
+            if (!_watchPaused && _watchGame && !_watchGame.isComplete) {
+                _startWatchTimer();
+            }
+        }
+        
+        function watchGameTogglePause() {
+            _watchPaused = !_watchPaused;
+            const btn = document.getElementById('wg-pause');
+            if (btn) {
+                btn.textContent = _watchPaused ? '▶ Play' : '⏸ Pause';
+                btn.style.background = _watchPaused ? 'rgba(78,205,196,0.3)' : 'rgba(255,255,255,0.1)';
+            }
+            if (!_watchPaused && _watchGame && !_watchGame.isComplete) {
+                _startWatchTimer();
+            }
+        }
+        
+        function watchGameSkip() {
+            if (!_watchGame) return;
+            // Fast-forward to end
+            if (_watchTimer) clearInterval(_watchTimer);
+            const result = _watchGame.finish();
+            
+            // Render remaining events (just the last batch)
+            _renderWatchEvents(result.events.slice(-20));
+            _updateWatchScoreboard();
+            _onWatchGameEnd();
+        }
+        
+        function watchGameClose() {
+            if (_watchTimer) clearInterval(_watchTimer);
+            _watchTimer = null;
+            
+            if (!_watchGame) return;
+            const result = _watchGame.getResult();
+            
+            // Apply the pipeline result the same way _simulateAllGamesOnDate does:
+            // Update team records
+            if (result.homeWon) {
+                _watchHomeTeam.wins++;
+                _watchAwayTeam.losses++;
+                if (_watchHomeTeam.coach) _watchHomeTeam.coach.seasonWins++;
+                if (_watchAwayTeam.coach) _watchAwayTeam.coach.seasonLosses++;
+            } else {
+                _watchAwayTeam.wins++;
+                _watchHomeTeam.losses++;
+                if (_watchAwayTeam.coach) _watchAwayTeam.coach.seasonWins++;
+                if (_watchHomeTeam.coach) _watchHomeTeam.coach.seasonLosses++;
+            }
+            
+            _watchHomeTeam.pointDiff += result.pointDiff;
+            _watchAwayTeam.pointDiff -= result.pointDiff;
+            
+            // Chemistry
+            simulationController.applyChemistryChanges(_watchHomeTeam, result.homeWon);
+            simulationController.applyChemistryChanges(_watchAwayTeam, !result.homeWon);
+            
+            // Accumulate player stats
+            simulationController.accumulatePlayerStats(_watchHomeTeam, result.homePlayerStats);
+            simulationController.accumulatePlayerStats(_watchAwayTeam, result.awayPlayerStats);
+            
+            // Mark the game as played in the schedule and store box score
+            const todaysGames = CalendarEngine.getGamesForDate(_watchDate, gameState);
+            const userTeamId = gameState.userTeamId;
+            const allSchedule = [...(todaysGames.tier1 || []), ...(todaysGames.tier2 || []), ...(todaysGames.tier3 || [])];
+            const schedGame = allSchedule.find(g => 
+                g.homeTeamId === _watchHomeTeam.id && g.awayTeamId === _watchAwayTeam.id && !g.played
+            );
+            if (schedGame) {
+                schedGame.played = true;
+                schedGame.homeScore = result.homeScore;
+                schedGame.awayScore = result.awayScore;
+                schedGame.winnerId = result.winner.id;
+                // Store box score
+                schedGame.boxScore = {
+                    home: {
+                        teamId: _watchHomeTeam.id,
+                        teamName: _watchHomeTeam.name,
+                        city: _watchHomeTeam.city || '',
+                        score: result.homeScore,
+                        players: result.homePlayerStats
+                            .filter(p => p.minutesPlayed > 0)
+                            .sort((a, b) => b.minutesPlayed - a.minutesPlayed)
+                            .map(p => ({
+                                name: p.playerName, pos: p.position,
+                                min: p.minutesPlayed, pts: p.points,
+                                reb: p.rebounds, ast: p.assists,
+                                stl: p.steals, blk: p.blocks,
+                                to: p.turnovers, pf: p.fouls,
+                                fgm: p.fieldGoalsMade, fga: p.fieldGoalsAttempted,
+                                tpm: p.threePointersMade, tpa: p.threePointersAttempted,
+                                ftm: p.freeThrowsMade, fta: p.freeThrowsAttempted,
+                                starter: p.gamesStarted > 0
+                            }))
+                    },
+                    away: {
+                        teamId: _watchAwayTeam.id,
+                        teamName: _watchAwayTeam.name,
+                        city: _watchAwayTeam.city || '',
+                        score: result.awayScore,
+                        players: result.awayPlayerStats
+                            .filter(p => p.minutesPlayed > 0)
+                            .sort((a, b) => b.minutesPlayed - a.minutesPlayed)
+                            .map(p => ({
+                                name: p.playerName, pos: p.position,
+                                min: p.minutesPlayed, pts: p.points,
+                                reb: p.rebounds, ast: p.assists,
+                                stl: p.steals, blk: p.blocks,
+                                to: p.turnovers, pf: p.fouls,
+                                fgm: p.fieldGoalsMade, fga: p.fieldGoalsAttempted,
+                                tpm: p.threePointersMade, tpa: p.threePointersAttempted,
+                                ftm: p.freeThrowsMade, fta: p.freeThrowsAttempted,
+                                starter: p.gamesStarted > 0
+                            }))
+                    },
+                    quarterScores: result.quarterScores,
+                    events: result.events.filter(e => ['made_shot', 'run', 'quarter_end'].includes(e.type)).slice(-30)
+                };
+            }
+            
+            // Process fatigue and injuries
+            processFatigueAfterGame(_watchHomeTeam, _watchAwayTeam, false);
+            updateInjuries(_watchHomeTeam);
+            updateInjuries(_watchAwayTeam);
+            const userGamesPlayed = getUserTeam() ? (getUserTeam().wins + getUserTeam().losses) : 0;
+            const injuries = checkForInjuries(_watchHomeTeam, _watchAwayTeam, userGamesPlayed, false);
+            const userTeamInjuries = injuries.filter(inj => inj.team.id === userTeamId);
+            const aiTeamInjuries = injuries.filter(inj => inj.team.id !== userTeamId);
+            aiTeamInjuries.forEach(({team, player, injury}) => {
+                const aiDecision = injury.canPlayThrough && Math.random() < 0.3 ? 'playThrough' : 'rest';
+                applyInjury(player, injury, aiDecision);
+            });
+            
+            // Close modal
+            document.getElementById('watchGameModal').classList.add('hidden');
+            _watchGame = null;
+            
+            // Save and update UI
+            gmMode.saveGameState();
+            gmMode.updateUI();
+            
+            // Handle user injuries
+            if (userTeamInjuries.length > 0) {
+                gameState.pendingInjuries = userTeamInjuries;
+                gmMode.saveGameState();
+                showNextInjuryModal();
+            }
+            
+            // Check season end
+            if (gameState.isSeasonComplete()) {
+                gmMode.showSeasonEnd();
+            }
+        }
+        
+        window.watchNextGame = watchNextGame;
+        window.watchGameSetSpeed = watchGameSetSpeed;
+        window.watchGameTogglePause = watchGameTogglePause;
+        window.watchGameSkip = watchGameSkip;
+        window.watchGameClose = watchGameClose;
 
         // ============================================
         // ALL-STAR GAME

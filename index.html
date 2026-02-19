@@ -1074,6 +1074,26 @@
         </div>
     </div>
 
+    <!-- Post-Game Summary Modal -->
+    <div id="postGameModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 700px;">
+            <div id="postGameContent"></div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button onclick="document.getElementById('postGameModal').classList.add('hidden')" class="success" style="font-size: 1.1em; padding: 12px 35px;">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Box Score Modal (detailed view from calendar) -->
+    <div id="boxScoreModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+            <div id="boxScoreContent"></div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button onclick="document.getElementById('boxScoreModal').classList.add('hidden')" class="success" style="padding: 10px 30px;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Franchise History Modal -->
     <div id="franchiseHistoryModal" class="modal hidden">
         <div class="modal-content" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;">
@@ -3330,6 +3350,9 @@ class GMMode {
         this.gameState.currentDate = nextUserDate;
         this._simulateAllGamesOnDate(nextUserDate, false);
         
+        // Show post-game summary for user's game
+        this._showPostGameIfUserPlayed(nextUserDate);
+        
         this.saveGameState();
         this.updateUI();
         
@@ -3373,6 +3396,7 @@ class GMMode {
         if (unplayedToday > 0) {
             // Simulate today's games
             this._simulateAllGamesOnDate(currentDate, false);
+            this._showPostGameIfUserPlayed(currentDate);
             this.saveGameState();
             this.updateUI();
         } else {
@@ -3522,16 +3546,65 @@ class GMMode {
                 applyFatigueAutoRest(awayTeam, false);
                 
                 // Simulate
-                this.sim.simulateFullGame(homeTeam, awayTeam);
+                const gameResult = this.sim.simulateFullGame(homeTeam, awayTeam);
                 game.played = true;
+                game.homeScore = gameResult.homeScore;
+                game.awayScore = gameResult.awayScore;
+                game.winnerId = gameResult.winner.id;
+                
+                // Store detailed box score for user team games only (storage efficient)
+                if (isUserGame && gameResult.homePlayerStats && gameResult.awayPlayerStats) {
+                    game.boxScore = {
+                        home: {
+                            teamId: homeTeam.id,
+                            teamName: homeTeam.name,
+                            city: homeTeam.city,
+                            score: gameResult.homeScore,
+                            players: gameResult.homePlayerStats
+                                .filter(p => p.minutesPlayed > 0)
+                                .sort((a, b) => b.minutesPlayed - a.minutesPlayed)
+                                .map(p => ({
+                                    name: p.playerName, pos: p.position, 
+                                    min: p.minutesPlayed, pts: p.points, 
+                                    reb: p.rebounds, ast: p.assists, 
+                                    stl: p.steals, blk: p.blocks,
+                                    to: p.turnovers, pf: p.fouls,
+                                    fgm: p.fieldGoalsMade, fga: p.fieldGoalsAttempted,
+                                    tpm: p.threePointersMade, tpa: p.threePointersAttempted,
+                                    ftm: p.freeThrowsMade, fta: p.freeThrowsAttempted,
+                                    starter: p.gamesStarted > 0
+                                }))
+                        },
+                        away: {
+                            teamId: awayTeam.id,
+                            teamName: awayTeam.name,
+                            city: awayTeam.city,
+                            score: gameResult.awayScore,
+                            players: gameResult.awayPlayerStats
+                                .filter(p => p.minutesPlayed > 0)
+                                .sort((a, b) => b.minutesPlayed - a.minutesPlayed)
+                                .map(p => ({
+                                    name: p.playerName, pos: p.position, 
+                                    min: p.minutesPlayed, pts: p.points, 
+                                    reb: p.rebounds, ast: p.assists, 
+                                    stl: p.steals, blk: p.blocks,
+                                    to: p.turnovers, pf: p.fouls,
+                                    fgm: p.fieldGoalsMade, fga: p.fieldGoalsAttempted,
+                                    tpm: p.threePointersMade, tpa: p.threePointersAttempted,
+                                    ftm: p.freeThrowsMade, fta: p.freeThrowsAttempted,
+                                    starter: p.gamesStarted > 0
+                                }))
+                        }
+                    };
+                }
                 
                 // Emit game completed event
                 eventBus.emit(GameEvents.SEASON_GAME_COMPLETED, {
                     date: dateStr,
                     homeTeamId: homeTeam.id,
                     awayTeamId: awayTeam.id,
-                    homeScore: homeTeam.lastGameScore || 0,
-                    awayScore: awayTeam.lastGameScore || 0,
+                    homeScore: gameResult.homeScore,
+                    awayScore: gameResult.awayScore,
                     isUserGame: isUserGame,
                     homeWins: homeTeam.wins,
                     homeLosses: homeTeam.losses,
@@ -3587,6 +3660,46 @@ class GMMode {
         if (userTeamPlayedToday && !silent) {
             this.checkForAiTradeProposals();
         }
+    }
+    
+    /**
+     * Show post-game summary popup if the user's team played on this date
+     */
+    _showPostGameIfUserPlayed(dateStr) {
+        const userTeam = getUserTeam();
+        if (!userTeam) return;
+        
+        const todaysGames = CalendarEngine.getGamesForDate(dateStr, this.gameState);
+        const allGames = [...(todaysGames.tier1 || []), ...(todaysGames.tier2 || []), ...(todaysGames.tier3 || [])];
+        
+        const userGame = allGames.find(g => 
+            g.played && (g.homeTeamId === userTeam.id || g.awayTeamId === userTeam.id) && g.boxScore
+        );
+        
+        if (!userGame) return;
+        
+        const isHome = userGame.homeTeamId === userTeam.id;
+        const userWon = userGame.winnerId === userTeam.id;
+        const userBox = isHome ? userGame.boxScore.home : userGame.boxScore.away;
+        const oppBox = isHome ? userGame.boxScore.away : userGame.boxScore.home;
+        
+        // Find top performer on user team
+        const topPlayer = userBox.players.length > 0 
+            ? userBox.players.reduce((best, p) => p.pts > best.pts ? p : best, userBox.players[0])
+            : null;
+        
+        const html = UIRenderer.postGameSummary({
+            userTeam: userBox,
+            opponent: oppBox,
+            isHome,
+            userWon,
+            topPlayer,
+            date: dateStr,
+            userRecord: { wins: userTeam.wins, losses: userTeam.losses }
+        });
+        
+        document.getElementById('postGameContent').innerHTML = html;
+        document.getElementById('postGameModal').classList.remove('hidden');
     }
     
     /**
@@ -11356,72 +11469,91 @@ let gmMode = null;
                 html += `<div style="margin-bottom: 10px; padding: 8px 12px; background: rgba(255,215,0,0.15); border-radius: 6px; color: #ffd700;">${event}</div>`;
             }
             
-            // Show user's game first if any
+            // Collect all games with team names and scores
+            const allGames = [];
             const tierSchedules = [
-                { schedule: games.tier1, label: 'Tier 1', tier: 1 },
-                { schedule: games.tier2, label: 'Tier 2', tier: 2 },
-                { schedule: games.tier3, label: 'Tier 3', tier: 3 }
+                { schedule: games.tier1, teams: gameState.tier1Teams, tier: 1 },
+                { schedule: games.tier2, teams: gameState.tier2Teams, tier: 2 },
+                { schedule: games.tier3, teams: gameState.tier3Teams, tier: 3 }
             ];
             
-            let userGameHTML = '';
-            let otherGamesHTML = '';
-            let totalGames = 0;
-            
-            for (const { schedule, label, tier } of tierSchedules) {
-                if (!schedule || schedule.length === 0) continue;
-                totalGames += schedule.length;
-                
+            for (const { schedule, teams, tier } of tierSchedules) {
+                if (!schedule) continue;
                 for (const game of schedule) {
                     const home = allTeams.find(t => t.id === game.homeTeamId);
                     const away = allTeams.find(t => t.id === game.awayTeamId);
                     if (!home || !away) continue;
-                    
-                    const isUserGame = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
-                    const isUserHome = game.homeTeamId === userTeamId;
-                    
-                    const gameHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; 
-                                    background: ${isUserGame ? 'rgba(102,126,234,0.2)' : 'transparent'}; 
-                                    border-radius: 4px; margin: 2px 0; font-size: 0.9em;">
-                            <span style="flex: 1; text-align: right; ${game.awayTeamId === userTeamId ? 'color: #667eea; font-weight: bold;' : ''}">${away.name}</span>
-                            <span style="padding: 0 10px; opacity: 0.5; font-size: 0.85em;">@</span>
-                            <span style="flex: 1; ${game.homeTeamId === userTeamId ? 'color: #667eea; font-weight: bold;' : ''}">${home.name}</span>
-                            <span style="width: 50px; text-align: center; font-size: 0.8em; opacity: 0.5;">${game.played ? '✅' : ''}</span>
-                        </div>
-                    `;
-                    
-                    if (isUserGame) {
-                        userGameHTML += gameHTML;
-                    } else {
-                        otherGamesHTML += gameHTML;
-                    }
+                    allGames.push({
+                        ...game,
+                        homeName: `${home.city} ${home.name}`,
+                        awayName: `${away.city} ${away.name}`,
+                        tier
+                    });
                 }
             }
             
-            if (totalGames === 0) {
-                html += `<p style="opacity: 0.6;">No games scheduled</p>`;
+            // User game first
+            const userGame = allGames.find(g => g.homeTeamId === userTeamId || g.awayTeamId === userTeamId);
+            const otherGames = allGames.filter(g => g.homeTeamId !== userTeamId && g.awayTeamId !== userTeamId);
+            
+            if (allGames.length === 0) {
+                html += '<p style="opacity: 0.6;">No games scheduled</p>';
             } else {
-                if (userGameHTML) {
-                    html += `<div style="margin-bottom: 10px;"><strong style="font-size: 0.9em;">🏀 Your Game</strong>${userGameHTML}</div>`;
+                if (userGame) {
+                    html += '<div style="margin-bottom: 10px;"><strong style="font-size: 0.9em;">🏀 Your Game</strong>';
+                    html += UIRenderer.calendarDayScores({ games: [userGame], date: '', userTeamId });
+                    html += '</div>';
                 }
                 
-                // Show a limited number of other games
-                if (otherGamesHTML) {
-                    const otherCount = totalGames - (userGameHTML ? 1 : 0);
+                if (otherGames.length > 0) {
                     html += `<details style="margin-top: 5px;">
-                        <summary style="cursor: pointer; opacity: 0.7; font-size: 0.9em;">${otherCount} other game${otherCount !== 1 ? 's' : ''} today</summary>
-                        <div style="max-height: 300px; overflow-y: auto; margin-top: 5px;">${otherGamesHTML}</div>
-                    </details>`;
+                        <summary style="cursor: pointer; opacity: 0.7; font-size: 0.9em;">${otherGames.length} other game${otherGames.length !== 1 ? 's' : ''} today</summary>
+                        <div style="max-height: 300px; overflow-y: auto; margin-top: 5px;">`;
+                    html += UIRenderer.calendarDayScores({ games: otherGames, date: '', userTeamId });
+                    html += '</div></details>';
                 }
             }
             
-            html += `</div>`;
+            html += '</div>';
             detail.innerHTML = html;
             detail.style.display = 'block';
         }
         
         window.openCalendarView = openCalendarView;
         window.showCalendarDayDetail = showCalendarDayDetail;
+        
+        function showBoxScore(dateStr, homeTeamId, awayTeamId) {
+            const games = CalendarEngine.getGamesForDate(dateStr, gameState);
+            const allSchedule = [...(games.tier1 || []), ...(games.tier2 || []), ...(games.tier3 || [])];
+            const game = allSchedule.find(g => g.homeTeamId === homeTeamId && g.awayTeamId === awayTeamId);
+            
+            if (!game || !game.played) return;
+            
+            const allTeams = [...(gameState.tier1Teams || []), ...(gameState.tier2Teams || []), ...(gameState.tier3Teams || [])];
+            const homeTeam = allTeams.find(t => t.id === homeTeamId);
+            const awayTeam = allTeams.find(t => t.id === awayTeamId);
+            
+            if (game.boxScore) {
+                // Full box score available
+                document.getElementById('boxScoreContent').innerHTML = UIRenderer.boxScore({
+                    home: game.boxScore.home,
+                    away: game.boxScore.away,
+                    date: CalendarEngine.formatDateDisplay(dateStr),
+                    hasDetailedStats: true
+                });
+            } else {
+                // Score only (non-user game)
+                document.getElementById('boxScoreContent').innerHTML = UIRenderer.boxScore({
+                    home: { city: homeTeam ? homeTeam.city : '', name: homeTeam ? homeTeam.name : '', score: game.homeScore, players: [] },
+                    away: { city: awayTeam ? awayTeam.city : '', name: awayTeam ? awayTeam.name : '', score: game.awayScore, players: [] },
+                    date: CalendarEngine.formatDateDisplay(dateStr),
+                    hasDetailedStats: false
+                });
+            }
+            
+            document.getElementById('boxScoreModal').classList.remove('hidden');
+        }
+        window.showBoxScore = showBoxScore;
 
         // ============================================
         // ALL-STAR GAME

@@ -1030,4 +1030,219 @@ export class UIRenderer {
             </div>
         `;
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // POST-GAME SUMMARY (popup after user team games)
+    // ═══════════════════════════════════════════════════════════════
+
+    static postGameSummary({ userTeam, opponent, isHome, userWon, topPlayer, date, userRecord }) {
+        const resultColor = userWon ? '#4ecdc4' : '#ff6b6b';
+        const resultText = userWon ? 'VICTORY' : 'DEFEAT';
+        const resultIcon = userWon ? '🎉' : '😤';
+
+        let html = `
+            <div style="text-align: center; padding: 10px;">
+                <div style="font-size: 1.5em; margin-bottom: 5px;">${resultIcon}</div>
+                <div style="font-size: 1.8em; font-weight: bold; color: ${resultColor}; margin-bottom: 5px;">${resultText}</div>
+                <div style="opacity: 0.7; font-size: 0.9em; margin-bottom: 15px;">${date}</div>
+                
+                <div style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 20px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 0.9em; opacity: 0.8; margin-bottom: 5px;">${userTeam.city}</div>
+                        <div style="font-size: 2.5em; font-weight: bold; color: ${userWon ? '#4ecdc4' : '#fff'};">${userTeam.score}</div>
+                    </div>
+                    <div style="font-size: 1.2em; opacity: 0.4;">—</div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 0.9em; opacity: 0.8; margin-bottom: 5px;">${opponent.city}</div>
+                        <div style="font-size: 2.5em; font-weight: bold; color: ${!userWon ? '#4ecdc4' : '#fff'};">${opponent.score}</div>
+                    </div>
+                </div>
+                
+                <div style="opacity: 0.7; margin-bottom: 15px;">Record: ${userRecord.wins}-${userRecord.losses}</div>
+        `;
+
+        if (topPlayer) {
+            const fgPct = topPlayer.fga > 0 ? ((topPlayer.fgm / topPlayer.fga) * 100).toFixed(0) : 0;
+            html += `
+                <div style="background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.2); border-radius: 10px; padding: 15px; margin-bottom: 10px;">
+                    <div style="font-size: 0.85em; opacity: 0.7; margin-bottom: 5px;">⭐ Player of the Game</div>
+                    <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 8px;">${topPlayer.name}</div>
+                    <div style="display: flex; justify-content: center; gap: 20px; font-size: 1.1em;">
+                        <span><strong>${topPlayer.pts}</strong> <span style="opacity: 0.6; font-size: 0.8em;">PTS</span></span>
+                        <span><strong>${topPlayer.reb}</strong> <span style="opacity: 0.6; font-size: 0.8em;">REB</span></span>
+                        <span><strong>${topPlayer.ast}</strong> <span style="opacity: 0.6; font-size: 0.8em;">AST</span></span>
+                    </div>
+                    <div style="opacity: 0.6; font-size: 0.85em; margin-top: 5px;">${topPlayer.fgm}-${topPlayer.fga} FG (${fgPct}%) · ${topPlayer.min} MIN</div>
+                </div>
+            `;
+        }
+
+        html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: left;">';
+        [userTeam, opponent].forEach(team => {
+            html += `<div><div style="font-weight: bold; margin-bottom: 8px; opacity: 0.8;">${team.city} Leaders</div>`;
+            const top3 = (team.players || []).sort((a, b) => b.pts - a.pts).slice(0, 3);
+            top3.forEach(p => {
+                html += `<div style="padding: 4px 0; font-size: 0.88em;"><strong>${p.name}</strong> <span style="opacity: 0.7;">${p.pts} pts, ${p.reb} reb, ${p.ast} ast</span></div>`;
+            });
+            html += '</div>';
+        });
+        html += '</div></div>';
+        return html;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FULL BOX SCORE (from calendar deep-dive)
+    // ═══════════════════════════════════════════════════════════════
+
+    static boxScore({ home, away, date, hasDetailedStats }) {
+        const winner = home.score > away.score ? 'home' : 'away';
+        let html = `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="opacity: 0.7; font-size: 0.9em; margin-bottom: 10px;">${date || ''}</div>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 30px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 0.95em; opacity: 0.8;">${away.city} ${away.teamName || away.name || ''}</div>
+                        <div style="font-size: 2.5em; font-weight: bold; ${winner === 'away' ? 'color: #4ecdc4;' : ''}">${away.score}</div>
+                    </div>
+                    <div style="font-size: 1.3em; opacity: 0.3;">@</div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 0.95em; opacity: 0.8;">${home.city} ${home.teamName || home.name || ''}</div>
+                        <div style="font-size: 2.5em; font-weight: bold; ${winner === 'home' ? 'color: #4ecdc4;' : ''}">${home.score}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        if (!hasDetailedStats) {
+            html += '<p style="text-align: center; opacity: 0.6; padding: 20px;">Detailed box score available for your team\'s games only.</p>';
+            return html;
+        }
+
+        [away, home].forEach(team => { html += UIRenderer._boxScoreTeamTable(team); });
+        return html;
+    }
+
+    static _boxScoreTeamTable(team) {
+        const players = team.players || [];
+        if (players.length === 0) return '';
+        
+        const starters = players.filter(p => p.starter);
+        const bench = players.filter(p => !p.starter);
+        
+        const totals = players.reduce((t, p) => ({
+            pts: t.pts + p.pts, reb: t.reb + p.reb, ast: t.ast + p.ast,
+            stl: t.stl + p.stl, blk: t.blk + p.blk, to: t.to + p.to,
+            fgm: t.fgm + p.fgm, fga: t.fga + p.fga,
+            tpm: t.tpm + p.tpm, tpa: t.tpa + p.tpa,
+            ftm: t.ftm + p.ftm, fta: t.fta + p.fta
+        }), { pts:0, reb:0, ast:0, stl:0, blk:0, to:0, fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0 });
+
+        const renderRow = (p, i) => {
+            const bg = i % 2 === 0 ? 'background: rgba(255,255,255,0.02);' : '';
+            return `<tr style="${bg}">
+                <td style="padding: 5px 8px; text-align: left;"><strong>${p.name}</strong> <span style="opacity: 0.5; font-size: 0.85em;">${p.pos}</span></td>
+                <td style="padding: 5px 4px; text-align: center;">${p.min}</td>
+                <td style="padding: 5px 4px; text-align: center; font-weight: bold;">${p.pts}</td>
+                <td style="padding: 5px 4px; text-align: center;">${p.reb}</td>
+                <td style="padding: 5px 4px; text-align: center;">${p.ast}</td>
+                <td style="padding: 5px 4px; text-align: center;">${p.stl}</td>
+                <td style="padding: 5px 4px; text-align: center;">${p.blk}</td>
+                <td style="padding: 5px 4px; text-align: center;">${p.to}</td>
+                <td style="padding: 5px 4px; text-align: center;">${p.fgm}-${p.fga}</td>
+                <td style="padding: 5px 4px; text-align: center;">${p.tpm}-${p.tpa}</td>
+                <td style="padding: 5px 4px; text-align: center;">${p.ftm}-${p.fta}</td>
+            </tr>`;
+        };
+
+        let html = `<div style="margin-bottom: 25px;">
+            <h3 style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid rgba(255,255,255,0.1);">${team.city} ${team.teamName || team.name || ''} — ${team.score}</h3>
+            <div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.82em; white-space: nowrap;">
+                <thead><tr style="opacity: 0.6; border-bottom: 1px solid rgba(255,255,255,0.15);">
+                    <th style="padding: 5px 8px; text-align: left;">Player</th>
+                    <th style="padding: 5px 4px; text-align: center;">MIN</th>
+                    <th style="padding: 5px 4px; text-align: center; font-weight: bold;">PTS</th>
+                    <th style="padding: 5px 4px; text-align: center;">REB</th>
+                    <th style="padding: 5px 4px; text-align: center;">AST</th>
+                    <th style="padding: 5px 4px; text-align: center;">STL</th>
+                    <th style="padding: 5px 4px; text-align: center;">BLK</th>
+                    <th style="padding: 5px 4px; text-align: center;">TO</th>
+                    <th style="padding: 5px 4px; text-align: center;">FG</th>
+                    <th style="padding: 5px 4px; text-align: center;">3PT</th>
+                    <th style="padding: 5px 4px; text-align: center;">FT</th>
+                </tr></thead><tbody>`;
+
+        starters.forEach((p, i) => { html += renderRow(p, i); });
+        if (bench.length > 0) {
+            html += '<tr><td colspan="11" style="padding: 3px 8px; font-size: 0.85em; opacity: 0.5; border-top: 1px solid rgba(255,255,255,0.08);">Bench</td></tr>';
+            bench.forEach((p, i) => { html += renderRow(p, i); });
+        }
+
+        html += `<tr style="border-top: 2px solid rgba(255,255,255,0.15); font-weight: bold;">
+            <td style="padding: 5px 8px;">TOTAL</td><td></td>
+            <td style="padding: 5px 4px; text-align: center;">${totals.pts}</td>
+            <td style="padding: 5px 4px; text-align: center;">${totals.reb}</td>
+            <td style="padding: 5px 4px; text-align: center;">${totals.ast}</td>
+            <td style="padding: 5px 4px; text-align: center;">${totals.stl}</td>
+            <td style="padding: 5px 4px; text-align: center;">${totals.blk}</td>
+            <td style="padding: 5px 4px; text-align: center;">${totals.to}</td>
+            <td style="padding: 5px 4px; text-align: center;">${totals.fgm}-${totals.fga}</td>
+            <td style="padding: 5px 4px; text-align: center;">${totals.tpm}-${totals.tpa}</td>
+            <td style="padding: 5px 4px; text-align: center;">${totals.ftm}-${totals.fta}</td>
+        </tr></tbody></table></div></div>`;
+        return html;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CALENDAR SCORES VIEW
+    // ═══════════════════════════════════════════════════════════════
+
+    static calendarDayScores({ games, date, userTeamId }) {
+        if (!games || games.length === 0) {
+            return '<p style="text-align: center; opacity: 0.7; padding: 15px;">No games on this date.</p>';
+        }
+
+        let html = `<div style="margin-bottom: 10px; font-weight: bold; opacity: 0.8;">${date} — ${games.length} game${games.length !== 1 ? 's' : ''}</div>`;
+        html += '<div style="display: grid; gap: 6px;">';
+
+        games.forEach(game => {
+            const isUserGame = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
+            const bg = isUserGame ? 'background: rgba(102,126,234,0.15); border: 1px solid rgba(102,126,234,0.3);' : 'background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);';
+            const hasBox = !!game.boxScore;
+            const cursor = game.played ? 'cursor: pointer;' : '';
+            const onclick = game.played ? `onclick="showBoxScore('${date}', ${game.homeTeamId}, ${game.awayTeamId})"` : '';
+
+            if (game.played) {
+                const homeWon = game.homeScore > game.awayScore;
+                html += `
+                    <div style="${bg} padding: 10px 12px; border-radius: 6px; ${cursor}" ${onclick}>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                                    <span ${!homeWon ? 'style="opacity: 0.6;"' : 'style="font-weight: bold;"'}>${game.homeName || 'Home'}</span>
+                                    <span ${!homeWon ? 'style="opacity: 0.6;"' : 'style="font-weight: bold;"'}>${game.homeScore}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span ${homeWon ? 'style="opacity: 0.6;"' : 'style="font-weight: bold;"'}>${game.awayName || 'Away'}</span>
+                                    <span ${homeWon ? 'style="opacity: 0.6;"' : 'style="font-weight: bold;"'}>${game.awayScore}</span>
+                                </div>
+                            </div>
+                            ${hasBox ? '<div style="margin-left: 12px; opacity: 0.4; font-size: 0.8em;">📊</div>' : ''}
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div style="${bg} padding: 10px 12px; border-radius: 6px; opacity: 0.6;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>${game.homeName || 'Home'} vs ${game.awayName || 'Away'}</span>
+                            <span>Upcoming</span>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        html += '</div>';
+        return html;
+    }
 }

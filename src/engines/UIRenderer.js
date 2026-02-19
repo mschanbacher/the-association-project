@@ -1256,4 +1256,127 @@ export class UIRenderer {
         html += '</div>';
         return html;
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CALENDAR GRID VIEW
+    // ═══════════════════════════════════════════════════════════════
+
+    static calendarGrid({ months, currentDate, userGamesByDate, allGamesByDate, seasonDates, startYear }) {
+        const allStarStart = seasonDates.allStarStart;
+        const allStarEnd = seasonDates.allStarEnd;
+        const tradeDeadline = seasonDates.tradeDeadline;
+        const regSeasonEnd = seasonDates.tier1End;
+        
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                            'July', 'August', 'September', 'October', 'November', 'December'];
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        
+        let html = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0;">📅 Season ${startYear}-${(startYear + 1) % 100} Calendar</h2>
+                <button onclick="document.getElementById('calendarModal').classList.add('hidden')" 
+                        style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 1em;">
+                    ✕ Close
+                </button>
+            </div>
+            
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px; font-size: 0.85em;">
+                <span style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span style="width: 14px; height: 14px; background: rgba(102,126,234,0.6); border-radius: 3px; display: inline-block;"></span> Your Game (Home)
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span style="width: 14px; height: 14px; background: rgba(234,67,53,0.5); border-radius: 3px; display: inline-block;"></span> Your Game (Away)
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span style="width: 14px; height: 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; display: inline-block;"></span> League Games
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span style="width: 14px; height: 14px; background: rgba(255,215,0,0.3); border-radius: 3px; display: inline-block;"></span> Special Event
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span style="width: 14px; height: 14px; border: 2px solid #ffd700; border-radius: 3px; display: inline-block;"></span> Today
+                </span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; max-height: 65vh; overflow-y: auto; padding-right: 5px;">
+        `;
+        
+        for (const { year, month } of months) {
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            html += `
+            <div style="background: rgba(255,255,255,0.03); border-radius: 10px; padding: 12px; border: 1px solid rgba(255,255,255,0.06);">
+                <h3 style="text-align: center; margin: 0 0 10px 0; font-size: 1.05em; color: #ffd700;">${monthNames[month]} ${year}</h3>
+                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center;">
+            `;
+            
+            for (const d of dayNames) {
+                html += `<div style="font-size: 0.7em; opacity: 0.5; padding: 2px 0;">${d}</div>`;
+            }
+            for (let i = 0; i < firstDay; i++) {
+                html += '<div></div>';
+            }
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const isToday = dateStr === currentDate;
+                const userGame = userGamesByDate[dateStr];
+                const dayGames = allGamesByDate[dateStr];
+                const isAllStar = dateStr >= allStarStart && dateStr <= allStarEnd;
+                const isTradeDeadline = dateStr === tradeDeadline;
+                const isSeasonEnd = dateStr === regSeasonEnd;
+                const isSpecial = isAllStar || isTradeDeadline || isSeasonEnd;
+                
+                let bgColor = 'transparent';
+                let border = 'none';
+                let textColor = 'rgba(255,255,255,0.3)';
+                let title = '';
+                let dotHTML = '';
+                
+                if (userGame) {
+                    if (userGame.isHome) {
+                        bgColor = userGame.played ? 'rgba(102,126,234,0.35)' : 'rgba(102,126,234,0.6)';
+                    } else {
+                        bgColor = userGame.played ? 'rgba(234,67,53,0.3)' : 'rgba(234,67,53,0.5)';
+                    }
+                    textColor = '#fff';
+                    const oppName = userGame.opponent ? userGame.opponent.name.split(' ').pop() : '???';
+                    title = `${userGame.isHome ? 'vs' : '@'} ${oppName}`;
+                    dotHTML = `<div style="font-size: 0.55em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.9; margin-top: 1px;">${userGame.isHome ? 'vs' : '@'} ${oppName}</div>`;
+                } else if (dayGames && dayGames.total > 0) {
+                    bgColor = 'rgba(255,255,255,0.06)';
+                    textColor = 'rgba(255,255,255,0.6)';
+                    title = `${dayGames.total} games`;
+                    dotHTML = `<div style="font-size: 0.5em; opacity: 0.4; margin-top: 1px;">${dayGames.total}g</div>`;
+                }
+                
+                if (isSpecial) {
+                    bgColor = 'rgba(255,215,0,0.2)';
+                    textColor = '#ffd700';
+                    if (isAllStar) { title = '⭐ All-Star Break'; dotHTML = `<div style="font-size: 0.5em; color: #ffd700;">⭐</div>`; }
+                    if (isTradeDeadline) { title = '⏰ Trade Deadline'; dotHTML = `<div style="font-size: 0.5em; color: #ffd700;">TDL</div>`; }
+                    if (isSeasonEnd) { title = '🏁 Season End'; dotHTML = `<div style="font-size: 0.5em; color: #ffd700;">END</div>`; }
+                }
+                
+                if (isToday) border = '2px solid #ffd700';
+                
+                html += `
+                    <div style="background: ${bgColor}; border-radius: 4px; padding: 3px 1px; min-height: 36px;
+                        color: ${textColor}; border: ${border}; cursor: ${(userGame || dayGames) ? 'pointer' : 'default'};
+                        position: relative; transition: background 0.15s;"
+                        title="${title}" onclick="${(userGame || dayGames) ? `showCalendarDayDetail('${dateStr}')` : ''}">
+                        <div style="font-size: 0.8em; font-weight: ${isToday ? 'bold' : 'normal'};">${day}</div>
+                        ${dotHTML}
+                    </div>
+                `;
+            }
+            
+            html += '</div></div>';
+        }
+        
+        html += '</div>';
+        html += '<div id="calendarDayDetail" style="margin-top: 15px; display: none;"></div>';
+        return html;
+    }
 }

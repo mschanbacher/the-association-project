@@ -3558,7 +3558,7 @@ class GMMode {
                         home: {
                             teamId: homeTeam.id,
                             teamName: homeTeam.name,
-                            city: homeTeam.city,
+                            city: homeTeam.city || '',
                             score: gameResult.homeScore,
                             players: gameResult.homePlayerStats
                                 .filter(p => p.minutesPlayed > 0)
@@ -3578,7 +3578,7 @@ class GMMode {
                         away: {
                             teamId: awayTeam.id,
                             teamName: awayTeam.name,
-                            city: awayTeam.city,
+                            city: awayTeam.city || '',
                             score: gameResult.awayScore,
                             players: gameResult.awayPlayerStats
                                 .filter(p => p.minutesPlayed > 0)
@@ -11485,8 +11485,8 @@ let gmMode = null;
                     if (!home || !away) continue;
                     allGames.push({
                         ...game,
-                        homeName: `${home.city} ${home.name}`,
-                        awayName: `${away.city} ${away.name}`,
+                        homeName: home.city ? `${home.city} ${home.name}` : home.name,
+                        awayName: away.city ? `${away.city} ${away.name}` : away.name,
                         tier
                     });
                 }
@@ -11501,7 +11501,7 @@ let gmMode = null;
             } else {
                 if (userGame) {
                     html += '<div style="margin-bottom: 10px;"><strong style="font-size: 0.9em;">🏀 Your Game</strong>';
-                    html += UIRenderer.calendarDayScores({ games: [userGame], date: '', userTeamId });
+                    html += UIRenderer.calendarDayScores({ games: [userGame], date: dateStr, userTeamId, showHeader: false });
                     html += '</div>';
                 }
                 
@@ -11509,7 +11509,7 @@ let gmMode = null;
                     html += `<details style="margin-top: 5px;">
                         <summary style="cursor: pointer; opacity: 0.7; font-size: 0.9em;">${otherGames.length} other game${otherGames.length !== 1 ? 's' : ''} today</summary>
                         <div style="max-height: 300px; overflow-y: auto; margin-top: 5px;">`;
-                    html += UIRenderer.calendarDayScores({ games: otherGames, date: '', userTeamId });
+                    html += UIRenderer.calendarDayScores({ games: otherGames, date: dateStr, userTeamId, showHeader: false });
                     html += '</div></details>';
                 }
             }
@@ -11544,8 +11544,8 @@ let gmMode = null;
             } else {
                 // Score only (non-user game)
                 document.getElementById('boxScoreContent').innerHTML = UIRenderer.boxScore({
-                    home: { city: homeTeam ? homeTeam.city : '', name: homeTeam ? homeTeam.name : '', score: game.homeScore, players: [] },
-                    away: { city: awayTeam ? awayTeam.city : '', name: awayTeam ? awayTeam.name : '', score: game.awayScore, players: [] },
+                    home: { city: homeTeam ? (homeTeam.city || '') : '', name: homeTeam ? homeTeam.name : '', score: game.homeScore, players: [] },
+                    away: { city: awayTeam ? (awayTeam.city || '') : '', name: awayTeam ? awayTeam.name : '', score: game.awayScore, players: [] },
                     date: CalendarEngine.formatDateDisplay(dateStr),
                     hasDetailedStats: false
                 });

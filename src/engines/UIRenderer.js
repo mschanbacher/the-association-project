@@ -32,6 +32,14 @@ export class UIRenderer {
         return n + 'th';
     }
 
+    /** Safe team display name — handles city+name or just name */
+    static _tn(obj) {
+        if (!obj) return '';
+        const city = obj.city || '';
+        const name = obj.teamName || obj.name || '';
+        return city ? `${city} ${name}` : name;
+    }
+
     static pct(wins, losses) {
         const total = wins + losses;
         return total > 0 ? (wins / total * 100).toFixed(1) : '0.0';
@@ -87,7 +95,7 @@ export class UIRenderer {
                 <p style="opacity: 0.7; margin-bottom: 20px;">${tierName}</p>
                 
                 <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 15px;">${userTeam.city} ${userTeam.name}</h3>
+                    <h3 style="margin-bottom: 15px;">${UIRenderer._tn(userTeam)}</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px; text-align: center;">
                         <div>
                             <div style="font-size: 2em; font-weight: bold; ${winCol ? 'color:' + winCol + ';' : ''}">${userTeam.wins}-${userTeam.losses}</div>
@@ -140,7 +148,7 @@ export class UIRenderer {
                     <div style="font-size: 0.88em;">
                         ${top.map((t, i) => `
                             <div style="display: flex; justify-content: space-between; padding: 3px 8px; ${i % 2 === 0 ? 'background: rgba(255,255,255,0.03);' : ''} border-radius: 4px;">
-                                <span>${i + 1}. ${t.city} ${t.name}</span>
+                                <span>${i + 1}. ${UIRenderer._tn(t)}</span>
                                 <span style="opacity: 0.8;">${t.wins}-${t.losses}</span>
                             </div>
                         `).join('')}
@@ -177,7 +185,7 @@ export class UIRenderer {
             <div style="text-align: center; padding: 15px;">
                 <div style="font-size: 3em; margin-bottom: 10px;">${icon}</div>
                 <h2 style="color: ${color}; margin-bottom: 5px;">${title}</h2>
-                <h3 style="margin-bottom: 20px;">${team.city} ${team.name}</h3>
+                <h3 style="margin-bottom: 20px;">${UIRenderer._tn(team)}</h3>
                 <p style="margin-bottom: 20px; opacity: 0.8;">
                     Moving from ${UIRenderer.tierLabel(fromTier)} to ${UIRenderer.tierLabel(toTier)}
                 </p>
@@ -1048,12 +1056,12 @@ export class UIRenderer {
                 
                 <div style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 20px;">
                     <div style="text-align: center;">
-                        <div style="font-size: 0.9em; opacity: 0.8; margin-bottom: 5px;">${userTeam.city}</div>
+                        <div style="font-size: 0.9em; opacity: 0.8; margin-bottom: 5px;">${UIRenderer._tn(userTeam)}</div>
                         <div style="font-size: 2.5em; font-weight: bold; color: ${userWon ? '#4ecdc4' : '#fff'};">${userTeam.score}</div>
                     </div>
                     <div style="font-size: 1.2em; opacity: 0.4;">—</div>
                     <div style="text-align: center;">
-                        <div style="font-size: 0.9em; opacity: 0.8; margin-bottom: 5px;">${opponent.city}</div>
+                        <div style="font-size: 0.9em; opacity: 0.8; margin-bottom: 5px;">${UIRenderer._tn(opponent)}</div>
                         <div style="font-size: 2.5em; font-weight: bold; color: ${!userWon ? '#4ecdc4' : '#fff'};">${opponent.score}</div>
                     </div>
                 </div>
@@ -1079,7 +1087,7 @@ export class UIRenderer {
 
         html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: left;">';
         [userTeam, opponent].forEach(team => {
-            html += `<div><div style="font-weight: bold; margin-bottom: 8px; opacity: 0.8;">${team.city} Leaders</div>`;
+            html += `<div><div style="font-weight: bold; margin-bottom: 8px; opacity: 0.8;">${UIRenderer._tn(team)} Leaders</div>`;
             const top3 = (team.players || []).sort((a, b) => b.pts - a.pts).slice(0, 3);
             top3.forEach(p => {
                 html += `<div style="padding: 4px 0; font-size: 0.88em;"><strong>${p.name}</strong> <span style="opacity: 0.7;">${p.pts} pts, ${p.reb} reb, ${p.ast} ast</span></div>`;
@@ -1101,12 +1109,12 @@ export class UIRenderer {
                 <div style="opacity: 0.7; font-size: 0.9em; margin-bottom: 10px;">${date || ''}</div>
                 <div style="display: flex; justify-content: center; align-items: center; gap: 30px;">
                     <div style="text-align: center;">
-                        <div style="font-size: 0.95em; opacity: 0.8;">${away.city} ${away.teamName || away.name || ''}</div>
+                        <div style="font-size: 0.95em; opacity: 0.8;">${UIRenderer._tn(away)}</div>
                         <div style="font-size: 2.5em; font-weight: bold; ${winner === 'away' ? 'color: #4ecdc4;' : ''}">${away.score}</div>
                     </div>
                     <div style="font-size: 1.3em; opacity: 0.3;">@</div>
                     <div style="text-align: center;">
-                        <div style="font-size: 0.95em; opacity: 0.8;">${home.city} ${home.teamName || home.name || ''}</div>
+                        <div style="font-size: 0.95em; opacity: 0.8;">${UIRenderer._tn(home)}</div>
                         <div style="font-size: 2.5em; font-weight: bold; ${winner === 'home' ? 'color: #4ecdc4;' : ''}">${home.score}</div>
                     </div>
                 </div>
@@ -1155,7 +1163,7 @@ export class UIRenderer {
         };
 
         let html = `<div style="margin-bottom: 25px;">
-            <h3 style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid rgba(255,255,255,0.1);">${team.city} ${team.teamName || team.name || ''} — ${team.score}</h3>
+            <h3 style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid rgba(255,255,255,0.1);">${UIRenderer._tn(team)} — ${team.score}</h3>
             <div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.82em; white-space: nowrap;">
                 <thead><tr style="opacity: 0.6; border-bottom: 1px solid rgba(255,255,255,0.15);">
                     <th style="padding: 5px 8px; text-align: left;">Player</th>
@@ -1196,12 +1204,15 @@ export class UIRenderer {
     // CALENDAR SCORES VIEW
     // ═══════════════════════════════════════════════════════════════
 
-    static calendarDayScores({ games, date, userTeamId }) {
+    static calendarDayScores({ games, date, userTeamId, showHeader }) {
         if (!games || games.length === 0) {
             return '<p style="text-align: center; opacity: 0.7; padding: 15px;">No games on this date.</p>';
         }
 
-        let html = `<div style="margin-bottom: 10px; font-weight: bold; opacity: 0.8;">${date} — ${games.length} game${games.length !== 1 ? 's' : ''}</div>`;
+        let html = '';
+        if (showHeader !== false && date) {
+            html += `<div style="margin-bottom: 10px; font-weight: bold; opacity: 0.8;">${date} — ${games.length} game${games.length !== 1 ? 's' : ''}</div>`;
+        }
         html += '<div style="display: grid; gap: 6px;">';
 
         games.forEach(game => {

@@ -79,10 +79,10 @@ class GameState {
     }
 
     _getPossessionsPerQuarter() {
-        // NBA averages ~100 possessions per game per team = ~25 per quarter
-        // Slight variance by tier
-        const base = { 1: 25, 2: 24, 3: 23 };
-        return (base[this.tier] || 25) + Math.floor(Math.random() * 3) - 1;
+        // Total possessions per quarter (both teams combined, alternating)
+        // NBA averages ~100 possessions per team per game = ~200 total = ~50 per quarter
+        const base = { 1: 50, 2: 48, 3: 46 };
+        return (base[this.tier] || 50) + Math.floor(Math.random() * 4) - 2;
     }
 
     get clock() {
@@ -524,7 +524,7 @@ export class GamePipeline {
                     // Overtime
                     game.isOvertime = true;
                     game.quarter = 5;
-                    game.possessionsPerQuarter = 6; // ~5 min OT
+                    game.possessionsPerQuarter = 12; // ~5 min OT, both teams
                     game.quarterScores.home.push(0);
                     game.quarterScores.away.push(0);
                     game.events.push({ type: 'overtime', homeScore: game.homeScore, awayScore: game.awayScore });

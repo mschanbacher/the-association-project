@@ -3750,55 +3750,76 @@ class GMMode {
      * Finish season in batches to prevent freezing
      */
     finishSeasonBatch() {
-        const batchSize = 50; // Process more games per batch since we're doing full days
+        const batchSize = 50;
         let gamesSimulated = 0;
-        const userTeam = getUserTeam();
         
         console.log('🎯 GMMode.finishSeasonBatch() - calendar-aware batch sim');
         
-        // Simulate day by day in batch
+        // Early exit if already complete
+        if (this.gameState.isSeasonComplete()) {
+            console.log('✅ Season already complete — showing end screen');
+            this.saveGameState();
+            this.updateUI();
+            this.showSeasonEnd();
+            return;
+        }
+        
         let safetyCounter = 0;
-        const maxDays = 250; // Safety limit
+        const maxDays = 250;
         
         while (!this.gameState.isSeasonComplete() && safetyCounter < maxDays) {
             safetyCounter++;
             const currentDate = this.gameState.currentDate;
             
-            // Simulate all games on current date (silent mode for batch)
             const todaysGames = CalendarEngine.getGamesForDate(currentDate, this.gameState);
             const unplayed = todaysGames.tier1.filter(g => !g.played).length +
                            todaysGames.tier2.filter(g => !g.played).length +
                            todaysGames.tier3.filter(g => !g.played).length;
             
             if (unplayed > 0) {
-                this._simulateAllGamesOnDate(currentDate, true); // silent=true
+                this._simulateAllGamesOnDate(currentDate, true);
                 gamesSimulated += unplayed;
             }
             
             // Advance to next day
-            const nextDate = CalendarEngine.addDays(currentDate, 1);
-            this.gameState.currentDate = nextDate;
+            this.gameState.currentDate = CalendarEngine.addDays(currentDate, 1);
             
             // Break for UI update every batch
             if (gamesSimulated >= batchSize) {
                 this.saveGameState();
                 this.updateUI();
                 
-                if (!this.gameState.isSeasonComplete()) {
-                    setTimeout(() => this.finishSeasonBatch(), 10);
-                } else {
+                if (this.gameState.isSeasonComplete()) {
                     this.showSeasonEnd();
+                } else {
+                    setTimeout(() => this.finishSeasonBatch(), 10);
                 }
                 return;
             }
         }
         
-        // Save and update
+        // Final save and season end check
         this.saveGameState();
         this.updateUI();
         
+        console.log(`finishSeasonBatch done: ${gamesSimulated} games, seasonComplete=${this.gameState.isSeasonComplete()}, safety=${safetyCounter}`);
+        
         if (this.gameState.isSeasonComplete()) {
             this.showSeasonEnd();
+        } else if (safetyCounter >= maxDays) {
+            console.warn('⚠️ Safety counter hit — forcing season end check');
+            // Force one more check after a tick in case of timing issue
+            setTimeout(() => {
+                if (this.gameState.isSeasonComplete()) {
+                    this.showSeasonEnd();
+                } else {
+                    console.error('Season not complete after maxDays! Remaining:',
+                        (this.gameState._tier1Schedule || []).filter(g => !g.played).length,
+                        (this.gameState._tier2Schedule || []).filter(g => !g.played).length,
+                        (this.gameState._tier3Schedule || []).filter(g => !g.played).length
+                    );
+                }
+            }, 50);
         }
     }
     

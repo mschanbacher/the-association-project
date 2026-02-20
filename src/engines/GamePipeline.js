@@ -341,8 +341,11 @@ export class GamePipeline {
         const shooterStats = stats[shooter.player.id];
         const archetype = (window.StatEngine.POSITION_ARCHETYPES || {})[shooter.player.position] || window.StatEngine.POSITION_ARCHETYPES['SF'];
 
-        // Rating-based modifiers
-        const ratingBonus = (shooter.effectiveRating - 75 + homeBonus + momentumBoost) * 0.004;
+        // Rating-based modifiers — 3PT is less affected by raw talent than 2PT
+        const ratingDelta = shooter.effectiveRating - 75 + homeBonus + momentumBoost;
+        const ratingBonus2pt = ratingDelta * 0.003;    // 2PT: ±0.3% per rating point
+        const ratingBonus3pt = ratingDelta * 0.0015;   // 3PT: ±0.15% per rating point
+        const ratingBonusFt  = ratingDelta * 0.002;    // FT: ±0.2% per rating point
         const defenseImpact = (defCoachMods.defenseModifier || 0) * 0.5;
         const chemBonus = (chemistry - 1.0) * 0.03;
 
@@ -355,7 +358,7 @@ export class GamePipeline {
                     defStats[fouler.player.id].fouls++;
                     fouler.fouls++;
                 }
-                const ftPct = Math.min(0.95, archetype.baseFtPct + ratingBonus + chemBonus);
+                const ftPct = Math.min(0.95, archetype.baseFtPct + ratingBonusFt + chemBonus);
                 let ftMade = 0;
                 for (let i = 0; i < 2; i++) {
                     shooterStats.freeThrowsAttempted++;
@@ -382,7 +385,7 @@ export class GamePipeline {
 
         // === TURNOVER CHECK ===
         const tierTOMod = game.tier === 3 ? 0.02 : game.tier === 2 ? 0.01 : 0;
-        const toChance = 0.13 - ratingBonus * 0.5 + defenseImpact * 0.3 + tierTOMod;
+        const toChance = 0.15 - ratingBonus2pt * 0.5 + defenseImpact * 0.3 + tierTOMod;
         if (roll < Math.max(0.06, Math.min(0.22, toChance))) {
             shooterStats.turnovers++;
             game.events.push({
@@ -415,7 +418,7 @@ export class GamePipeline {
                 if (Math.random() < 0.45) {
                     const isThree = Math.random() < (archetype.threePtRate || 0.3);
                     const ftCount = isThree ? 3 : 2;
-                    const ftPct = Math.min(0.95, archetype.baseFtPct + ratingBonus + chemBonus);
+                    const ftPct = Math.min(0.95, archetype.baseFtPct + ratingBonusFt + chemBonus);
                     let ftMade = 0;
                     for (let i = 0; i < ftCount; i++) {
                         shooterStats.freeThrowsAttempted++;
@@ -444,8 +447,8 @@ export class GamePipeline {
         // === SHOT ATTEMPT ===
         const isThree = Math.random() < (archetype.threePtRate + (coachMods.threePtRateModifier || 0));
         const shotPct = isThree
-            ? Math.max(0.20, Math.min(0.45, archetype.baseThreePct + ratingBonus + chemBonus + defenseImpact))
-            : Math.max(0.35, Math.min(0.62, archetype.baseFgPct + 0.04 + ratingBonus + chemBonus + defenseImpact));
+            ? Math.max(0.20, Math.min(0.45, archetype.baseThreePct + ratingBonus3pt + chemBonus + defenseImpact))
+            : Math.max(0.35, Math.min(0.62, archetype.baseFgPct + 0.04 + ratingBonus2pt + chemBonus + defenseImpact));
 
         shooterStats.fieldGoalsAttempted++;
         if (isThree) shooterStats.threePointersAttempted++;
@@ -464,7 +467,7 @@ export class GamePipeline {
             }
 
             if (!isThree && Math.random() < 0.05) {
-                const ftPct = Math.min(0.95, archetype.baseFtPct + ratingBonus);
+                const ftPct = Math.min(0.95, archetype.baseFtPct + ratingBonusFt);
                 shooterStats.freeThrowsAttempted++;
                 if (Math.random() < ftPct) {
                     shooterStats.freeThrowsMade++;

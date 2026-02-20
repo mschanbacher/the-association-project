@@ -1279,7 +1279,7 @@ const StatEngine = {
             fgaPer36:     15.0,
             threePtRate:  0.40,
             baseFgPct:    0.430,
-            baseThreePct: 0.360,
+            baseThreePct: 0.345,
             ftRate:       0.25,
             baseFtPct:    0.820,
         },
@@ -1294,7 +1294,7 @@ const StatEngine = {
             fgaPer36:     16.0,
             threePtRate:  0.42,
             baseFgPct:    0.435,
-            baseThreePct: 0.370,
+            baseThreePct: 0.355,
             ftRate:       0.27,
             baseFtPct:    0.810,
         },
@@ -1309,7 +1309,7 @@ const StatEngine = {
             fgaPer36:     14.5,
             threePtRate:  0.32,
             baseFgPct:    0.445,
-            baseThreePct: 0.360,
+            baseThreePct: 0.345,
             ftRate:       0.28,
             baseFtPct:    0.790,
         },
@@ -1324,7 +1324,7 @@ const StatEngine = {
             fgaPer36:     13.5,
             threePtRate:  0.22,
             baseFgPct:    0.475,
-            baseThreePct: 0.345,
+            baseThreePct: 0.330,
             ftRate:       0.30,
             baseFtPct:    0.740,
         },
@@ -1339,16 +1339,16 @@ const StatEngine = {
             fgaPer36:     12.0,
             threePtRate:  0.10,
             baseFgPct:    0.535,
-            baseThreePct: 0.320,
+            baseThreePct: 0.305,
             ftRate:       0.32,
             baseFtPct:    0.700,
         }
     },
 
     TIER_PACE: {
-        1: { targetPoints: 108, variance: 8 },  // NBA caliber: high efficiency, fast pace
-        2: { targetPoints: 90,  variance: 9 },   // G-League/top college: lower efficiency, more variance
-        3: { targetPoints: 76,  variance: 10 },   // Low college/semi-pro: lowest efficiency, highest variance
+        1: { targetPoints: 104, variance: 8 },  // NBA: strength bonus adds ~3-5, landing ~108-112
+        2: { targetPoints: 86,  variance: 9 },   // G-League: with bonus lands ~90-95
+        3: { targetPoints: 72,  variance: 10 },   // Low college: with bonus lands ~74-80
     },
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1746,8 +1746,8 @@ const StatEngine = {
         const threePA = Math.round(fga * adjustedThreePtRate);
         const twoPA = fga - threePA;
 
-        const fgPctBonus = ratingDelta * 0.004;
-        const threePctBonus = ratingDelta * 0.002;
+        const fgPctBonus = ratingDelta * 0.003;
+        const threePctBonus = ratingDelta * 0.0015;
         const ftPctBonus = ratingDelta * 0.002;
         const shootingHeat = this._normalRandom() * 0.06;
         // Opponent defensive intensity affects shooting (scaled by their coachability aggregate)

@@ -384,11 +384,12 @@ export class GamePipeline {
         const roll = Math.random();
 
         // === TURNOVER CHECK ===
-        // NBA team average: ~13-14 TO/game = ~14% of possessions
-        // Lower tiers slightly higher but not drastically (college ~14-15)
-        const tierTOMod = game.tier === 3 ? 0.005 : game.tier === 2 ? 0.003 : 0;
-        const toChance = 0.14 - ratingBonus2pt * 0.2 + defenseImpact * 0.2 + tierTOMod;
-        if (roll < Math.max(0.10, Math.min(0.16, toChance))) {
+        // NBA avg: ~13.5 TO/game (~14% of possessions). Turnovers don't scale
+        // heavily with skill — even elite players average 3+ TO. Use flat tier rates
+        // with minor defensive coaching impact only.
+        const baseTORate = { 1: 0.135, 2: 0.14, 3: 0.145 };
+        const toChance = (baseTORate[game.tier] || 0.14) + defenseImpact * 0.15;
+        if (roll < Math.max(0.11, Math.min(0.16, toChance))) {
             shooterStats.turnovers++;
             game.events.push({
                 type: 'turnover', player: shooter.player.name, side: isHome ? 'home' : 'away',

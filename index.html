@@ -3798,7 +3798,45 @@ class GMMode {
             }
         }
         
-        // Final save and season end check
+        // If we exhausted the date range but games remain, sim them directly
+        // This catches orphaned games whose dates were skipped
+        if (!this.gameState.isSeasonComplete()) {
+            console.log('🔧 Cleaning up orphaned unplayed games...');
+            const tierConfigs = [
+                { schedule: this.gameState._tier1Schedule, teams: this.gameState.tier1Teams, tier: 1 },
+                { schedule: this.gameState._tier2Schedule, teams: this.gameState.tier2Teams, tier: 2 },
+                { schedule: this.gameState._tier3Schedule, teams: this.gameState.tier3Teams, tier: 3 }
+            ];
+            for (const { schedule, teams, tier } of tierConfigs) {
+                if (!schedule || !teams) continue;
+                const unplayed = schedule.filter(g => !g.played);
+                if (unplayed.length > 0) {
+                    console.log(`  Tier ${tier}: ${unplayed.length} orphaned games`);
+                }
+                for (const game of unplayed) {
+                    const home = teams.find(t => t.id === game.homeTeamId);
+                    const away = teams.find(t => t.id === game.awayTeamId);
+                    if (!home || !away) { game.played = true; continue; }
+                    
+                    const result = simulationController.simulateFullGame(home, away);
+                    game.played = true;
+                    game.homeScore = result.homeScore;
+                    game.awayScore = result.awayScore;
+                    game.winnerId = result.winner.id;
+                    processFatigueAfterGame(home, away, false);
+                    updateInjuries(home);
+                    updateInjuries(away);
+                    const userGamesPlayed = getUserTeam() ? (getUserTeam().wins + getUserTeam().losses) : 0;
+                    const injuries = checkForInjuries(home, away, userGamesPlayed, false);
+                    injuries.forEach(({team, player, injury}) => {
+                        const aiDecision = injury.canPlayThrough && Math.random() < 0.3 ? 'playThrough' : 'rest';
+                        applyInjury(player, injury, aiDecision);
+                    });
+                }
+            }
+        }
+        
+        // Final save and season end
         this.saveGameState();
         this.updateUI();
         
@@ -3806,20 +3844,6 @@ class GMMode {
         
         if (this.gameState.isSeasonComplete()) {
             this.showSeasonEnd();
-        } else if (safetyCounter >= maxDays) {
-            console.warn('⚠️ Safety counter hit — forcing season end check');
-            // Force one more check after a tick in case of timing issue
-            setTimeout(() => {
-                if (this.gameState.isSeasonComplete()) {
-                    this.showSeasonEnd();
-                } else {
-                    console.error('Season not complete after maxDays! Remaining:',
-                        (this.gameState._tier1Schedule || []).filter(g => !g.played).length,
-                        (this.gameState._tier2Schedule || []).filter(g => !g.played).length,
-                        (this.gameState._tier3Schedule || []).filter(g => !g.played).length
-                    );
-                }
-            }, 50);
         }
     }
     
@@ -11483,13 +11507,40 @@ let gmMode = null;
             if (!gameState || !gameState.currentDate) return;
             
             const currentDate = gameState.currentDate;
+            
+            // Check if All-Star break would be crossed (same as simulateNextGame)
+            const seasonDates = gameState.seasonDates;
+            const allStarStart = CalendarEngine.toDateString(seasonDates.allStarStart);
+            if (!gameState._allStarCompleted && currentDate <= allStarStart) {
+                const nextUD = CalendarEngine.getNextUserGameDate(currentDate, gameState);
+                if (nextUD && nextUD > allStarStart) {
+                    let sd = CalendarEngine.addDays(currentDate, 1);
+                    while (sd < allStarStart) {
+                        gmMode._simulateAllGamesOnDate(sd, true);
+                        sd = CalendarEngine.addDays(sd, 1);
+                    }
+                    gameState.currentDate = allStarStart;
+                    gmMode.saveGameState();
+                    gmMode.updateUI();
+                    runAllStarWeekend();
+                    const allStarEnd = CalendarEngine.toDateString(seasonDates.allStarEnd);
+                    gameState.currentDate = CalendarEngine.addDays(allStarEnd, 1);
+                    gmMode.saveGameState();
+                    gmMode.updateUI();
+                    return;
+                }
+            }
+            
             const nextUserDate = CalendarEngine.getNextUserGameDate(currentDate, gameState);
             if (!nextUserDate) {
                 alert('No upcoming games found.');
                 return;
             }
             
-            // Sim intervening days silently (same as simulateNextGame)
+            // Sim ALL games on currentDate first (catches any unplayed games on current day)
+            gmMode._simulateAllGamesOnDate(currentDate, true);
+            
+            // Sim all intervening days between currentDate+1 and user's next game date
             let simDate = CalendarEngine.addDays(currentDate, 1);
             while (simDate < nextUserDate) {
                 gmMode._simulateAllGamesOnDate(simDate, true);

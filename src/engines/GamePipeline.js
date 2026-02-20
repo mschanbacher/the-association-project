@@ -385,10 +385,10 @@ export class GamePipeline {
 
         // === TURNOVER CHECK ===
         // NBA team average: ~13-14 TO/game = ~14% of possessions
-        // Lower tiers slightly higher but not drastically
-        const tierTOMod = game.tier === 3 ? 0.01 : game.tier === 2 ? 0.005 : 0;
-        const toChance = 0.14 - ratingBonus2pt * 0.3 + defenseImpact * 0.2 + tierTOMod;
-        if (roll < Math.max(0.07, Math.min(0.19, toChance))) {
+        // Lower tiers slightly higher but not drastically (college ~14-15)
+        const tierTOMod = game.tier === 3 ? 0.005 : game.tier === 2 ? 0.003 : 0;
+        const toChance = 0.14 - ratingBonus2pt * 0.2 + defenseImpact * 0.2 + tierTOMod;
+        if (roll < Math.max(0.10, Math.min(0.16, toChance))) {
             shooterStats.turnovers++;
             game.events.push({
                 type: 'turnover', player: shooter.player.name, side: isHome ? 'home' : 'away',
@@ -417,7 +417,8 @@ export class GamePipeline {
                 defStats[fouler.player.id].fouls++;
                 fouler.fouls++;
 
-                if (Math.random() < 0.45) {
+                // Shooting foul (~52% of fouls) — generates free throws
+                if (Math.random() < 0.52) {
                     const isThree = Math.random() < (archetype.threePtRate || 0.3);
                     const ftCount = isThree ? 3 : 2;
                     const ftPct = Math.min(0.95, archetype.baseFtPct + ratingBonusFt + chemBonus);

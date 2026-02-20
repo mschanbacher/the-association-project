@@ -127,8 +127,8 @@ export class GamePipeline {
         SLOW:           { min: 18, max: 24 },    // Running clock, milking shot clock
         FOUL_PLAY:      { min: 4, max: 8 },      // Intentional foul situations
         BUZZER:         { min: 1, max: 4 },       // End of quarter scramble
-        // Tier adjustments: lower tiers play slower half-court
-        TIER_MODIFIER:  { 1: 0, 2: 1.5, 3: 3.0 } // Added seconds per possession
+        // Tier adjustments: lower tiers play slightly slower half-court
+        TIER_MODIFIER:  { 1: 0, 2: 1.0, 3: 2.0 } // Added seconds per possession
     };
 
     /**
@@ -384,9 +384,11 @@ export class GamePipeline {
         const roll = Math.random();
 
         // === TURNOVER CHECK ===
-        const tierTOMod = game.tier === 3 ? 0.02 : game.tier === 2 ? 0.01 : 0;
-        const toChance = 0.15 - ratingBonus2pt * 0.5 + defenseImpact * 0.3 + tierTOMod;
-        if (roll < Math.max(0.06, Math.min(0.22, toChance))) {
+        // NBA team average: ~13-14 TO/game = ~14% of possessions
+        // Lower tiers slightly higher but not drastically
+        const tierTOMod = game.tier === 3 ? 0.01 : game.tier === 2 ? 0.005 : 0;
+        const toChance = 0.14 - ratingBonus2pt * 0.3 + defenseImpact * 0.2 + tierTOMod;
+        if (roll < Math.max(0.07, Math.min(0.19, toChance))) {
             shooterStats.turnovers++;
             game.events.push({
                 type: 'turnover', player: shooter.player.name, side: isHome ? 'home' : 'away',

@@ -11823,9 +11823,15 @@ let gmMode = null;
                 applyInjury(player, injury, aiDecision);
             });
             
+            // Advance date past the watched game (same as simulateNextGame does)
+            gameState.currentDate = CalendarEngine.addDays(_watchDate, 1);
+            
             // Close modal
             document.getElementById('watchGameModal').classList.add('hidden');
             _watchGame = null;
+            
+            // Show post-game popup (same as sim next game)
+            gmMode._showPostGameIfUserPlayed(_watchDate);
             
             // Save and update UI
             gmMode.saveGameState();

@@ -1279,7 +1279,7 @@ const StatEngine = {
             fgaPer36:     15.0,
             threePtRate:  0.40,
             baseFgPct:    0.430,
-            baseThreePct: 0.415,
+            baseThreePct: 0.360,
             ftRate:       0.25,
             baseFtPct:    0.820,
         },
@@ -1294,7 +1294,7 @@ const StatEngine = {
             fgaPer36:     16.0,
             threePtRate:  0.42,
             baseFgPct:    0.435,
-            baseThreePct: 0.420,
+            baseThreePct: 0.370,
             ftRate:       0.27,
             baseFtPct:    0.810,
         },
@@ -1309,7 +1309,7 @@ const StatEngine = {
             fgaPer36:     14.5,
             threePtRate:  0.32,
             baseFgPct:    0.445,
-            baseThreePct: 0.410,
+            baseThreePct: 0.360,
             ftRate:       0.28,
             baseFtPct:    0.790,
         },
@@ -1324,7 +1324,7 @@ const StatEngine = {
             fgaPer36:     13.5,
             threePtRate:  0.22,
             baseFgPct:    0.475,
-            baseThreePct: 0.390,
+            baseThreePct: 0.345,
             ftRate:       0.30,
             baseFtPct:    0.740,
         },
@@ -1339,7 +1339,7 @@ const StatEngine = {
             fgaPer36:     12.0,
             threePtRate:  0.10,
             baseFgPct:    0.535,
-            baseThreePct: 0.360,
+            baseThreePct: 0.320,
             ftRate:       0.32,
             baseFtPct:    0.700,
         }
@@ -1753,8 +1753,8 @@ const StatEngine = {
         // Opponent defensive intensity affects shooting (scaled by their coachability aggregate)
         const oppDefPenalty = scaledDefMod;
 
-        const twoPtPct = Math.max(0.30, Math.min(0.70, (archetype.baseFgPct + 0.04) + fgPctBonus + shootingHeat + oppDefPenalty));
-        const threePtPct = Math.max(0.15, Math.min(0.55, archetype.baseThreePct + threePctBonus + shootingHeat + oppDefPenalty * 0.8));
+        const twoPtPct = Math.max(0.30, Math.min(0.62, (archetype.baseFgPct + 0.04) + fgPctBonus + shootingHeat + oppDefPenalty));
+        const threePtPct = Math.max(0.15, Math.min(0.45, archetype.baseThreePct + threePctBonus + shootingHeat + oppDefPenalty * 0.8));
         const ftPct = Math.max(0.40, Math.min(0.95, archetype.baseFtPct + ftPctBonus + (this._normalRandom() * 0.05)));
 
         const twoPM = this._binomialRoll(twoPA, twoPtPct);

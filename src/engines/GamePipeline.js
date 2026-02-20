@@ -1,46 +1,63 @@
 /**
  * GamePipeline — Possession-by-possession basketball simulation
  * 
- * Produces the same output format as StatEngine.generateGame() so the rest
- * of the system (stat accumulation, standings, etc.) doesn't care which path was used.
+ * Clock-based: each possession consumes variable game time (8-24 sec).
+ * Quarter ends when 12:00 of game clock expire, not after fixed possession count.
  * 
- * Two modes:
- *   1. resolve() — run the entire game instantly, return final result
- *   2. step()    — advance one possession, return events (for coach mode / live view)
+ * Context-aware pace:
+ *   - Early quarters: normal half-court pace (14-18 sec/possession)
+ *   - Fast breaks after turnovers/steals: 6-10 sec
+ *   - Close game late Q4: intentional fouls → rapid possessions (4-8 sec)
+ *   - Blowout Q4: winning team milks clock (20-24 sec)
+ *   - End of quarter: quick shots to beat buzzer (2-5 sec)
  * 
- * Architecture:
- *   - GamePipeline manages game state (clock, score, quarter, lineups)
- *   - Each possession resolves: who has ball → action → outcome → stats updated
- *   - Events emitted at each step for UI consumption
+ * Produces the same output format as StatEngine.generateGame().
  */
 
 import { CoachEngine } from './CoachEngine.js';
 
 // ═══════════════════════════════════════════════════════════════
-// POSSESSION OUTCOMES
+// GAME STATE — Clock-based
 // ═══════════════════════════════════════════════════════════════
 
-const ShotType = {
-    TWO_POINT: '2pt',
-    THREE_POINT: '3pt',
-    FREE_THROW: 'ft'
-};
+class GameClock {
+    constructor(tier) {
+        this.tier = tier;
+        this.quarter = 1;
+        this.secondsLeft = 720; // 12:00 per quarter
+        this.isOvertime = false;
+        this.otPeriod = 0;
+    }
 
-const PossessionResult = {
-    MADE_TWO: 'made_2pt',
-    MADE_THREE: 'made_3pt',
-    MISSED: 'missed',
-    TURNOVER: 'turnover',
-    FOUL_SHOOTING: 'foul_shooting',
-    FOUL_NON_SHOOTING: 'foul_non_shooting',
-    AND_ONE: 'and_one'
-};
+    get minutesLeft() { return this.secondsLeft / 60; }
 
-// ═══════════════════════════════════════════════════════════════
-// GAME STATE
-// ═══════════════════════════════════════════════════════════════
+    get display() {
+        const min = Math.floor(this.secondsLeft / 60);
+        const sec = Math.floor(this.secondsLeft % 60);
+        const qLabel = this.quarter <= 4 ? `Q${this.quarter}` : `OT${this.quarter - 4}`;
+        return `${qLabel} ${min}:${String(sec).padStart(2, '0')}`;
+    }
 
-class GameState {
+    consume(seconds) {
+        this.secondsLeft = Math.max(0, this.secondsLeft - seconds);
+    }
+
+    get isQuarterOver() { return this.secondsLeft <= 0; }
+
+    startNextQuarter() {
+        this.quarter++;
+        this.secondsLeft = 720; // 12 min
+    }
+
+    startOvertime() {
+        this.isOvertime = true;
+        this.otPeriod++;
+        this.quarter = 4 + this.otPeriod;
+        this.secondsLeft = 300; // 5 min OT
+    }
+}
+
+class PipelineGameState {
     constructor(homeTeam, awayTeam, options = {}) {
         this.homeTeam = homeTeam;
         this.awayTeam = awayTeam;
@@ -53,21 +70,19 @@ class GameState {
         this.quarterScores = { home: [0, 0, 0, 0], away: [0, 0, 0, 0] };
 
         // Clock
-        this.quarter = 1;
+        this.clock = new GameClock(this.tier);
         this.possession = 0;
-        this.possessionsPerQuarter = this._getPossessionsPerQuarter();
-        this.totalPossessions = this.possessionsPerQuarter * 4;
 
         // Possession tracking
-        this.offenseIsHome = Math.random() < 0.5; // Coin flip for first possession
+        this.offenseIsHome = Math.random() < 0.5;
+        this.lastPossessionWasFastBreak = false;
         this.events = [];
         this.isComplete = false;
-        this.isOvertime = false;
 
         // Momentum (-10 to +10, positive = home advantage)
         this.momentum = 0;
-        this.homeRun = 0; // consecutive home scores
-        this.awayRun = 0; // consecutive away scores
+        this.homeRun = 0;
+        this.awayRun = 0;
 
         // Player stats (accumulated per possession)
         this.homePlayerStats = {};
@@ -78,22 +93,24 @@ class GameState {
         this.awayTimeouts = 7;
     }
 
-    _getPossessionsPerQuarter() {
-        // Total possessions per quarter (both teams combined, alternating)
-        // NBA averages ~100 possessions per team per game = ~200 total = ~50 per quarter
-        // Lower tiers have slightly slower pace (fewer fast breaks, more half-court)
-        const base = { 1: 50, 2: 46, 3: 42 };
-        return (base[this.tier] || 50) + Math.floor(Math.random() * 4) - 2;
+    /** Get the score margin from home's perspective */
+    get margin() { return this.homeScore - this.awayScore; }
+
+    /** Is this a close game? (within 6 points) */
+    get isClose() { return Math.abs(this.margin) <= 6; }
+
+    /** Is this a blowout? (15+ points) */
+    get isBlowout() { return Math.abs(this.margin) >= 15; }
+
+    /** Are we in the clutch? (Q4 or OT, under 3 min, close game) */
+    get isClutch() {
+        return this.clock.quarter >= 4 && this.clock.secondsLeft <= 180 && this.isClose;
     }
 
-    get clock() {
-        const possInQuarter = this.possession % this.possessionsPerQuarter;
-        const minutesLeft = 12 - (possInQuarter / this.possessionsPerQuarter) * 12;
-        return {
-            quarter: this.quarter,
-            minutesLeft: Math.max(0, minutesLeft),
-            display: `Q${this.quarter} ${Math.floor(minutesLeft)}:${String(Math.floor((minutesLeft % 1) * 60)).padStart(2, '0')}`
-        };
+    /** Is the losing team likely to intentionally foul? */
+    get isFoulingTime() {
+        return this.clock.quarter >= 4 && this.clock.secondsLeft <= 120 &&
+               Math.abs(this.margin) >= 3 && Math.abs(this.margin) <= 10;
     }
 }
 
@@ -103,14 +120,24 @@ class GameState {
 
 export class GamePipeline {
 
+    // Pace constants: seconds consumed per possession type
+    static PACE = {
+        FAST_BREAK:     { min: 5, max: 9 },     // Transition after steal/TO
+        NORMAL:         { min: 14, max: 18 },    // Standard half-court
+        SLOW:           { min: 18, max: 24 },    // Running clock, milking shot clock
+        FOUL_PLAY:      { min: 4, max: 8 },      // Intentional foul situations
+        BUZZER:         { min: 1, max: 4 },       // End of quarter scramble
+        // Tier adjustments: lower tiers play slower half-court
+        TIER_MODIFIER:  { 1: 0, 2: 1.5, 3: 3.0 } // Added seconds per possession
+    };
+
     /**
      * Run an entire game and return result compatible with StatEngine.generateGame()
      */
     static resolve(homeTeam, awayTeam, options = {}) {
-        const game = new GameState(homeTeam, awayTeam, options);
+        const game = new PipelineGameState(homeTeam, awayTeam, options);
         const setup = GamePipeline._setupTeams(game);
 
-        // Run all possessions
         while (!game.isComplete) {
             GamePipeline._stepPossession(game, setup);
         }
@@ -119,15 +146,13 @@ export class GamePipeline {
     }
 
     /**
-     * Create an interactive game for step-by-step simulation (coach mode)
-     * Returns a game handle with step() and getState() methods
+     * Create an interactive game for step-by-step simulation
      */
     static create(homeTeam, awayTeam, options = {}) {
-        const game = new GameState(homeTeam, awayTeam, options);
+        const game = new PipelineGameState(homeTeam, awayTeam, options);
         const setup = GamePipeline._setupTeams(game);
 
         return {
-            /** Advance one possession. Returns array of events from this possession. */
             step() {
                 if (game.isComplete) return [];
                 const eventsBefore = game.events.length;
@@ -135,57 +160,46 @@ export class GamePipeline {
                 return game.events.slice(eventsBefore);
             },
 
-            /** Get current game state snapshot */
             getState() {
                 return {
                     homeScore: game.homeScore,
                     awayScore: game.awayScore,
-                    quarter: game.quarter,
-                    clock: game.clock,
+                    quarter: game.clock.quarter,
+                    clock: { quarter: game.clock.quarter, minutesLeft: game.clock.minutesLeft, display: game.clock.display },
                     quarterScores: game.quarterScores,
                     momentum: game.momentum,
                     homeRun: game.homeRun,
                     awayRun: game.awayRun,
                     isComplete: game.isComplete,
-                    isOvertime: game.isOvertime,
+                    isOvertime: game.clock.isOvertime,
                     possession: game.possession,
                     offenseIsHome: game.offenseIsHome,
                     homeTimeouts: game.homeTimeouts,
                     awayTimeouts: game.awayTimeouts,
-                    homeLineup: setup.homeRotation.filter(e => e.onCourt).map(e => ({
-                        name: e.player.name, pos: e.player.position, rating: e.effectiveRating, fatigue: e.fatigue
-                    })),
-                    awayLineup: setup.awayRotation.filter(e => e.onCourt).map(e => ({
-                        name: e.player.name, pos: e.player.position, rating: e.effectiveRating, fatigue: e.fatigue
-                    }))
+                    isClutch: game.isClutch,
+                    isFoulingTime: game.isFoulingTime,
+                    margin: game.margin
                 };
             },
 
-            /** Call a timeout for the given side ('home' or 'away') */
             callTimeout(side) {
                 if (side === 'home' && game.homeTimeouts > 0) {
                     game.homeTimeouts--;
                     game.momentum = Math.max(-3, Math.min(3, game.momentum * 0.3));
-                    game.events.push({ type: 'timeout', side: 'home', quarter: game.quarter });
+                    game.events.push({ type: 'timeout', side: 'home', quarter: game.clock.quarter });
                     return true;
                 } else if (side === 'away' && game.awayTimeouts > 0) {
                     game.awayTimeouts--;
                     game.momentum = Math.max(-3, Math.min(3, game.momentum * 0.3));
-                    game.events.push({ type: 'timeout', side: 'away', quarter: game.quarter });
+                    game.events.push({ type: 'timeout', side: 'away', quarter: game.clock.quarter });
                     return true;
                 }
                 return false;
             },
 
-            /** Get final result (only valid after game.isComplete) */
-            getResult() {
-                return GamePipeline._buildResult(game, setup);
-            },
-
-            /** Check if game is over */
+            getResult() { return GamePipeline._buildResult(game, setup); },
             get isComplete() { return game.isComplete; },
 
-            /** Run to completion and return result */
             finish() {
                 while (!game.isComplete) {
                     GamePipeline._stepPossession(game, setup);
@@ -196,7 +210,7 @@ export class GamePipeline {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // SETUP — Build rotations, calculate modifiers
+    // SETUP
     // ═══════════════════════════════════════════════════════════════
 
     static _setupTeams(game) {
@@ -219,7 +233,6 @@ export class GamePipeline {
 
         const homeCourtBonus = game.tier === 1 ? 3 : game.tier === 2 ? 2.5 : 2;
 
-        // Initialize player stat accumulators
         for (const entry of homeRotation) {
             game.homePlayerStats[entry.player.id] = GamePipeline._emptyStatLine(entry.player, entry.isStarter);
         }
@@ -236,10 +249,71 @@ export class GamePipeline {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // PACE — How much clock a possession consumes
+    // ═══════════════════════════════════════════════════════════════
+
+    static _getPossessionTime(game) {
+        const tierMod = GamePipeline.PACE.TIER_MODIFIER[game.tier] || 0;
+        let pace;
+
+        // Buzzer-beater territory: under 5 seconds
+        if (game.clock.secondsLeft <= 5) {
+            return game.clock.secondsLeft; // Use whatever's left
+        }
+
+        // End of quarter, under 30 sec: quick shots
+        if (game.clock.secondsLeft <= 30) {
+            pace = GamePipeline.PACE.BUZZER;
+            return GamePipeline._randRange(pace.min, Math.min(pace.max, game.clock.secondsLeft));
+        }
+
+        // Intentional foul time: trailing team fouls quickly
+        if (game.isFoulingTime) {
+            const offenseIsLeading = (game.offenseIsHome && game.margin > 0) || (!game.offenseIsHome && game.margin < 0);
+            if (!offenseIsLeading) {
+                pace = GamePipeline.PACE.FAST_BREAK;
+            } else {
+                pace = GamePipeline.PACE.FOUL_PLAY;
+            }
+            return GamePipeline._randRange(pace.min, pace.max);
+        }
+
+        // Blowout Q4: winning team runs clock
+        if (game.clock.quarter >= 4 && game.isBlowout && game.clock.secondsLeft < 360) {
+            const leadingHasBall = (game.offenseIsHome && game.margin > 0) || (!game.offenseIsHome && game.margin < 0);
+            if (leadingHasBall) {
+                pace = GamePipeline.PACE.SLOW;
+                return GamePipeline._randRange(pace.min, pace.max) + tierMod;
+            }
+        }
+
+        // Fast break after steal/turnover
+        if (game.lastPossessionWasFastBreak) {
+            game.lastPossessionWasFastBreak = false;
+            pace = GamePipeline.PACE.FAST_BREAK;
+            return GamePipeline._randRange(pace.min, pace.max) + tierMod * 0.5;
+        }
+
+        // Normal half-court
+        pace = GamePipeline.PACE.NORMAL;
+        return GamePipeline._randRange(pace.min, pace.max) + tierMod;
+    }
+
+    static _randRange(min, max) {
+        return min + Math.random() * (max - min);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // CORE — Resolve one possession
     // ═══════════════════════════════════════════════════════════════
 
     static _stepPossession(game, setup) {
+        // Check if quarter is already over
+        if (game.clock.isQuarterOver) {
+            GamePipeline._handleQuarterEnd(game, setup);
+            return;
+        }
+
         const isHome = game.offenseIsHome;
         const rotation = isHome ? setup.homeRotation : setup.awayRotation;
         const defRotation = isHome ? setup.awayRotation : setup.homeRotation;
@@ -251,12 +325,15 @@ export class GamePipeline {
         const homeBonus = isHome ? setup.homeCourtBonus : 0;
         const momentumBoost = game.momentum * (isHome ? 0.15 : -0.15);
 
-        // Pick the shooter based on usage share among on-court players
+        // Consume clock
+        const possTime = GamePipeline._getPossessionTime(game);
+        game.clock.consume(possTime);
+
+        // Pick the shooter
         const onCourt = rotation.filter(e => e.onCourt && e.minutes > 0);
         if (onCourt.length === 0) {
             game.offenseIsHome = !game.offenseIsHome;
             game.possession++;
-            GamePipeline._checkQuarterEnd(game, setup);
             return;
         }
 
@@ -264,37 +341,70 @@ export class GamePipeline {
         const shooterStats = stats[shooter.player.id];
         const archetype = (window.StatEngine.POSITION_ARCHETYPES || {})[shooter.player.position] || window.StatEngine.POSITION_ARCHETYPES['SF'];
 
-        // Determine possession outcome
+        // Rating-based modifiers
         const ratingBonus = (shooter.effectiveRating - 75 + homeBonus + momentumBoost) * 0.004;
         const defenseImpact = (defCoachMods.defenseModifier || 0) * 0.5;
         const chemBonus = (chemistry - 1.0) * 0.03;
 
+        // === INTENTIONAL FOUL CHECK ===
+        if (game.isFoulingTime) {
+            const offenseIsLeading = (isHome && game.margin > 0) || (!isHome && game.margin < 0);
+            if (offenseIsLeading && Math.random() < 0.70) {
+                const fouler = GamePipeline._pickDefender(defRotation);
+                if (fouler) {
+                    defStats[fouler.player.id].fouls++;
+                    fouler.fouls++;
+                }
+                const ftPct = Math.min(0.95, archetype.baseFtPct + ratingBonus + chemBonus);
+                let ftMade = 0;
+                for (let i = 0; i < 2; i++) {
+                    shooterStats.freeThrowsAttempted++;
+                    if (Math.random() < ftPct) {
+                        shooterStats.freeThrowsMade++;
+                        shooterStats.points++;
+                        ftMade++;
+                    }
+                }
+                GamePipeline._addScore(game, isHome, ftMade);
+                game.events.push({
+                    type: 'foul_shooting', shooter: shooter.player.name,
+                    fouler: fouler ? fouler.player.name : 'unknown',
+                    ftMade, ftAttempted: 2, side: isHome ? 'home' : 'away',
+                    quarter: game.clock.quarter, clock: game.clock.display,
+                    context: 'intentional'
+                });
+                GamePipeline._endPossession(game, setup, ftMade > 0, isHome);
+                return;
+            }
+        }
+
         const roll = Math.random();
 
-        // Turnover chance: ~12-15% of possessions
-        const toChance = 0.13 - ratingBonus * 0.5 + defenseImpact * 0.3;
-        if (roll < Math.max(0.05, Math.min(0.22, toChance))) {
+        // === TURNOVER CHECK ===
+        const tierTOMod = game.tier === 3 ? 0.02 : game.tier === 2 ? 0.01 : 0;
+        const toChance = 0.13 - ratingBonus * 0.5 + defenseImpact * 0.3 + tierTOMod;
+        if (roll < Math.max(0.06, Math.min(0.22, toChance))) {
             shooterStats.turnovers++;
             game.events.push({
                 type: 'turnover', player: shooter.player.name, side: isHome ? 'home' : 'away',
-                quarter: game.quarter, clock: game.clock.display
+                quarter: game.clock.quarter, clock: game.clock.display
             });
 
-            // Defender gets steal credit
             const stealer = GamePipeline._pickDefender(defRotation);
             if (stealer && Math.random() < 0.55) {
                 defStats[stealer.player.id].steals++;
                 game.events.push({
                     type: 'steal', player: stealer.player.name, side: isHome ? 'away' : 'home',
-                    quarter: game.quarter
+                    quarter: game.clock.quarter
                 });
+                game.lastPossessionWasFastBreak = true;
             }
 
             GamePipeline._endPossession(game, setup, false, isHome);
             return;
         }
 
-        // Foul chance: ~18% of possessions result in some foul
+        // === FOUL CHECK ===
         const foulRoll = Math.random();
         if (foulRoll < 0.18) {
             const fouler = GamePipeline._pickDefender(defRotation);
@@ -302,7 +412,6 @@ export class GamePipeline {
                 defStats[fouler.player.id].fouls++;
                 fouler.fouls++;
 
-                // Shooting foul (~45% of fouls)
                 if (Math.random() < 0.45) {
                     const isThree = Math.random() < (archetype.threePtRate || 0.3);
                     const ftCount = isThree ? 3 : 2;
@@ -320,44 +429,40 @@ export class GamePipeline {
                     game.events.push({
                         type: 'foul_shooting', shooter: shooter.player.name, fouler: fouler.player.name,
                         ftMade, ftAttempted: ftCount, side: isHome ? 'home' : 'away',
-                        quarter: game.quarter, clock: game.clock.display
+                        quarter: game.clock.quarter, clock: game.clock.display
                     });
                     GamePipeline._endPossession(game, setup, ftMade > 0, isHome);
                     return;
                 }
-                // Non-shooting foul — possession retained, no stat change for shooter
                 game.events.push({
                     type: 'foul', fouler: fouler.player.name, side: isHome ? 'away' : 'home',
-                    quarter: game.quarter
+                    quarter: game.clock.quarter
                 });
-                // Continue to shot attempt (possession not lost)
             }
         }
 
-        // Shot attempt
+        // === SHOT ATTEMPT ===
         const isThree = Math.random() < (archetype.threePtRate + (coachMods.threePtRateModifier || 0));
         const shotPct = isThree
-            ? Math.max(0.20, Math.min(0.50, archetype.baseThreePct + ratingBonus + chemBonus + defenseImpact))
-            : Math.max(0.35, Math.min(0.65, archetype.baseFgPct + 0.04 + ratingBonus + chemBonus + defenseImpact));
+            ? Math.max(0.20, Math.min(0.45, archetype.baseThreePct + ratingBonus + chemBonus + defenseImpact))
+            : Math.max(0.35, Math.min(0.62, archetype.baseFgPct + 0.04 + ratingBonus + chemBonus + defenseImpact));
 
         shooterStats.fieldGoalsAttempted++;
         if (isThree) shooterStats.threePointersAttempted++;
 
         if (Math.random() < shotPct) {
-            // Made shot
+            // === MADE SHOT ===
             const points = isThree ? 3 : 2;
             shooterStats.fieldGoalsMade++;
             if (isThree) shooterStats.threePointersMade++;
             shooterStats.points += points;
             GamePipeline._addScore(game, isHome, points);
 
-            // Assist credit (~60% of made baskets)
             if (Math.random() < 0.60) {
                 const passer = GamePipeline._pickAssister(onCourt, shooter);
                 if (passer) stats[passer.player.id].assists++;
             }
 
-            // And-one chance (~5% of made 2s)
             if (!isThree && Math.random() < 0.05) {
                 const ftPct = Math.min(0.95, archetype.baseFtPct + ratingBonus);
                 shooterStats.freeThrowsAttempted++;
@@ -368,7 +473,7 @@ export class GamePipeline {
                 }
                 game.events.push({
                     type: 'and_one', player: shooter.player.name, points: points,
-                    side: isHome ? 'home' : 'away', quarter: game.quarter, clock: game.clock.display
+                    side: isHome ? 'home' : 'away', quarter: game.clock.quarter, clock: game.clock.display
                 });
             }
 
@@ -376,27 +481,26 @@ export class GamePipeline {
                 type: 'made_shot', player: shooter.player.name, points: points,
                 shotType: isThree ? '3pt' : '2pt', side: isHome ? 'home' : 'away',
                 homeScore: game.homeScore, awayScore: game.awayScore,
-                quarter: game.quarter, clock: game.clock.display
+                quarter: game.clock.quarter, clock: game.clock.display
             });
 
             GamePipeline._endPossession(game, setup, true, isHome);
         } else {
-            // Missed shot — rebound
+            // === MISSED SHOT ===
             game.events.push({
                 type: 'missed_shot', player: shooter.player.name,
                 shotType: isThree ? '3pt' : '2pt', side: isHome ? 'home' : 'away',
-                quarter: game.quarter, clock: game.clock.display
+                quarter: game.clock.quarter, clock: game.clock.display
             });
 
-            // Offensive rebound chance ~25%, defensive ~75%
             if (Math.random() < 0.25) {
                 const rebounder = GamePipeline._pickRebounder(onCourt);
                 if (rebounder) stats[rebounder.player.id].rebounds++;
-                // Offensive rebound — don't switch possession, but still end this possession count
             } else {
                 const defOnCourt = defRotation.filter(e => e.onCourt);
                 const rebounder = GamePipeline._pickRebounder(defOnCourt);
                 if (rebounder) defStats[rebounder.player.id].rebounds++;
+                if (Math.random() < 0.15) game.lastPossessionWasFastBreak = true;
             }
 
             GamePipeline._endPossession(game, setup, false, isHome);
@@ -425,7 +529,6 @@ export class GamePipeline {
     static _pickAssister(onCourt, shooter) {
         const candidates = onCourt.filter(e => e.player.id !== shooter.player.id);
         if (candidates.length === 0) return null;
-        // Bias toward PGs and players with high assist archetypes
         const weights = candidates.map(e => {
             const pos = e.player.position || 'SF';
             return pos === 'PG' ? 3 : pos === 'SG' ? 1.5 : 1;
@@ -455,6 +558,7 @@ export class GamePipeline {
     }
 
     static _addScore(game, isHome, points) {
+        if (points === 0) return;
         if (isHome) {
             game.homeScore += points;
             game.homeRun += points;
@@ -467,28 +571,25 @@ export class GamePipeline {
             game.momentum = Math.max(-10, game.momentum - points * 0.3);
         }
 
-        // Track quarter scores
-        const qi = Math.min(game.quarter - 1, 3);
-        if (qi < 4) {
+        const qi = Math.min(game.clock.quarter - 1, game.quarterScores.home.length - 1);
+        if (qi >= 0) {
             if (isHome) game.quarterScores.home[qi] += points;
             else game.quarterScores.away[qi] += points;
         }
 
-        // Emit run events
         const run = isHome ? game.homeRun : game.awayRun;
         if (run >= 8 && run % 4 === 0) {
             game.events.push({
                 type: 'run', side: isHome ? 'home' : 'away', run: run,
-                quarter: game.quarter
+                quarter: game.clock.quarter
             });
         }
     }
 
     static _endPossession(game, setup, scored, wasHome) {
         game.possession++;
-        game.offenseIsHome = !game.offenseIsHome; // Alternate possession
+        game.offenseIsHome = !game.offenseIsHome;
 
-        // Fatigue accumulation for on-court players
         const allOnCourt = [
             ...setup.homeRotation.filter(e => e.onCourt),
             ...setup.awayRotation.filter(e => e.onCourt)
@@ -497,61 +598,66 @@ export class GamePipeline {
             entry.fatigue += 0.4 + Math.random() * 0.2;
         }
 
-        // Momentum decay
         game.momentum *= 0.97;
 
-        // Auto-substitution at quarter breaks and when fatigued
-        GamePipeline._checkQuarterEnd(game, setup);
+        // Mid-quarter subs for fatigued players
+        if (game.possession % 8 === 0) {
+            GamePipeline._midQuarterSubs(setup.homeRotation);
+            GamePipeline._midQuarterSubs(setup.awayRotation);
+        }
+
+        if (game.clock.isQuarterOver) {
+            GamePipeline._handleQuarterEnd(game, setup);
+        }
     }
 
-    static _checkQuarterEnd(game, setup) {
-        const possInQuarter = game.possession % game.possessionsPerQuarter;
+    // ═══════════════════════════════════════════════════════════════
+    // QUARTER / GAME FLOW
+    // ═══════════════════════════════════════════════════════════════
 
-        if (possInQuarter === 0 && game.possession > 0) {
-            if (game.quarter < 4) {
-                game.quarter++;
+    static _handleQuarterEnd(game, setup) {
+        if (game.isComplete) return; // Already ended
+
+        if (game.clock.quarter < 4) {
+            game.events.push({
+                type: 'quarter_end', quarter: game.clock.quarter,
+                homeScore: game.homeScore, awayScore: game.awayScore
+            });
+            game.clock.startNextQuarter();
+            GamePipeline._quarterBreakSubs(setup.homeRotation);
+            GamePipeline._quarterBreakSubs(setup.awayRotation);
+            game.momentum *= 0.5;
+        } else if (game.clock.quarter === 4) {
+            if (game.homeScore === game.awayScore) {
                 game.events.push({
-                    type: 'quarter_end', quarter: game.quarter - 1,
+                    type: 'quarter_end', quarter: 4,
                     homeScore: game.homeScore, awayScore: game.awayScore
                 });
-                // Auto-subs at quarter breaks
-                GamePipeline._autoSubstitute(setup.homeRotation);
-                GamePipeline._autoSubstitute(setup.awayRotation);
-                // Reset momentum slightly
-                game.momentum *= 0.5;
-            } else if (game.quarter === 4) {
-                // End of regulation
-                if (game.homeScore === game.awayScore) {
-                    // Overtime
-                    game.isOvertime = true;
-                    game.quarter = 5;
-                    game.possessionsPerQuarter = 12; // ~5 min OT, both teams
-                    game.quarterScores.home.push(0);
-                    game.quarterScores.away.push(0);
-                    game.events.push({ type: 'overtime', homeScore: game.homeScore, awayScore: game.awayScore });
-                    GamePipeline._autoSubstitute(setup.homeRotation);
-                    GamePipeline._autoSubstitute(setup.awayRotation);
-                } else {
-                    game.isComplete = true;
-                    game.events.push({
-                        type: 'game_end', homeScore: game.homeScore, awayScore: game.awayScore,
-                        isOvertime: false
-                    });
-                }
+                game.quarterScores.home.push(0);
+                game.quarterScores.away.push(0);
+                game.clock.startOvertime();
+                game.events.push({ type: 'overtime', homeScore: game.homeScore, awayScore: game.awayScore });
+                GamePipeline._quarterBreakSubs(setup.homeRotation);
+                GamePipeline._quarterBreakSubs(setup.awayRotation);
             } else {
-                // End of OT period
-                if (game.homeScore === game.awayScore) {
-                    game.quarter++;
-                    game.quarterScores.home.push(0);
-                    game.quarterScores.away.push(0);
-                    game.events.push({ type: 'overtime', period: game.quarter - 4 });
-                } else {
-                    game.isComplete = true;
-                    game.events.push({
-                        type: 'game_end', homeScore: game.homeScore, awayScore: game.awayScore,
-                        isOvertime: true
-                    });
-                }
+                game.isComplete = true;
+                game.events.push({
+                    type: 'game_end', homeScore: game.homeScore, awayScore: game.awayScore,
+                    isOvertime: false
+                });
+            }
+        } else {
+            if (game.homeScore === game.awayScore) {
+                game.quarterScores.home.push(0);
+                game.quarterScores.away.push(0);
+                game.clock.startOvertime();
+                game.events.push({ type: 'overtime', period: game.clock.otPeriod });
+            } else {
+                game.isComplete = true;
+                game.events.push({
+                    type: 'game_end', homeScore: game.homeScore, awayScore: game.awayScore,
+                    isOvertime: true
+                });
             }
         }
     }
@@ -560,27 +666,51 @@ export class GamePipeline {
     // SUBSTITUTION LOGIC
     // ═══════════════════════════════════════════════════════════════
 
-    static _autoSubstitute(rotation) {
+    static _midQuarterSubs(rotation) {
         const onCourt = rotation.filter(e => e.onCourt);
         const bench = rotation.filter(e => !e.onCourt && e.minutes > 0);
 
-        // Sub out the most fatigued player if bench is available
-        for (const tired of onCourt.sort((a, b) => b.fatigue - a.fatigue)) {
-            if (tired.fatigue > 6 && bench.length > 0) {
-                // Find best bench replacement at same position or similar
+        for (const tired of onCourt) {
+            if (tired.fatigue > 8 && bench.length > 0) {
                 const sub = bench
-                    .sort((a, b) => a.fatigue - b.fatigue)
-                    .find(b => !b.onCourt) || bench[0];
+                    .filter(b => !b.onCourt)
+                    .sort((a, b) => a.fatigue - b.fatigue)[0];
+                if (sub && sub.fatigue < tired.fatigue - 3) {
+                    tired.onCourt = false;
+                    sub.onCourt = true;
+                    tired.fatigue = Math.max(0, tired.fatigue - 2);
+                }
+            }
+        }
+
+        GamePipeline._ensureFive(rotation);
+    }
+
+    static _quarterBreakSubs(rotation) {
+        const onCourt = rotation.filter(e => e.onCourt);
+        const bench = rotation.filter(e => !e.onCourt && e.minutes > 0);
+
+        for (const tired of onCourt.sort((a, b) => b.fatigue - a.fatigue)) {
+            if (tired.fatigue > 5 && bench.length > 0) {
+                const sub = bench
+                    .filter(b => !b.onCourt)
+                    .sort((a, b) => a.fatigue - b.fatigue)[0];
                 if (sub && sub.fatigue < tired.fatigue - 2) {
                     tired.onCourt = false;
                     sub.onCourt = true;
-                    // Partial fatigue recovery for benched player
                     tired.fatigue = Math.max(0, tired.fatigue - 3);
                 }
             }
         }
 
-        // Ensure 5 on court
+        for (const entry of rotation.filter(e => !e.onCourt)) {
+            entry.fatigue = Math.max(0, entry.fatigue - 4);
+        }
+
+        GamePipeline._ensureFive(rotation);
+    }
+
+    static _ensureFive(rotation) {
         const currentOnCourt = rotation.filter(e => e.onCourt).length;
         if (currentOnCourt < 5) {
             const available = rotation.filter(e => !e.onCourt && e.minutes > 0)
@@ -596,18 +726,11 @@ export class GamePipeline {
     // ═══════════════════════════════════════════════════════════════
 
     static _buildResult(game, setup) {
-        // Calculate minutes from possessions played
-        const totalPoss = game.possession;
-        const minutesPerPoss = 48 / (game.possessionsPerQuarter * 4 || 100);
-
-        // Build stat arrays matching StatEngine format
         const buildStats = (rotation, playerStats) => {
             return rotation.map(entry => {
                 const s = playerStats[entry.player.id];
                 if (!s) return GamePipeline._emptyStatLine(entry.player, entry.isStarter);
 
-                // Estimate minutes from possession involvement
-                // Starters ~32-36 min, bench ~12-20 min
                 const estMinutes = entry.isStarter
                     ? Math.round(30 + Math.random() * 8)
                     : Math.round(entry.minutes > 0 ? 10 + Math.random() * 14 : 0);
@@ -624,7 +747,6 @@ export class GamePipeline {
         const homeStats = buildStats(setup.homeRotation, game.homePlayerStats);
         const awayStats = buildStats(setup.awayRotation, game.awayPlayerStats);
 
-        // Distribute blocks among defensive players who might have earned them
         GamePipeline._distributeBlocks(homeStats, setup.homeRotation);
         GamePipeline._distributeBlocks(awayStats, setup.awayRotation);
 
@@ -641,17 +763,15 @@ export class GamePipeline {
             pointDiff: game.homeScore - game.awayScore,
             homePlayerStats: homeStats,
             awayPlayerStats: awayStats,
-            // Pipeline-specific extras
             quarterScores: game.quarterScores,
             events: game.events,
-            isOvertime: game.isOvertime,
+            isOvertime: game.clock.isOvertime,
             momentum: game.momentum,
             totalPossessions: game.possession
         };
     }
 
     static _distributeBlocks(stats, rotation) {
-        // Generate a few blocks for big men based on their archetype
         for (const entry of rotation) {
             const pos = entry.player.position || 'SF';
             const s = stats.find(st => st.playerId === entry.player.id);

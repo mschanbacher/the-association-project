@@ -175,10 +175,20 @@ export class OffseasonController {
 
         gameState.userPlayoffResult = action;
 
+        // Always run full postseason simulation for promo/releg determination
         console.log('🏆 Running full postseason via PlayoffEngine...');
         const postseasonResults = engines.PlayoffEngine.simulateFullPostseason(gameState);
         gameState.postseasonResults = postseasonResults;
 
+        // If user is in T1 championship playoffs, enter interactive round-by-round flow
+        if (action === 'championship') {
+            console.log('🏆 User qualifies for T1 Championship — entering interactive playoff flow...');
+            const gameSim = helpers.getGameSimController();
+            gameSim.runTier1ChampionshipPlayoffs();
+            return;
+        }
+
+        // Otherwise show static postseason results summary
         const html = engines.PlayoffEngine.generatePostseasonHTML(postseasonResults, gameState.userTeamId);
         document.getElementById('championshipPlayoffContent').innerHTML = UIRenderer.postseasonContinue({ resultsHTML: html });
         document.getElementById('championshipPlayoffModal').classList.remove('hidden');
@@ -273,83 +283,25 @@ export class OffseasonController {
     // ═══════════════════════════════════════════════════════════════════
 
     executePromotionRelegationFromResults(results) {
-        const { gameState, helpers } = this.ctx;
+        const { gameState, engines } = this.ctx;
 
-        if (gameState.tier1Teams.length !== 30 || gameState.tier2Teams.length !== 86 || gameState.tier3Teams.length !== 144) {
-            console.error('🚨 CANNOT EXECUTE PROMOTION/RELEGATION - Tier counts already wrong!');
-            console.error('T1:', gameState.tier1Teams.length, 'T2:', gameState.tier2Teams.length, 'T3:', gameState.tier3Teams.length);
-            alert('Critical Error: Tier counts are corrupted. Cannot advance season.');
-            return;
-        }
-
-        const t1RelegatedTeams = results.relegated.fromT1;
-        const t2PromotedToT1 = results.promoted.toT1;
-        const t2RelegatedToT3 = results.relegated.fromT2;
-        const t3PromotedToT2 = results.promoted.toT2;
-
-        console.log('=== PROMOTION/RELEGATION (PlayoffEngine) ===');
-        console.log('T1→T2 Relegated:', t1RelegatedTeams.map(t => t.name));
-        console.log('T2→T1 Promoted:', t2PromotedToT1.map(t => t.name));
-        console.log('T2→T3 Relegated:', t2RelegatedToT3.map(t => t.name));
-        console.log('T3→T2 Promoted:', t3PromotedToT2.map(t => t.name));
-
-        const t1RelegatedIds = t1RelegatedTeams.map(t => t.id);
-        const t2PromotedToT1Ids = t2PromotedToT1.map(t => t.id);
-        const t2RelegatedToT3Ids = t2RelegatedToT3.map(t => t.id);
-        const t3PromotedToT2Ids = t3PromotedToT2.map(t => t.id);
-
-        gameState.tier1Teams = gameState.tier1Teams.filter(t => !t1RelegatedIds.includes(t.id));
-        gameState.tier2Teams = gameState.tier2Teams.filter(t =>
-            !t2PromotedToT1Ids.includes(t.id) && !t2RelegatedToT3Ids.includes(t.id)
+        const result = engines.LeagueManager.executePromotionRelegation(
+            {
+                t1Relegated: results.relegated.fromT1,
+                t2PromotedToT1: results.promoted.toT1,
+                t2RelegatedToT3: results.relegated.fromT2,
+                t3PromotedToT2: results.promoted.toT2,
+                gameState
+            },
+            {
+                SalaryCapEngine: engines.SalaryCapEngine,
+                DivisionManager: engines.DivisionManager
+            }
         );
-        gameState.tier3Teams = gameState.tier3Teams.filter(t => !t3PromotedToT2Ids.includes(t.id));
 
-        t1RelegatedTeams.forEach(team => {
-            helpers.applyParachutePayment(team, 1, 2);
-            team.tier = 2;
-            team.division = helpers.assignDivision(team.name, 2);
-            gameState.tier2Teams.push(team);
-        });
-
-        t2PromotedToT1.forEach(team => {
-            helpers.applyPromotionBonus(team, 2, 1);
-            team.tier = 1;
-            team.division = helpers.assignDivision(team.name, 1);
-            gameState.tier1Teams.push(team);
-        });
-
-        gameState.promotedToT1 = t2PromotedToT1.map(t => t.id);
-
-        t2RelegatedToT3.forEach(team => {
-            helpers.applyParachutePayment(team, 2, 3);
-            team.tier = 3;
-            team.division = helpers.assignDivision(team.name, 3);
-            gameState.tier3Teams.push(team);
-        });
-
-        t3PromotedToT2.forEach(team => {
-            helpers.applyPromotionBonus(team, 3, 2);
-            team.tier = 2;
-            team.division = helpers.assignDivision(team.name, 2);
-            gameState.tier2Teams.push(team);
-        });
-
-        helpers.balanceTier1Divisions();
-        helpers.balanceTier2Divisions();
-        helpers.balanceTier3Divisions();
-
-        console.log('T1 after:', gameState.tier1Teams.length, '(should be 30)');
-        console.log('T2 after:', gameState.tier2Teams.length, '(should be 86)');
-        console.log('T3 after:', gameState.tier3Teams.length, '(should be 144)');
-
-        // Update user's tier
-        const userInT1 = gameState.tier1Teams.find(t => t.id === gameState.userTeamId);
-        const userInT2 = gameState.tier2Teams.find(t => t.id === gameState.userTeamId);
-        if (userInT1) gameState.currentTier = 1;
-        else if (userInT2) gameState.currentTier = 2;
-        else gameState.currentTier = 3;
-
-        console.log('✅ User now in Tier', gameState.currentTier);
+        if (!result.success) {
+            alert('Critical Error: ' + result.error + '\nCannot advance season.');
+        }
     }
 
     showFinancialTransitionBriefing(team, action) {

@@ -428,7 +428,27 @@ export class GameSimController {
         if (gameState.currentTier === 1) {
             if (rank === totalTeams) { status = '⚠️ AUTO-RELEGATED TO TIER 2'; statusColor = '#ea4335'; nextAction = 'relegate'; }
             else if (rank >= totalTeams - 2 && rank <= totalTeams - 1) { status = '⚠️ RELEGATION PLAYOFF'; statusColor = '#ffa500'; nextAction = 'relegation-playoff'; }
-            else { status = '✅ Safe in Tier 1'; statusColor = '#34a853'; nextAction = 'stay'; }
+            else {
+                // Check if user is in the top 8 of their conference (championship playoff eligible)
+                const t1Sorted = helpers.sortTeamsByStandings(gameState.tier1Teams, gameState.tier1Schedule);
+                const eastTeams = t1Sorted.filter(t =>
+                    t.division === 'Atlantic' || t.division === 'Central' || t.division === 'Southeast'
+                );
+                const westTeams = t1Sorted.filter(t =>
+                    t.division === 'Northwest' || t.division === 'Pacific' || t.division === 'Southwest'
+                );
+                const inEastPlayoffs = eastTeams.slice(0, 8).some(t => t.id === userTeam.id);
+                const inWestPlayoffs = westTeams.slice(0, 8).some(t => t.id === userTeam.id);
+                if (inEastPlayoffs || inWestPlayoffs) {
+                    const conf = inEastPlayoffs ? 'Eastern' : 'Western';
+                    const confTeams = inEastPlayoffs ? eastTeams.slice(0, 8) : westTeams.slice(0, 8);
+                    const seed = confTeams.findIndex(t => t.id === userTeam.id) + 1;
+                    status = `🏆 #${seed} SEED — ${conf} Conference Playoffs!`;
+                    statusColor = '#ffd700'; nextAction = 'championship';
+                } else {
+                    status = '✅ Safe in Tier 1'; statusColor = '#34a853'; nextAction = 'stay';
+                }
+            }
         } else if (gameState.currentTier === 2) {
             if (rank === 1) { status = '🎉 AUTO-PROMOTED TO TIER 1!'; statusColor = '#34a853'; nextAction = 'promote'; }
             else if (rank >= 2 && rank <= 4) { status = '⚡ PROMOTION PLAYOFF BERTH'; statusColor = '#ffa500'; nextAction = 'promotion-playoff'; }
@@ -684,12 +704,24 @@ export class GameSimController {
     }
 
     skipChampionshipPlayoffs() {
-        const { helpers } = this.ctx;
+        const { gameState, helpers } = this.ctx;
         document.getElementById('championshipPlayoffModal').classList.add('hidden');
-        console.log('⬆️⬇️ Step 2: Executing promotion/relegation...');
-        helpers.executePromotionRelegationAfterPlayoffs();
-        console.log('Proceeding to draft/development...');
-        helpers.proceedToDraftOrDevelopment();
+        // Update T1 champion from interactive results if available
+        const playoffData = gameState.championshipPlayoffData;
+        if (playoffData && playoffData.roundResults && playoffData.roundResults[3]) {
+            const finalRound = playoffData.roundResults[3];
+            if (finalRound[0] && gameState.postseasonResults && gameState.postseasonResults.t1) {
+                gameState.postseasonResults.t1.champion = finalRound[0].result.winner;
+            }
+        }
+        console.log('⬆️⬇️ Routing through continueAfterPostseason for proper history/promo-releg...');
+        const offseasonCtrl = helpers.getOffseasonController ? helpers.getOffseasonController() : null;
+        if (offseasonCtrl) {
+            offseasonCtrl.continueAfterPostseason();
+        } else {
+            helpers.executePromotionRelegationFromResults();
+            helpers.proceedToDraftOrDevelopment();
+        }
     }
 
     simulateChampionshipRound(roundNumber, silent = false) {
@@ -803,10 +835,22 @@ export class GameSimController {
             this.simulateChampionshipRound(playoffData.currentRound + 1);
         } else {
             console.log('🏆 Championship playoffs complete!');
-            console.log('⬆️⬇️ Step 2: Executing promotion/relegation...');
-            helpers.executePromotionRelegationAfterPlayoffs();
-            console.log('Proceeding to draft...');
-            helpers.proceedToDraftOrDevelopment();
+            // Update T1 champion in postseasonResults from the interactive results
+            const finalRound = playoffData.roundResults[3];
+            if (finalRound && finalRound[0]) {
+                gameState.postseasonResults.t1.champion = finalRound[0].result.winner;
+            }
+            // Route through the standard postseason continuation (handles history snapshot, promo/releg, tier changes)
+            const offseasonCtrl = helpers.getOffseasonController
+                ? helpers.getOffseasonController()
+                : null;
+            if (offseasonCtrl) {
+                offseasonCtrl.continueAfterPostseason();
+            } else {
+                // Fallback: direct execution
+                helpers.executePromotionRelegationFromResults();
+                helpers.proceedToDraftOrDevelopment();
+            }
         }
     }
 

@@ -303,4 +303,134 @@ export class LeagueManager {
     static sortTeamsByStandings(teams, schedule = null, allTeams = null) {
         return [...teams].sort((a, b) => LeagueManager.compareTeams(a, b, schedule, allTeams));
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // PROMOTION / RELEGATION EXECUTION
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Execute promotion/relegation tier swaps.
+     * Pure execution — takes the four lists of teams that are moving
+     * and physically moves them between tier arrays.
+     *
+     * Handles: pre-flight validation, tier array mutations, financial
+     * adjustments (parachute/promotion), division reassignment,
+     * division rebalancing, duplicate/count verification, and
+     * user tier tracking.
+     *
+     * @param {Object} params
+     * @param {Array}  params.t1Relegated - Teams dropping from T1 to T2
+     * @param {Array}  params.t2PromotedToT1 - Teams rising from T2 to T1
+     * @param {Array}  params.t2RelegatedToT3 - Teams dropping from T2 to T3
+     * @param {Array}  params.t3PromotedToT2 - Teams rising from T3 to T2
+     * @param {Object} params.gameState - gameState with tier arrays + userTeamId
+     * @param {Object} deps - { SalaryCapEngine, DivisionManager }
+     * @returns {{ success: boolean, error?: string }}
+     */
+    static executePromotionRelegation(params, deps) {
+        const { t1Relegated, t2PromotedToT1, t2RelegatedToT3, t3PromotedToT2, gameState } = params;
+        const { SalaryCapEngine: SCE, DivisionManager: DM } = deps;
+
+        // ── Pre-flight: verify tier counts before touching anything ──
+        if (gameState.tier1Teams.length !== 30 || gameState.tier2Teams.length !== 86 || gameState.tier3Teams.length !== 144) {
+            const msg = `Tier counts already wrong! T1:${gameState.tier1Teams.length} T2:${gameState.tier2Teams.length} T3:${gameState.tier3Teams.length}`;
+            console.error('🚨 CANNOT EXECUTE PROMOTION/RELEGATION -', msg);
+            return { success: false, error: msg };
+        }
+
+        const t1RelegatedIds = t1Relegated.map(t => t.id);
+        const t2PromotedToT1Ids = t2PromotedToT1.map(t => t.id);
+        const t2RelegatedToT3Ids = t2RelegatedToT3.map(t => t.id);
+        const t3PromotedToT2Ids = t3PromotedToT2.map(t => t.id);
+
+        // ── Overlap check ──
+        const overlap = t2PromotedToT1Ids.filter(id => t2RelegatedToT3Ids.includes(id));
+        if (overlap.length > 0) {
+            console.error('🚨 CRITICAL: Same team in BOTH T2 promotion AND relegation!', overlap);
+        }
+
+        console.log('=== PROMOTION/RELEGATION ===');
+        console.log('T1→T2 Relegated:', t1Relegated.map(t => t.name));
+        console.log('T2→T1 Promoted:', t2PromotedToT1.map(t => t.name));
+        console.log('T2→T3 Relegated:', t2RelegatedToT3.map(t => t.name));
+        console.log('T3→T2 Promoted:', t3PromotedToT2.map(t => t.name));
+
+        // ── Remove moving teams from current tiers ──
+        gameState.tier1Teams = gameState.tier1Teams.filter(t => !t1RelegatedIds.includes(t.id));
+        gameState.tier2Teams = gameState.tier2Teams.filter(t =>
+            !t2PromotedToT1Ids.includes(t.id) && !t2RelegatedToT3Ids.includes(t.id)
+        );
+        gameState.tier3Teams = gameState.tier3Teams.filter(t => !t3PromotedToT2Ids.includes(t.id));
+
+        // ── Apply financial adjustments, update tier, assign division, push to new tier ──
+        t1Relegated.forEach(team => {
+            SCE.applyParachutePayment(team, 1, 2);
+            team.tier = 2;
+            team.division = DM.assignDivision(team.name, 2);
+            gameState.tier2Teams.push(team);
+        });
+
+        t2PromotedToT1.forEach(team => {
+            SCE.applyPromotionBonus(team, 2, 1);
+            team.tier = 1;
+            team.division = DM.assignDivision(team.name, 1);
+            gameState.tier1Teams.push(team);
+        });
+
+        // Track promoted teams for draft compensatory picks
+        gameState.promotedToT1 = t2PromotedToT1.map(t => t.id);
+
+        t2RelegatedToT3.forEach(team => {
+            SCE.applyParachutePayment(team, 2, 3);
+            team.tier = 3;
+            team.division = DM.assignDivision(team.name, 3);
+            gameState.tier3Teams.push(team);
+        });
+
+        t3PromotedToT2.forEach(team => {
+            SCE.applyPromotionBonus(team, 3, 2);
+            team.tier = 2;
+            team.division = DM.assignDivision(team.name, 2);
+            gameState.tier2Teams.push(team);
+        });
+
+        // ── Rebalance divisions ──
+        DM.balanceTier1(gameState.tier1Teams);
+        DM.balanceTier2(gameState.tier2Teams);
+        DM.balanceTier3(gameState.tier3Teams);
+
+        // ── Validate results ──
+        const t1Ids = gameState.tier1Teams.map(t => t.id);
+        const t2Ids = gameState.tier2Teams.map(t => t.id);
+        const t3Ids = gameState.tier3Teams.map(t => t.id);
+        const t1Dupes = t1Ids.filter((id, idx) => t1Ids.indexOf(id) !== idx);
+        const t2Dupes = t2Ids.filter((id, idx) => t2Ids.indexOf(id) !== idx);
+        const t3Dupes = t3Ids.filter((id, idx) => t3Ids.indexOf(id) !== idx);
+
+        if (t1Dupes.length) console.error('⚠️ DUPLICATE TEAMS IN TIER 1:', t1Dupes);
+        if (t2Dupes.length) console.error('⚠️ DUPLICATE TEAMS IN TIER 2:', t2Dupes);
+        if (t3Dupes.length) console.error('⚠️ DUPLICATE TEAMS IN TIER 3:', t3Dupes);
+
+        console.log('T1 after:', gameState.tier1Teams.length, '(30)');
+        console.log('T2 after:', gameState.tier2Teams.length, '(86)');
+        console.log('T3 after:', gameState.tier3Teams.length, '(144)');
+
+        if (gameState.tier1Teams.length !== 30 || gameState.tier2Teams.length !== 86 || gameState.tier3Teams.length !== 144) {
+            console.error('❌ TIER COUNT ERROR after promo/rel!');
+        } else {
+            console.log('✅ Tier counts correct!');
+        }
+
+        // ── Update user's tier ──
+        if (gameState.tier1Teams.find(t => t.id === gameState.userTeamId)) {
+            gameState.currentTier = 1;
+        } else if (gameState.tier2Teams.find(t => t.id === gameState.userTeamId)) {
+            gameState.currentTier = 2;
+        } else {
+            gameState.currentTier = 3;
+        }
+
+        console.log('✅ User now in Tier', gameState.currentTier);
+        return { success: true };
+    }
 }

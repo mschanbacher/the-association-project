@@ -1,0 +1,555 @@
+// ═══════════════════════════════════════════════════════════════════
+// TeamFactory — Player generation, salaries, contracts, rosters, schedules
+// ═══════════════════════════════════════════════════════════════════
+//
+// Pure logic: no DOM, no gameState.
+// All functions take the data they need as parameters.
+//
+// Dependencies (passed as needed):
+//   - PlayerAttributes (for generate/generateFromRating)
+//   - SalaryCapEngine (for cap/floor lookups)
+//
+
+export class TeamFactory {
+
+    // ─────────────────────────────────────────────────────────────
+    // NAME POOLS
+    // ─────────────────────────────────────────────────────────────
+
+    static FIRST_NAMES = [
+        'James', 'Michael', 'Kevin', 'Chris', 'Anthony', 'Marcus', 'DeAndre', 'Brandon',
+        'Jordan', 'Tyler', 'Justin', 'Isaiah', 'Xavier', 'Malik', 'Darius', 'Jaylen',
+        'Trey', 'Jamal', 'Andre', 'Derrick', 'Kyle', 'Kobe', 'LeBron', 'Stephen',
+        'Damian', 'Russell', 'Kawhi', 'Paul', 'Devin', 'Donovan', 'Zach', 'DeMar',
+        'Jimmy', 'Kemba', 'John', 'Bradley', 'Tobias', 'Khris', 'CJ', 'Victor',
+        'Kristaps', 'Nikola', 'Luka', 'Giannis', 'Joel', 'Karl-Anthony', 'Ben',
+        'Trae', 'Ja', 'Zion', 'RJ', 'Cam', 'Collin', 'Shai', 'Bam', 'Pascal'
+    ];
+
+    static LAST_NAMES = [
+        'Williams', 'Johnson', 'Brown', 'Jones', 'Davis', 'Wilson', 'Moore',
+        'Taylor', 'Anderson', 'Thomas', 'Jackson', 'White', 'Harris', 'Martin', 'Thompson',
+        'Garcia', 'Martinez', 'Robinson', 'Clark', 'Rodriguez', 'Lewis', 'Lee', 'Walker',
+        'Hall', 'Allen', 'Young', 'King', 'Wright', 'Lopez', 'Hill', 'Scott', 'Green',
+        'Adams', 'Baker', 'Nelson', 'Carter', 'Mitchell', 'Perez', 'Roberts', 'Turner',
+        'Phillips', 'Campbell', 'Parker', 'Evans', 'Edwards', 'Collins', 'Stewart',
+        'Morris', 'Rogers', 'Reed', 'Cook', 'Morgan', 'Bell', 'Murphy', 'Bailey'
+    ];
+
+    static POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+
+    static COLLEGE_NAMES = [
+        'Duke', 'Kentucky', 'North Carolina', 'Kansas', 'UCLA', 'Michigan State', 'Villanova',
+        'Gonzaga', 'Virginia', 'Arizona', 'Ohio State', 'Louisville', 'Syracuse', 'Indiana',
+        'Texas', 'Florida', 'Michigan', 'Georgetown', 'UConn', 'Tennessee', 'Baylor',
+        'Creighton', 'Auburn', 'Purdue', 'Houston', 'Alabama', 'Illinois', 'Iowa State',
+        'Memphis', 'San Diego State', 'Oregon', 'Maryland', 'Wisconsin', 'Arkansas',
+        'Providence', 'Marquette', 'Xavier', 'Butler', 'VCU', 'Wichita State',
+        'Rutgers', 'Nebraska', 'USC', 'Stanford', 'Wake Forest', 'Clemson', 'NC State',
+        'Murray State', 'Saint Louis', 'Davidson', 'Dayton', 'Loyola Chicago'
+    ];
+
+    // ─────────────────────────────────────────────────────────────
+    // EMPTY SEASON STATS
+    // ─────────────────────────────────────────────────────────────
+
+    static emptySeasonStats() {
+        return {
+            gamesPlayed: 0, gamesStarted: 0, minutesPlayed: 0,
+            points: 0, rebounds: 0, assists: 0, steals: 0, blocks: 0,
+            turnovers: 0, fouls: 0,
+            fieldGoalsMade: 0, fieldGoalsAttempted: 0,
+            threePointersMade: 0, threePointersAttempted: 0,
+            freeThrowsMade: 0, freeThrowsAttempted: 0,
+        };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // RANDOM HELPERS
+    // ─────────────────────────────────────────────────────────────
+
+    static randomFirst() {
+        return TeamFactory.FIRST_NAMES[Math.floor(Math.random() * TeamFactory.FIRST_NAMES.length)];
+    }
+
+    static randomLast() {
+        return TeamFactory.LAST_NAMES[Math.floor(Math.random() * TeamFactory.LAST_NAMES.length)];
+    }
+
+    static randomPosition() {
+        return TeamFactory.POSITIONS[Math.floor(Math.random() * TeamFactory.POSITIONS.length)];
+    }
+
+    static randomCollege() {
+        return TeamFactory.COLLEGE_NAMES[Math.floor(Math.random() * TeamFactory.COLLEGE_NAMES.length)];
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CONTRACT LENGTH
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Determine contract length based on player age and rating.
+     * @param {number} age
+     * @param {number} rating
+     * @returns {number}
+     */
+    static determineContractLength(age, rating) {
+        if (age <= 25 && rating >= 75)
+            return Math.floor(3 + Math.random() * 2); // 3-4
+        if (age <= 29 && rating >= 70)
+            return Math.floor(2 + Math.random() * 3); // 2-4
+        if (age >= 30)
+            return Math.floor(1 + Math.random() * 2); // 1-2
+        if (rating >= 60)
+            return Math.floor(2 + Math.random() * 2); // 2-3
+        return Math.floor(1 + Math.random() * 2);     // 1-2
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // SALARY GENERATION
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Generate salary based on player rating and tier.
+     * @param {number} rating
+     * @param {number} tier - 1, 2, or 3
+     * @returns {number}
+     */
+    static generateSalary(rating, tier = 2) {
+        if (tier === 1) {
+            if (rating >= 95) return Math.floor(18000000 + Math.random() * 7000000);
+            if (rating >= 90) return Math.floor(12000000 + Math.random() * 6000000);
+            if (rating >= 85) return Math.floor(8000000 + Math.random() * 4000000);
+            if (rating >= 80) return Math.floor(5000000 + Math.random() * 3000000);
+            if (rating >= 75) return Math.floor(3000000 + Math.random() * 2000000);
+            if (rating >= 70) return Math.floor(1500000 + Math.random() * 1500000);
+            return Math.floor(500000 + Math.random() * 1000000);
+        }
+
+        if (tier === 2) {
+            if (rating >= 85) return Math.floor(1200000 + Math.random() * 600000);
+            if (rating >= 80) return Math.floor(800000 + Math.random() * 400000);
+            if (rating >= 75) return Math.floor(500000 + Math.random() * 300000);
+            if (rating >= 70) return Math.floor(300000 + Math.random() * 200000);
+            if (rating >= 65) return Math.floor(200000 + Math.random() * 100000);
+            if (rating >= 60) return Math.floor(120000 + Math.random() * 80000);
+            return Math.floor(80000 + Math.random() * 40000);
+        }
+
+        // Tier 3
+        if (rating >= 75) return Math.floor(120000 + Math.random() * 60000);
+        if (rating >= 70) return Math.floor(90000 + Math.random() * 30000);
+        if (rating >= 65) return Math.floor(70000 + Math.random() * 20000);
+        if (rating >= 60) return Math.floor(50000 + Math.random() * 20000);
+        if (rating >= 55) return Math.floor(35000 + Math.random() * 15000);
+        return Math.floor(25000 + Math.random() * 10000);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // NATURAL TIER & MARKET VALUE
+    // ─────────────────────────────────────────────────────────────
+
+    /** Highest tier a player is qualified for. */
+    static getPlayerNaturalTier(player) {
+        if (player.rating >= 70) return 1;
+        if (player.rating >= 60) return 2;
+        return 3;
+    }
+
+    /**
+     * Get market value for a player at a specific tier's pay scale.
+     * Caches result on the player object for consistency within a session.
+     */
+    static getMarketValue(player, tier) {
+        if (!player._marketValueCache) player._marketValueCache = {};
+        if (player._marketValueCache[tier] !== undefined) {
+            return player._marketValueCache[tier];
+        }
+        const value = TeamFactory.generateSalary(player.rating, tier);
+        player._marketValueCache[tier] = value;
+        return value;
+    }
+
+    /** Get market value at the player's natural (highest) tier. */
+    static getNaturalMarketValue(player) {
+        return TeamFactory.getMarketValue(player, TeamFactory.getPlayerNaturalTier(player));
+    }
+
+    /** Clear cached market values (call at start of each FA window). */
+    static clearMarketValueCache(players) {
+        if (!players) return;
+        players.forEach(p => { delete p._marketValueCache; });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // PLAYER GENERATION
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Generate a random player.
+     * @param {number} tier
+     * @param {number} playerId
+     * @param {Object} deps - { PlayerAttributes }
+     * @returns {Object} Player object
+     */
+    static generatePlayer(tier, playerId, deps) {
+        const { PlayerAttributes: PA } = deps;
+        const firstName = TeamFactory.randomFirst();
+        const lastName = TeamFactory.randomLast();
+        const position = TeamFactory.randomPosition();
+        const age = Math.floor(19 + Math.random() * 16);
+
+        const { measurables, attributes, rating } = PA.generate(position, tier, age);
+        const salary = TeamFactory.generateSalary(rating, tier);
+        const contractYears = TeamFactory.determineContractLength(age, rating);
+        const enduranceThreshold = Math.max(60, Math.min(90, 65 + Math.round((attributes.endurance - 50) * 0.4)));
+
+        return {
+            id: playerId,
+            name: `${firstName} ${lastName}`,
+            position, rating, age, tier, salary,
+            contractYears,
+            originalContractLength: contractYears,
+            measurables, attributes,
+            chemistry: 75, gamesWithTeam: 0,
+            injuryStatus: 'healthy', injury: null,
+            fatigue: 0, fatigueThreshold: enduranceThreshold, gamesRested: 0,
+            minutesThisGame: 0,
+            relegationRelease: (tier === 1 && rating >= 85 && Math.random() < 0.10) ||
+                               (tier === 1 && rating >= 80 && rating < 85 && Math.random() < 0.05),
+            seasonStats: TeamFactory.emptySeasonStats()
+        };
+    }
+
+    /**
+     * Generate a college graduate prospect.
+     * @param {number} targetTier
+     * @param {number} playerId
+     * @param {Object} deps - { PlayerAttributes }
+     * @returns {Object}
+     */
+    static generateCollegeGraduate(targetTier, playerId, deps) {
+        const { PlayerAttributes: PA } = deps;
+        const firstName = TeamFactory.randomFirst();
+        const lastName = TeamFactory.randomLast();
+        const position = TeamFactory.randomPosition();
+        const college = TeamFactory.randomCollege();
+        const age = Math.random() < 0.7 ? 21 : 22;
+
+        const { measurables, attributes, rating } = PA.generate(position, targetTier, age);
+        const clampedRating = Math.max(48, Math.min(78, rating));
+        const salary = TeamFactory.generateSalary(clampedRating, targetTier);
+        const contractYears = TeamFactory.determineContractLength(age, clampedRating);
+        const enduranceThreshold = Math.max(60, Math.min(90, 65 + Math.round((attributes.endurance - 50) * 0.4)));
+        const potentialBoost = Math.floor(3 + Math.random() * 12);
+        const projectedCeiling = Math.min(92, clampedRating + potentialBoost);
+
+        return {
+            id: playerId,
+            name: `${firstName} ${lastName}`,
+            position, rating: clampedRating, age, tier: targetTier,
+            salary, contractYears,
+            originalContractLength: contractYears,
+            measurables, attributes,
+            chemistry: 75, gamesWithTeam: 0,
+            injuryStatus: 'healthy', injury: null,
+            fatigue: 0, fatigueThreshold: enduranceThreshold, gamesRested: 0,
+            minutesThisGame: 0,
+            relegationRelease: false,
+            isCollegeGrad: true, college,
+            projectedCeiling,
+            previousTeamId: null,
+            seasonStats: TeamFactory.emptySeasonStats()
+        };
+    }
+
+    /**
+     * Generate a college graduate class.
+     * @param {number} startId
+     * @param {Object} deps - { PlayerAttributes }
+     * @returns {Array}
+     */
+    static generateCollegeGraduateClass(startId, deps) {
+        const graduates = [];
+        const classSize = 90 + Math.floor(Math.random() * 31);
+        let id = startId;
+
+        for (let i = 0; i < classSize; i++) {
+            const targetTier = Math.random() < 0.30 ? 2 : 3;
+            graduates.push(TeamFactory.generateCollegeGraduate(targetTier, id++, deps));
+        }
+
+        graduates.sort((a, b) => b.rating - a.rating);
+        return graduates;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // ROSTER GENERATION
+    // ─────────────────────────────────────────────────────────────
+
+    /** Rating ranges by tier for structured roster building. */
+    static ROSTER_RATING_RANGES = {
+        1: { star: [88, 95], starter: [78, 87], depth: [70, 77] },
+        2: { star: [78, 85], starter: [68, 77], depth: [60, 67] },
+        3: { star: [68, 75], starter: [58, 67], depth: [50, 57] }
+    };
+
+    /**
+     * Generate a cap-compliant roster with realistic salary distribution.
+     * @param {number} tier
+     * @param {number} teamId
+     * @param {Object} deps - { PlayerAttributes, SalaryCapEngine }
+     * @returns {Array}
+     */
+    static generateRoster(tier, teamId, deps) {
+        const { PlayerAttributes: PA, SalaryCapEngine: SC } = deps;
+        const cap = SC.getSalaryCap(tier);
+        const floor = SC.getSalaryFloor(tier);
+        const targetPlayers = 12 + Math.floor(Math.random() * 4);
+        const positions = TeamFactory.POSITIONS;
+        const ranges = TeamFactory.ROSTER_RATING_RANGES[tier] || TeamFactory.ROSTER_RATING_RANGES[3];
+
+        const roster = [];
+        let playerId = teamId * 1000;
+        let totalSalary = 0;
+
+        function genInRange(ratingRange, posOverride) {
+            const player = TeamFactory.generatePlayer(tier, playerId++, { PlayerAttributes: PA });
+            if (posOverride) player.position = posOverride;
+            const [minR, maxR] = ratingRange;
+            const targetRating = Math.floor(minR + Math.random() * (maxR - minR + 1));
+            const regen = PA.generateFromRating(player.position, targetRating, tier, player.age);
+            player.measurables = regen.measurables;
+            player.attributes = regen.attributes;
+            player.rating = regen.rating;
+            player.salary = TeamFactory.generateSalary(player.rating, tier);
+            player.fatigueThreshold = Math.max(60, Math.min(90, 65 + Math.round((player.attributes.endurance - 50) * 0.4)));
+            return player;
+        }
+
+        // Phase 1: Stars
+        const numStars = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < numStars && i < positions.length; i++) {
+            const star = genInRange(ranges.star, positions[i]);
+            roster.push(star);
+            totalSalary += star.salary;
+        }
+
+        // Phase 2: Starters
+        const numStarters = 3 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < numStarters; i++) {
+            const posIdx = (numStars + i) % positions.length;
+            const starter = genInRange(ranges.starter, positions[posIdx]);
+            if (totalSalary + starter.salary <= cap) {
+                roster.push(starter);
+                totalSalary += starter.salary;
+            }
+        }
+
+        // Phase 3: Fill positions
+        for (let i = 0; i < positions.length; i++) {
+            if (!roster.find(p => p.position === positions[i])) {
+                const filler = genInRange(ranges.depth, positions[i]);
+                if (totalSalary + filler.salary <= cap) {
+                    roster.push(filler);
+                    totalSalary += filler.salary;
+                }
+            }
+        }
+
+        // Phase 4: Depth
+        let attempts = 0;
+        while (roster.length < targetPlayers && attempts < 200) {
+            attempts++;
+            const player = genInRange(ranges.depth);
+            if (totalSalary + player.salary <= cap) {
+                roster.push(player);
+                totalSalary += player.salary;
+            } else if (roster.length >= 12) {
+                break;
+            } else {
+                const tierMins = { 1: 65, 2: 55, 3: 45 };
+                const cheapPlayer = TeamFactory.generatePlayer(tier, playerId++, { PlayerAttributes: PA });
+                const regen = PA.generateFromRating(cheapPlayer.position, tierMins[tier] || 50, tier, cheapPlayer.age);
+                cheapPlayer.measurables = regen.measurables;
+                cheapPlayer.attributes = regen.attributes;
+                cheapPlayer.rating = regen.rating;
+                cheapPlayer.salary = TeamFactory.generateSalary(cheapPlayer.rating, tier);
+                if (totalSalary + cheapPlayer.salary <= cap) {
+                    roster.push(cheapPlayer);
+                    totalSalary += cheapPlayer.salary;
+                }
+            }
+        }
+
+        // Phase 5: Floor enforcement
+        if (totalSalary < floor && roster.length > 0) {
+            const multiplier = floor / totalSalary;
+            roster.forEach(p => { p.salary = Math.round(p.salary * multiplier); });
+            totalSalary = roster.reduce((sum, p) => sum + p.salary, 0);
+        }
+
+        return roster;
+    }
+
+    /**
+     * Generate lean free agent pool.
+     * @param {number} startId
+     * @param {Object} deps - { PlayerAttributes }
+     * @returns {Array}
+     */
+    static generateFreeAgentPool(startId, deps) {
+        const freeAgents = [];
+        let playerId = startId;
+
+        // 3-5 T1, 5-8 T2, 7-10 T3
+        for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++)
+            freeAgents.push(TeamFactory.generatePlayer(1, playerId++, deps));
+        for (let i = 0; i < 5 + Math.floor(Math.random() * 4); i++)
+            freeAgents.push(TeamFactory.generatePlayer(2, playerId++, deps));
+        for (let i = 0; i < 7 + Math.floor(Math.random() * 4); i++)
+            freeAgents.push(TeamFactory.generatePlayer(3, playerId++, deps));
+
+        return freeAgents;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // SCHEDULE GENERATION
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Generate a round-robin-ish schedule for N teams.
+     * @param {Array} teams
+     * @param {number} numGames - Games per team
+     * @returns {Array} Schedule of { homeTeamId, awayTeamId, played }
+     */
+    static generateSchedule(teams, numGames = 82) {
+        const schedule = [];
+        const teamGameCounts = {};
+        teams.forEach(t => { teamGameCounts[t.id] = 0; });
+
+        let attempts = 0;
+        const maxAttempts = numGames * teams.length * 2;
+
+        while (attempts < maxAttempts) {
+            attempts++;
+            const allFull = teams.every(t => teamGameCounts[t.id] >= numGames);
+            if (allFull) break;
+
+            const available = teams.filter(t => teamGameCounts[t.id] < numGames);
+            if (available.length < 2) break;
+
+            const t1 = available[Math.floor(Math.random() * available.length)];
+            const others = available.filter(t => t.id !== t1.id);
+            if (others.length === 0) break;
+            const t2 = others[Math.floor(Math.random() * others.length)];
+
+            if (Math.random() > 0.5) {
+                schedule.push({ homeTeamId: t1.id, awayTeamId: t2.id, played: false });
+            } else {
+                schedule.push({ homeTeamId: t2.id, awayTeamId: t1.id, played: false });
+            }
+            teamGameCounts[t1.id]++;
+            teamGameCounts[t2.id]++;
+        }
+
+        return schedule.sort(() => Math.random() - 0.5);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Team Initialization Data & Factory (Phase 3F)
+    // ═══════════════════════════════════════════════════════════════════
+
+    static TIER1_DIVISIONS = {
+        'Atlantic': ['Boston Celtics', 'Brooklyn Nets', 'New York Knicks', 'Philadelphia 76ers', 'Toronto Raptors'],
+        'Central': ['Chicago Bulls', 'Cleveland Cavaliers', 'Detroit Pistons', 'Indiana Pacers', 'Milwaukee Bucks'],
+        'Southeast': ['Atlanta Hawks', 'Charlotte Hornets', 'Miami Heat', 'Orlando Magic', 'Washington Wizards'],
+        'Northwest': ['Denver Nuggets', 'Minnesota Timberwolves', 'Oklahoma City Thunder', 'Portland Trail Blazers', 'Utah Jazz'],
+        'Pacific': ['Golden State Warriors', 'LA Clippers', 'LA Lakers', 'Phoenix Suns', 'Sacramento Kings'],
+        'Southwest': ['Dallas Mavericks', 'Houston Rockets', 'Memphis Grizzlies', 'New Orleans Pelicans', 'San Antonio Spurs']
+    };
+
+    static TIER2_DIVISIONS = {
+        'Pacific Northwest': ['Seattle Storm', 'Tacoma Thunder', 'Spokane Shock', 'Salem Soldiers', 'Eugene Emeralds', 'Vancouver Volcanoes', 'Victoria Vanguard', 'Boise Hawks'],
+        'California': ['San Diego Surf', 'Anaheim Aces', 'Riverside Renegades', 'Ontario Outlaws', 'Tijuana Toros', 'Oakland Oaks', 'San Jose Sabercats', 'Fresno Fire'],
+        'Southwest': ['Las Vegas Vipers', 'Reno Aces', 'Albuquerque Atoms', 'Las Cruces Cruisers', 'Tucson Titans', 'Hermosillo Heat', 'Ciudad Juárez Jaguars', 'Colorado Springs Summit'],
+        'Great Plains': ['Omaha Storm', 'Lincoln Lightning', 'Wichita Wings', 'Kansas City Knights', 'Des Moines Dragons', 'Sioux Falls Skyforce', 'Tulsa Tornadoes', 'St. Louis Spirit'],
+        'Great Lakes': ['Pittsburgh Pioneers', 'Columbus Crush', 'Cincinnati Cyclones', 'Grand Rapids Gold', 'Madison Capitals', 'Fort Wayne Fury', 'Toledo Thunder', 'Buffalo Blaze'],
+        'South': ['Louisville Lightning', 'Nashville Knights', 'Birmingham Barons', 'Greenville Glory', 'Little Rock Rockets', 'Chattanooga Cheetahs', 'Knoxville Force', 'Mobile Mystics'],
+        'Southeast': ['Columbia Colonials', 'Raleigh Raptors', 'Richmond Rebels', 'Norfolk Tides', 'Greensboro Guardians', 'Charleston Thunder', 'Savannah Storm'],
+        'Northeast': ['Montreal Metros', 'Quebec City Caribou', 'Ottawa Outlaws', 'Hartford Hawks', 'Providence Storm', 'Albany Empire', 'Rochester Royals', 'Worcester Warriors', 'Portland Pirates'],
+        'Texas': ['Austin Thunder', 'Corpus Christi Waves', 'Lubbock Hawks', 'Amarillo Dusters', 'Waco Warriors', 'Laredo Heat', 'Monterrey Montañas', 'Saltillo Sabers'],
+        'Prairie/Mountain Canada': ['Calgary Flames', 'Edmonton Energy', 'Saskatoon Storm', 'Regina Rebels', 'Winnipeg Blizzard', 'Lethbridge Lancers', 'Missoula Mavericks'],
+        'Central Mexico': ['Mexico City Aztecs', 'Guadalajara Gallos', 'Puebla Panthers', 'León Lions', 'Querétaro Quetzals', 'Aguascalientes Armada', 'Toluca Titans']
+    };
+
+    static TIER3_DIVISIONS = {
+        'Greater Los Angeles MBL': ['Glendale Guardians', 'Pasadena Panthers', 'Long Beach Lions', 'Torrance Titans', 'Irvine Iguanas', 'Santa Clarita Storm'],
+        'Bay Area MBL': ['Fremont Flyers', 'Hayward Hawks', 'Richmond Raptors', 'Daly City Dragons', 'San Mateo Soldiers', 'Concord Cyclones'],
+        'Inland Empire MBL': ['San Bernardino Spartans', 'Moreno Valley Mavericks', 'Fontana Fire', 'Corona Cobras', 'Rancho Cucamonga Rattlers', 'Redlands Raiders'],
+        'Central Valley MBL': ['Bakersfield Blaze', 'Modesto Mustangs', 'Stockton Spartans', 'Visalia Vipers', 'Merced Meteors', 'Turlock Thunder'],
+        'Greater Chicago MBL': ['Aurora Aces', 'Naperville Knights', 'Joliet Jaguars', 'Rockford Raptors', 'Elgin Eagles', 'Peoria Pioneers'],
+        'Greater Houston MBL': ['Sugar Land Stars', 'The Woodlands Warriors', 'Pearland Panthers', 'League City Lions', 'Pasadena Predators', 'Beaumont Bobcats'],
+        'Dallas-Fort Worth MBL': ['Arlington Armada', 'Plano Patriots', 'Irving Ironmen', 'Garland Giants', 'Frisco Flyers', 'Denton Dragons'],
+        'Phoenix Metro MBL': ['Mesa Monsoon', 'Chandler Chiefs', 'Scottsdale Scorpions', 'Gilbert Gladiators', 'Peoria Predators', 'Flagstaff Fire'],
+        'Atlanta Metro MBL': ['Marietta Mavericks', 'Roswell Raptors', 'Macon Meteors', 'Columbus Cavalry', 'Athens Avengers', 'Warner Robins Warriors'],
+        'Greater Detroit MBL': ['Warren Warriors', 'Ann Arbor Aces', 'Lansing Lightning', 'Dearborn Defenders', 'Rochester Hills Raptors', 'Flint Fire'],
+        'Twin Cities MBL': ['St. Paul Saints', 'Rochester Royals', 'Duluth Dragons', 'St. Cloud Storm', 'Mankato Mavericks', 'Bloomington Blaze'],
+        'Greater Seattle MBL': ['Bellevue Blazers', 'Kent Kings', 'Everett Eagles', 'Bellingham Bulls', 'Yakima Yaks', 'Kennewick Knights'],
+        'South Florida MBL': ['Fort Lauderdale Force', 'Pembroke Pines Panthers', 'Boca Raton Bulls', 'West Palm Beach Warriors', 'Fort Myers Fire', 'Port St. Lucie Pirates'],
+        'New England MBL': ['Lowell Lightning', 'Springfield Stars', 'Bridgeport Blaze', 'New Haven Knights', 'Amherst Aces', 'Burlington Bears'],
+        'Greater Philadelphia MBL': ['Reading Raptors', 'Allentown Aces', 'Bethlehem Bears', 'Trenton Thunder', 'Wilmington Warriors', 'Lancaster Lions'],
+        'Pacific NW Small Cities MBL': ['Vancouver Vipers', 'Wenatchee Warriors', 'Bend Blazers', 'Medford Meteors', 'Idaho Falls Ice', 'Pocatello Pioneers'],
+        'Upstate New York MBL': ['Binghamton Bears', 'Utica United', 'Ithaca Ice', 'Elmira Eagles', 'Glens Falls Giants', 'Plattsburgh Patriots'],
+        'North Carolina Triangle MBL': ['Durham Dragons', 'Fayetteville Fire', 'Wilmington Waves', 'Asheville Altitude', 'High Point Hawks', 'Winston-Salem Warriors'],
+        'Ohio Valley MBL': ['Akron Aces', 'Dayton Dragons', 'Canton Cavalry', 'Youngstown Yaks', 'Huntington Hawks', 'Charleston Chiefs'],
+        'Midwest College Towns MBL': ['Muncie Mustangs', 'South Bend Storm', 'Champaign Chiefs', 'Ames Aces', 'Iowa City Icons', 'Kalamazoo Kings'],
+        'Mountain West MBL': ['Provo Peaks', 'Ogden Outlaws', 'Fort Collins Flyers', 'Boulder Bolts', 'Billings Blaze', 'Casper Cavalry'],
+        'Tennessee Valley MBL': ['Murfreesboro Meteors', 'Huntsville Hawks', 'Tuscaloosa Tide', 'Auburn Eagles', 'Montgomery Monarchs', 'Jackson Jaguars'],
+        'Gulf Coast MBL': ['Baton Rouge Bulls', 'Shreveport Storm', 'Lafayette Lightning', 'Lake Charles Cavaliers', 'Pensacola Panthers', 'Fayetteville Fire'],
+        'Border Cities MBL': ['McAllen Meteors', 'Brownsville Blaze', 'Yuma Yaks', 'Nuevo Laredo Knights', 'Reynosa Raptors', 'Mexicali Mavericks']
+    };
+
+    static TIER_CONFIG = {
+        1: { idOffset: 0, ratingBase: 75, ratingRange: 20, divisions: 'TIER1_DIVISIONS' },
+        2: { idOffset: 1000, ratingBase: 65, ratingRange: 15, divisions: 'TIER2_DIVISIONS' },
+        3: { idOffset: 2000, ratingBase: 55, ratingRange: 15, divisions: 'TIER3_DIVISIONS' }
+    };
+
+    /**
+     * Initialize all teams for a given tier
+     * @param {number} tier - 1, 2, or 3
+     * @param {Function} generateRoster - Roster generation function
+     * @returns {Array} Array of team objects
+     */
+    static initializeTierTeams(tier, generateRoster) {
+        const config = TeamFactory.TIER_CONFIG[tier];
+        const divisions = TeamFactory[config.divisions];
+
+        let id = config.idOffset;
+        const teams = [];
+        for (const [division, teamNames] of Object.entries(divisions)) {
+            for (const name of teamNames) {
+                const team = {
+                    id: id++,
+                    name: name,
+                    division: division,
+                    tier: tier,
+                    wins: 0,
+                    losses: 0,
+                    pointDiff: 0,
+                    rating: config.ratingBase + Math.random() * config.ratingRange,
+                    roster: []
+                };
+                team.roster = generateRoster(tier, team.id);
+                team.coach = CoachEngine.generateCoach(tier);
+                team.coach.teamId = team.id;
+                FinanceEngine.initializeTeamFinances(team);
+                teams.push(team);
+            }
+        }
+        console.log(`Initialized ${teams.length} Tier ${tier} teams with rosters`);
+        return teams;
+    }
+}

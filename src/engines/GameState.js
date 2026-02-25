@@ -1,0 +1,771 @@
+// ═══════════════════════════════════════════════════════════════════
+// GameState — Central game state with serialization/deserialization
+// ═══════════════════════════════════════════════════════════════════
+
+import { CoachEngine } from './CoachEngine.js';
+
+export 
+class GameState {
+    constructor() {
+        // === SEASON & USER INFO ===
+        this._currentSeason = 2025;
+        this._currentTier = 1;
+        this._userTeamId = null;
+        this._currentGame = 0;
+        this._currentMode = 'gm'; // 'gm', 'coach', or 'board'
+        
+        // === CALENDAR SYSTEM ===
+        this._currentDate = null; // YYYY-MM-DD string, set when season starts
+        this._seasonStartYear = 2025; // The year the season begins (Oct)
+        this._seasonDates = null; // Cached season dates object
+        
+        // === TEAMS ===
+        this._tier1Teams = [];
+        this._tier2Teams = [];
+        this._tier3Teams = [];
+        
+        // === SCHEDULES ===
+        this._schedule = []; // Current tier schedule
+        this._tier1Schedule = [];
+        this._tier2Schedule = [];
+        this._tier3Schedule = [];
+        
+        // === DRAFT SYSTEM ===
+        this._draftPickOwnership = {}; // { teamId: { year: { round1: ownerId, round2: ownerId } } }
+        this._promotedToT1 = []; // Track teams promoted to T1 for compensatory picks
+        this._relegatedFromT1 = [];
+        
+        // === FREE AGENCY ===
+        this._freeAgents = [];
+        
+        // === TRADING ===
+        this._pendingTradeProposal = null;
+        
+        // === HISTORY ===
+        this._seasonHistory = [];
+        this._championshipHistory = [];
+        this._fullSeasonHistory = []; // Detailed season snapshots (standings, awards, champions)
+        
+        // === METADATA ===
+        this._lastSaveTime = null;
+        this._gameVersion = '4.0';
+    }
+    
+    // ============================================
+    // GETTERS & SETTERS (with validation)
+    // ============================================
+    
+    get currentSeason() { return this._currentSeason; }
+    set currentSeason(value) {
+        if (value < 2025) throw new Error('Invalid season year');
+        this._currentSeason = value;
+    }
+    
+    get currentTier() { return this._currentTier; }
+    set currentTier(value) {
+        if (![1, 2, 3].includes(value)) throw new Error('Tier must be 1, 2, or 3');
+        this._currentTier = value;
+    }
+    
+    get userTeamId() { return this._userTeamId; }
+    set userTeamId(value) {
+        if (value !== null && !this.getTeamById(value)) {
+            throw new Error('Invalid team ID');
+        }
+        this._userTeamId = value;
+    }
+    
+    get currentGame() { return this._currentGame; }
+    set currentGame(value) {
+        if (value < 0) throw new Error('Game number cannot be negative');
+        this._currentGame = value;
+    }
+    
+    get currentDate() { return this._currentDate; }
+    set currentDate(value) { this._currentDate = value; }
+    
+    get seasonStartYear() { return this._seasonStartYear; }
+    set seasonStartYear(value) { this._seasonStartYear = value; }
+    
+    get seasonDates() {
+        if (!this._seasonDates) {
+            this._seasonDates = CalendarEngine.getSeasonDates(this._seasonStartYear);
+        }
+        return this._seasonDates;
+    }
+    set seasonDates(value) { this._seasonDates = value; }
+    
+    get currentMode() { return this._currentMode; }
+    set currentMode(value) {
+        if (!['gm', 'coach', 'board'].includes(value)) {
+            throw new Error('Mode must be gm, coach, or board');
+        }
+        this._currentMode = value;
+    }
+    
+    // Direct access to arrays (for compatibility)
+    get tier1Teams() { return this._tier1Teams; }
+    get tier2Teams() { return this._tier2Teams; }
+    get tier3Teams() { return this._tier3Teams; }
+    get schedule() { return this._schedule; }
+    get tier1Schedule() { return this._tier1Schedule; }
+    get tier2Schedule() { return this._tier2Schedule; }
+    get tier3Schedule() { return this._tier3Schedule; }
+    get freeAgents() { return this._freeAgents; }
+    get draftPickOwnership() { return this._draftPickOwnership; }
+    get promotedToT1() { return this._promotedToT1; }
+    get relegatedFromT1() { return this._relegatedFromT1; }
+    get pendingTradeProposal() { return this._pendingTradeProposal; }
+    set pendingTradeProposal(value) { this._pendingTradeProposal = value; }
+    get seasonHistory() { return this._seasonHistory; }
+    get championshipHistory() { return this._championshipHistory; }
+    get fullSeasonHistory() { return this._fullSeasonHistory; }
+    
+    // ============================================
+    // TEAM MANAGEMENT
+    // ============================================
+    
+    /**
+     * Get the user's team
+     */
+    getUserTeam() {
+        if (this._userTeamId === null) return null;
+        return this.getCurrentTeams().find(t => t.id === this._userTeamId);
+    }
+    
+    /**
+     * Get teams for current tier
+     */
+    getCurrentTeams() {
+        if (this._currentTier === 1) return this._tier1Teams;
+        if (this._currentTier === 2) return this._tier2Teams;
+        return this._tier3Teams;
+    }
+    
+    /**
+     * Get all teams across all tiers
+     */
+    getAllTeams() {
+        return [...this._tier1Teams, ...this._tier2Teams, ...this._tier3Teams];
+    }
+    
+    /**
+     * Get team by ID (searches all tiers)
+     */
+    getTeamById(id) {
+        return this.getAllTeams().find(t => t.id === id);
+    }
+    
+    /**
+     * Get teams by tier
+     */
+    getTeamsByTier(tier) {
+        if (tier === 1) return this._tier1Teams;
+        if (tier === 2) return this._tier2Teams;
+        if (tier === 3) return this._tier3Teams;
+        throw new Error('Invalid tier');
+    }
+    
+    /**
+     * Promote a team to a higher tier
+     */
+    promoteTeam(teamId, toTier) {
+        const team = this.getTeamById(teamId);
+        if (!team) throw new Error('Team not found');
+        
+        const fromTier = team.tier;
+        if (fromTier <= toTier) throw new Error('Can only promote to higher tier');
+        
+        // Remove from old tier
+        const fromArray = this.getTeamsByTier(fromTier);
+        const index = fromArray.findIndex(t => t.id === teamId);
+        if (index !== -1) fromArray.splice(index, 1);
+        
+        // Add to new tier
+        team.tier = toTier;
+        const toArray = this.getTeamsByTier(toTier);
+        toArray.push(team);
+        
+        // Track promotion to T1 for compensatory picks
+        if (toTier === 1) {
+            if (!this._promotedToT1.includes(teamId)) {
+                this._promotedToT1.push(teamId);
+            }
+        }
+        
+        console.log(`✅ ${team.name} promoted from Tier ${fromTier} to Tier ${toTier}`);
+    }
+    
+    /**
+     * Relegate a team to a lower tier
+     */
+    relegateTeam(teamId, toTier) {
+        const team = this.getTeamById(teamId);
+        if (!team) throw new Error('Team not found');
+        
+        const fromTier = team.tier;
+        if (fromTier >= toTier) throw new Error('Can only relegate to lower tier');
+        
+        // Remove from old tier
+        const fromArray = this.getTeamsByTier(fromTier);
+        const index = fromArray.findIndex(t => t.id === teamId);
+        if (index !== -1) fromArray.splice(index, 1);
+        
+        // Add to new tier
+        team.tier = toTier;
+        const toArray = this.getTeamsByTier(toTier);
+        toArray.push(team);
+        
+        // Track relegation from T1
+        if (fromTier === 1) {
+            if (!this._relegatedFromT1.includes(teamId)) {
+                this._relegatedFromT1.push(teamId);
+            }
+        }
+        
+        console.log(`⬇️ ${team.name} relegated from Tier ${fromTier} to Tier ${toTier}`);
+    }
+    
+    // ============================================
+    // SCHEDULE MANAGEMENT
+    // ============================================
+    
+    /**
+     * Get the current schedule based on tier
+     */
+    getCurrentSchedule() {
+        if (this._currentTier === 1) return this._tier1Schedule;
+        if (this._currentTier === 2) return this._tier2Schedule;
+        return this._tier3Schedule;
+    }
+    
+    /**
+     * Get next unplayed game
+     */
+    getNextGame() {
+        return this._schedule.find(g => !g.played);
+    }
+    
+    /**
+     * Mark a game as played
+     */
+    markGamePlayed(game) {
+        game.played = true;
+        this._currentGame++;
+    }
+    
+    /**
+     * Check if season is complete (all tiers' regular season games played)
+     */
+    isSeasonComplete() {
+        // Check if ALL tiers are done (calendar-aware)
+        const t1Done = !this._tier1Schedule || this._tier1Schedule.length === 0 || this._tier1Schedule.every(g => g.played);
+        const t2Done = !this._tier2Schedule || this._tier2Schedule.length === 0 || this._tier2Schedule.every(g => g.played);
+        const t3Done = !this._tier3Schedule || this._tier3Schedule.length === 0 || this._tier3Schedule.every(g => g.played);
+        return t1Done && t2Done && t3Done;
+    }
+    
+    /**
+     * Get remaining games
+     */
+    getRemainingGames() {
+        return this._schedule.filter(g => !g.played).length;
+    }
+    
+    /**
+     * Get games played
+     */
+    getGamesPlayed() {
+        return this._schedule.filter(g => g.played).length;
+    }
+    
+    /**
+     * Get total games in season for current tier
+     */
+    getTotalGamesInSeason() {
+        if (this._currentTier === 1) return 82;
+        if (this._currentTier === 2) return 60;
+        return 40;
+    }
+    
+    // ============================================
+    // DRAFT MANAGEMENT
+    // ============================================
+    
+    /**
+     * Initialize draft pick ownership
+     */
+    initializeDraftPickOwnership() {
+        if (!this._draftPickOwnership) {
+            this._draftPickOwnership = {};
+        }
+        
+        const allTeams = this.getAllTeams();
+        
+        // Initialize picks for next 5 years
+        allTeams.forEach(team => {
+            if (!this._draftPickOwnership[team.id]) {
+                this._draftPickOwnership[team.id] = {};
+            }
+            
+            for (let year = this._currentSeason; year <= this._currentSeason + 5; year++) {
+                if (!this._draftPickOwnership[team.id][year]) {
+                    this._draftPickOwnership[team.id][year] = {
+                        round1: team.id,
+                        round2: team.id
+                    };
+                }
+            }
+        });
+    }
+    
+    /**
+     * Get who owns a team's pick for a given year/round
+     */
+    getPickOwner(originalTeamId, year, round) {
+        this.initializeDraftPickOwnership();
+        
+        const roundKey = `round${round}`;
+        
+        if (!this._draftPickOwnership[originalTeamId]?.[year]) {
+            return originalTeamId; // Default: team owns their own pick
+        }
+        
+        return this._draftPickOwnership[originalTeamId][year][roundKey] || originalTeamId;
+    }
+    
+    /**
+     * Trade a draft pick
+     */
+    tradeDraftPick(fromTeamId, toTeamId, originalTeamId, year, round) {
+        // Check Ted Stepien Rule
+        if (this.violatesStepienRule(originalTeamId, year, round)) {
+            throw new Error('Trade violates Ted Stepien Rule (cannot trade first-round picks in consecutive years)');
+        }
+        
+        this.initializeDraftPickOwnership();
+        
+        const roundKey = `round${round}`;
+        
+        if (!this._draftPickOwnership[originalTeamId]) {
+            this._draftPickOwnership[originalTeamId] = {};
+        }
+        if (!this._draftPickOwnership[originalTeamId][year]) {
+            this._draftPickOwnership[originalTeamId][year] = {};
+        }
+        
+        this._draftPickOwnership[originalTeamId][year][roundKey] = toTeamId;
+        
+        const originalTeam = this.getTeamById(originalTeamId);
+        const fromTeam = this.getTeamById(fromTeamId);
+        const toTeam = this.getTeamById(toTeamId);
+        
+        console.log(`📝 Draft pick traded: ${originalTeam?.name}'s ${year} Round ${round}`);
+        console.log(`   From: ${fromTeam?.name} → To: ${toTeam?.name}`);
+    }
+    
+    /**
+     * Check if trading a pick violates Ted Stepien Rule
+     */
+    violatesStepienRule(teamId, year, round) {
+        if (round !== 1) return false; // Rule only applies to 1st rounders
+        
+        this.initializeDraftPickOwnership();
+        
+        // Check if team owns their 1st rounder in adjacent years
+        const prevYearOwner = this.getPickOwner(teamId, year - 1, 1);
+        const nextYearOwner = this.getPickOwner(teamId, year + 1, 1);
+        
+        // Violation: team doesn't own picks in BOTH adjacent years
+        return prevYearOwner !== teamId && nextYearOwner !== teamId;
+    }
+    
+    /**
+     * Get all picks owned by a team for a given year
+     */
+    getPicksOwnedByTeam(teamId, year) {
+        this.initializeDraftPickOwnership();
+        
+        const picks = [];
+        const allTeams = this.getAllTeams();
+        
+        allTeams.forEach(originalTeam => {
+            [1, 2].forEach(round => {
+                const owner = this.getPickOwner(originalTeam.id, year, round);
+                if (owner === teamId) {
+                    picks.push({
+                        originalTeamId: originalTeam.id,
+                        originalTeamName: originalTeam.name,
+                        year: year,
+                        round: round
+                    });
+                }
+            });
+        });
+        
+        return picks;
+    }
+    
+    // ============================================
+    // SEASON PROGRESSION
+    // ============================================
+    
+    /**
+     * Advance to the next season
+     */
+    advanceSeason() {
+        console.log(`\n🎯 Advancing from ${this._currentSeason}-${(this._currentSeason + 1) % 100} to ${this._currentSeason + 1}-${(this._currentSeason + 2) % 100}`);
+        
+        this._currentSeason++;
+        this._currentGame = 0;
+        
+        // Clear promotion/relegation tracking
+        this._promotedToT1 = [];
+        this._relegatedFromT1 = [];
+        
+        console.log(`✅ Season advanced to ${this._currentSeason}-${(this._currentSeason + 1) % 100}`);
+    }
+    
+    /**
+     * Record season in history
+     */
+    recordSeasonInHistory(rank, wins, losses, pointDiff) {
+        this._seasonHistory.push({
+            season: `${this._currentSeason}-${(this._currentSeason + 1) % 100}`,
+            tier: this._currentTier,
+            wins: wins,
+            losses: losses,
+            rank: rank,
+            pointDiff: pointDiff
+        });
+    }
+    
+    /**
+     * Record championship
+     */
+    recordChampionship(teamName, tier) {
+        this._championshipHistory.push({
+            season: `${this._currentSeason}-${(this._currentSeason + 1) % 100}`,
+            champion: teamName,
+            tier: tier
+        });
+    }
+    
+    // ============================================
+    // VALIDATION & INTEGRITY
+    // ============================================
+    
+    /**
+     * Validate game state integrity
+     */
+    validate() {
+        const issues = [];
+        
+        // Check tier sizes
+        if (this._tier1Teams.length !== 30) {
+            issues.push(`Tier 1 has ${this._tier1Teams.length} teams (expected 30)`);
+        }
+        
+        // Check user team exists
+        if (this._userTeamId === null) {
+            issues.push('No user team selected');
+        } else if (!this.getTeamById(this._userTeamId)) {
+            issues.push('User team ID is invalid');
+        }
+        
+        // Check schedules match teams
+        const currentSchedule = this.getCurrentSchedule();
+        currentSchedule.forEach(game => {
+            if (!this.getTeamById(game.homeTeamId)) {
+                issues.push(`Schedule references non-existent home team ${game.homeTeamId}`);
+            }
+            if (!this.getTeamById(game.awayTeamId)) {
+                issues.push(`Schedule references non-existent away team ${game.awayTeamId}`);
+            }
+        });
+        
+        if (issues.length > 0) {
+            console.warn('⚠️ GameState validation issues:');
+            issues.forEach(issue => console.warn(`  - ${issue}`));
+        } else {
+            console.log('✅ GameState validation passed');
+        }
+        
+        return issues.length === 0;
+    }
+    
+    // ============================================
+    // SERIALIZATION (Save/Load)
+    // ============================================
+    
+    /**
+     * Serialize to JSON for saving
+     */
+    serialize() {
+        // Compress schedules: store dates in a lookup table, games reference by index
+        const compressSchedule = (schedule) => {
+            if (!schedule || schedule.length === 0) return { dates: [], games: [] };
+            
+            // Build unique date lookup
+            const dateSet = new Set();
+            schedule.forEach(g => { if (g.date) dateSet.add(g.date); });
+            const dates = [...dateSet].sort();
+            const dateIndex = {};
+            dates.forEach((d, i) => { dateIndex[d] = i; });
+            
+            // Compress games: [homeId, awayId, played(0/1), dateIndex]
+            const games = schedule.map(g => [
+                g.homeTeamId,
+                g.awayTeamId,
+                g.played ? 1 : 0,
+                g.date ? (dateIndex[g.date] !== undefined ? dateIndex[g.date] : -1) : -1
+            ]);
+            
+            return { dates, games };
+        };
+        
+        // ═══════════════════════════════════════════════════════════
+        // COMPACT PLAYER SERIALIZATION
+        // Converts verbose player objects into compact arrays
+        // Saves ~60-70% of player data size
+        // ═══════════════════════════════════════════════════════════
+        const ATTR_KEYS = ['speed','strength','verticality','endurance','basketballIQ','clutch','workEthic','coachability','collaboration'];
+        const STAT_KEYS = ['gamesPlayed','gamesStarted','minutesPlayed','points','rebounds','assists','steals','blocks','turnovers','fouls','fieldGoalsMade','fieldGoalsAttempted','threePointersMade','threePointersAttempted','freeThrowsMade','freeThrowsAttempted'];
+        
+        const compressPlayer = (p) => {
+            // Pack into compact object with short keys
+            const cp = {
+                i: p.id, n: p.name, p: p.position, r: p.rating, a: p.age, t: p.tier,
+                s: p.salary, cy: p.contractYears, oc: p.originalContractLength,
+                ch: Math.round(p.chemistry || 75), gw: p.gamesWithTeam || 0,
+                is: p.injuryStatus === 'healthy' ? 0 : p.injuryStatus === 'out' ? 1 : 2,
+                ft: Math.round(p.fatigue || 0), fth: p.fatigueThreshold || 75,
+                gr: p.gamesRested || 0, gp: p.gamesPlayed || 0
+            };
+            // Injury details (only if injured)
+            if (p.injury) cp.inj = p.injury;
+            // Measurables as array: [height, weight, wingspan]
+            if (p.measurables) cp.m = [p.measurables.height, p.measurables.weight, p.measurables.wingspan];
+            // Attributes as array (ordered by ATTR_KEYS)
+            if (p.attributes) cp.at = ATTR_KEYS.map(k => p.attributes[k] || 50);
+            // Season stats as array (ordered by STAT_KEYS) — only non-zero
+            if (p.seasonStats) {
+                const sv = STAT_KEYS.map(k => p.seasonStats[k] || 0);
+                if (sv.some(v => v !== 0)) cp.ss = sv;
+            }
+            // Preserve special flags
+            if (p.isDraftProspect) cp.dp = 1;
+            if (p.previousTeamId) cp.ptid = p.previousTeamId;
+            if (p.previousSeasonAvgs) cp.psa = p.previousSeasonAvgs;
+            return cp;
+        };
+        
+        const compressCoach = (c) => {
+            if (!c) return null;
+            return {
+                i: c.id, n: c.name, a: c.age, o: c.overall, ar: c.archetype, t: c.tier,
+                s: c.salary, cy: c.contractYears, ti: c.teamId, ex: c.experience,
+                cw: c.careerWins, cl: c.careerLosses, ch: c.championships,
+                sw: c.seasonWins || 0, sl: c.seasonLosses || 0,
+                tr: Object.values(c.traits || {})
+            };
+        };
+        
+        const compressTeam = (team) => {
+            const ct = { ...team };
+            ct.roster = (team.roster || []).map(compressPlayer);
+            ct.coach = compressCoach(team.coach);
+            return ct;
+        };
+        
+        return JSON.stringify({
+            _v: 2, // Save format version for decompression
+            currentSeason: this._currentSeason,
+            currentTier: this._currentTier,
+            userTeamId: this._userTeamId,
+            currentGame: this._currentGame,
+            currentMode: this._currentMode,
+            currentDate: this._currentDate,
+            seasonStartYear: this._seasonStartYear,
+            tier1Teams: this._tier1Teams.map(compressTeam),
+            tier2Teams: this._tier2Teams.map(compressTeam),
+            tier3Teams: this._tier3Teams.map(compressTeam),
+            tier1ScheduleC: compressSchedule(this._tier1Schedule),
+            tier2ScheduleC: compressSchedule(this._tier2Schedule),
+            tier3ScheduleC: compressSchedule(this._tier3Schedule),
+            draftPickOwnership: this._draftPickOwnership,
+            promotedToT1: this._promotedToT1,
+            relegatedFromT1: this._relegatedFromT1,
+            freeAgents: (this._freeAgents || []).map(compressPlayer),
+            pendingTradeProposal: this._pendingTradeProposal,
+            seasonHistory: this._seasonHistory,
+            championshipHistory: this._championshipHistory,
+            fullSeasonHistory: this._fullSeasonHistory,
+            lastSaveTime: new Date().toISOString(),
+            gameVersion: this._gameVersion
+        });
+    }
+    
+    /**
+     * Deserialize from JSON (load game)
+     */
+    static deserialize(jsonString) {
+        const data = JSON.parse(jsonString);
+        const state = new GameState();
+        
+        // Decompress schedule from compact format
+        const decompressSchedule = (compressed) => {
+            if (!compressed || !compressed.dates || !compressed.games) return [];
+            const dates = compressed.dates;
+            return compressed.games.map(g => ({
+                homeTeamId: g[0],
+                awayTeamId: g[1],
+                played: g[2] === 1,
+                date: g[3] >= 0 && g[3] < dates.length ? dates[g[3]] : null
+            }));
+        };
+        
+        // ═══════════════════════════════════════════════════════════
+        // DECOMPRESS PLAYER AND COACH DATA (v2 format)
+        // ═══════════════════════════════════════════════════════════
+        const ATTR_KEYS = ['speed','strength','verticality','endurance','basketballIQ','clutch','workEthic','coachability','collaboration'];
+        const STAT_KEYS = ['gamesPlayed','gamesStarted','minutesPlayed','points','rebounds','assists','steals','blocks','turnovers','fouls','fieldGoalsMade','fieldGoalsAttempted','threePointersMade','threePointersAttempted','freeThrowsMade','freeThrowsAttempted'];
+        const COACH_TRAIT_KEYS = ['pace','threePointTendency','defensiveIntensity','ballMovement','benchUsage','playerDevelopment','adaptability'];
+        const isV2 = data._v >= 2;
+        
+        const decompressPlayer = (cp) => {
+            if (!cp || cp.name !== undefined) return cp; // Already full format (legacy)
+            const injMap = { 0: 'healthy', 1: 'out', 2: 'day-to-day' };
+            const p = {
+                id: cp.i, name: cp.n, position: cp.p, rating: cp.r, age: cp.a, tier: cp.t,
+                salary: cp.s, contractYears: cp.cy, originalContractLength: cp.oc,
+                chemistry: cp.ch || 75, gamesWithTeam: cp.gw || 0,
+                injuryStatus: injMap[cp.is] || 'healthy',
+                injury: cp.inj || null,
+                fatigue: cp.ft || 0, fatigueThreshold: cp.fth || 75,
+                gamesRested: cp.gr || 0, gamesPlayed: cp.gp || 0,
+                minutesThisGame: 0, resting: false
+            };
+            // Measurables
+            if (cp.m) p.measurables = { height: cp.m[0], weight: cp.m[1], wingspan: cp.m[2] };
+            // Attributes
+            if (cp.at) {
+                p.attributes = {};
+                ATTR_KEYS.forEach((k, idx) => { p.attributes[k] = cp.at[idx] || 50; });
+            }
+            // Season stats
+            p.seasonStats = {};
+            STAT_KEYS.forEach((k, idx) => { p.seasonStats[k] = (cp.ss && cp.ss[idx]) || 0; });
+            // Special flags
+            if (cp.dp) p.isDraftProspect = true;
+            if (cp.ptid) p.previousTeamId = cp.ptid;
+            if (cp.psa) p.previousSeasonAvgs = cp.psa;
+            return p;
+        };
+        
+        const decompressCoach = (cc) => {
+            if (!cc) return null;
+            if (cc.name !== undefined) return cc; // Already full format (legacy)
+            const c = {
+                id: cc.i, name: cc.n, age: cc.a, overall: cc.o, archetype: cc.ar, tier: cc.t,
+                salary: cc.s, contractYears: cc.cy, teamId: cc.ti, experience: cc.ex,
+                careerWins: cc.cw, careerLosses: cc.cl, championships: cc.ch,
+                seasonWins: cc.sw || 0, seasonLosses: cc.sl || 0, traits: {}
+            };
+            if (cc.tr && Array.isArray(cc.tr)) {
+                COACH_TRAIT_KEYS.forEach((k, idx) => { c.traits[k] = cc.tr[idx] || 50; });
+            }
+            return c;
+        };
+        
+        const decompressTeam = (team) => {
+            if (!team) return team;
+            if (isV2 && team.roster) {
+                team.roster = team.roster.map(decompressPlayer);
+            }
+            if (isV2 && team.coach !== undefined) {
+                team.coach = decompressCoach(team.coach);
+            }
+            return team;
+        };
+        
+        // Restore all properties
+        state._currentSeason = data.currentSeason;
+        state._currentTier = data.currentTier;
+        state._userTeamId = data.userTeamId;
+        state._currentGame = data.currentGame || 0;
+        state._currentMode = data.currentMode || 'gm';
+        state._currentDate = data.currentDate || null;
+        state._seasonStartYear = data.seasonStartYear || data.currentSeason || 2025;
+        state._tier1Teams = (data.tier1Teams || []).map(decompressTeam);
+        state._tier2Teams = (data.tier2Teams || []).map(decompressTeam);
+        state._tier3Teams = (data.tier3Teams || []).map(decompressTeam);
+        
+        // Load schedules: try compressed format first, fall back to uncompressed
+        if (data.tier1ScheduleC) {
+            state._tier1Schedule = decompressSchedule(data.tier1ScheduleC);
+            state._tier2Schedule = decompressSchedule(data.tier2ScheduleC);
+            state._tier3Schedule = decompressSchedule(data.tier3ScheduleC);
+            console.log('📦 Loaded compressed schedules');
+        } else {
+            state._tier1Schedule = data.tier1Schedule || [];
+            state._tier2Schedule = data.tier2Schedule || [];
+            state._tier3Schedule = data.tier3Schedule || [];
+        }
+        
+        // Set _schedule as reference to user's tier schedule
+        if (state._currentTier === 1) state._schedule = state._tier1Schedule;
+        else if (state._currentTier === 2) state._schedule = state._tier2Schedule;
+        else state._schedule = state._tier3Schedule;
+        
+        state._draftPickOwnership = data.draftPickOwnership || {};
+        state._promotedToT1 = data.promotedToT1 || [];
+        state._relegatedFromT1 = data.relegatedFromT1 || [];
+        state._freeAgents = isV2 ? (data.freeAgents || []).map(decompressPlayer) : (data.freeAgents || []);
+        state._pendingTradeProposal = data.pendingTradeProposal || null;
+        state._seasonHistory = data.seasonHistory || [];
+        state._championshipHistory = data.championshipHistory || [];
+        state._fullSeasonHistory = data.fullSeasonHistory || [];
+        state._lastSaveTime = data.lastSaveTime;
+        state._gameVersion = data.gameVersion || '3.0';
+        
+        console.log(`📁 Game loaded: Season ${state._currentSeason}, ${state._tier1Teams.length + state._tier2Teams.length + state._tier3Teams.length} teams${isV2 ? ' (v2 compressed)' : ''}`);
+        
+        return state;
+    }
+    
+    // ============================================
+    // UTILITY METHODS
+    // ============================================
+    
+    /**
+     * Get a summary of the game state
+     */
+    getSummary() {
+        const userTeam = this.getUserTeam();
+        return {
+            season: `${this._currentSeason}-${(this._currentSeason + 1) % 100}`,
+            tier: this._currentTier,
+            userTeam: userTeam ? userTeam.name : 'None',
+            gamesPlayed: this.getGamesPlayed(),
+            totalGames: this.getTotalGamesInSeason(),
+            teamsCount: this.getAllTeams().length,
+            freeAgentsCount: this._freeAgents.length
+        };
+    }
+    
+    /**
+     * Print debug info
+     */
+    debug() {
+        console.log('=== GAME STATE DEBUG ===');
+        console.log('Season:', `${this._currentSeason}-${(this._currentSeason + 1) % 100}`);
+        console.log('Tier:', this._currentTier);
+        console.log('Mode:', this._currentMode);
+        console.log('User Team:', this.getUserTeam()?.name || 'None');
+        console.log('Games:', `${this.getGamesPlayed()}/${this.getTotalGamesInSeason()}`);
+        console.log('Teams:', `T1: ${this._tier1Teams.length}, T2: ${this._tier2Teams.length}, T3: ${this._tier3Teams.length}`);
+        console.log('Free Agents:', this._freeAgents.length);
+        console.log('========================');
+    }
+}

@@ -128,6 +128,75 @@ export class SimulationController {
     }
 
     /**
+     * Simulate a playoff game (doesn't update team records, just returns result)
+     * @param {Object} homeTeam - Home team
+     * @param {Object} awayTeam - Away team
+     * @returns {Object} Game result
+     */
+    simulatePlayoffGame(homeTeam, awayTeam) {
+        const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, true);
+        this.accumulatePlayerStats(homeTeam, result.homePlayerStats);
+        this.accumulatePlayerStats(awayTeam, result.awayPlayerStats);
+        this.notifyObservers('playoffGameComplete', result);
+        return result;
+    }
+
+    /**
+     * Simulate an entire playoff series
+     * @param {Object} higherSeed - Higher seeded team
+     * @param {Object} lowerSeed - Lower seeded team
+     * @param {number} bestOf - Series length (5 or 7)
+     * @returns {Object} Series result with all game details
+     */
+    simulatePlayoffSeries(higherSeed, lowerSeed, bestOf) {
+        const gamesToWin = Math.ceil(bestOf / 2);
+        let higherSeedWins = 0;
+        let lowerSeedWins = 0;
+        const games = [];
+
+        const homePattern = bestOf === 7
+            ? [true, true, false, false, true, false, true]
+            : [true, true, false, false, true];
+
+        let gameNum = 0;
+        while (higherSeedWins < gamesToWin && lowerSeedWins < gamesToWin) {
+            const isHigherSeedHome = homePattern[gameNum];
+            const homeTeam = isHigherSeedHome ? higherSeed : lowerSeed;
+            const awayTeam = isHigherSeedHome ? lowerSeed : higherSeed;
+
+            const gameResult = this.simulatePlayoffGame(homeTeam, awayTeam);
+
+            if (gameResult.winner.id === higherSeed.id) {
+                higherSeedWins++;
+            } else {
+                lowerSeedWins++;
+            }
+
+            games.push({
+                gameNumber: gameNum + 1,
+                homeTeam, awayTeam,
+                homeScore: gameResult.homeScore,
+                awayScore: gameResult.awayScore,
+                winner: gameResult.winner
+            });
+
+            gameNum++;
+        }
+
+        const result = {
+            higherSeed, lowerSeed,
+            winner: higherSeedWins >= gamesToWin ? higherSeed : lowerSeed,
+            loser: higherSeedWins >= gamesToWin ? lowerSeed : higherSeed,
+            higherSeedWins, lowerSeedWins,
+            games,
+            seriesScore: `${higherSeedWins}-${lowerSeedWins}`
+        };
+
+        this.notifyObservers('playoffSeriesComplete', result);
+        return result;
+    }
+
+    /**
      * Add an observer to be notified of simulation events
      * @param {Function} callback - Callback function(event, data)
      */

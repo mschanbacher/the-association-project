@@ -1209,6 +1209,7 @@
         import { FreeAgencyController } from './src/engines/FreeAgencyController.js';
         import { DashboardController } from './src/engines/DashboardController.js';
         import { CoachManagementController } from './src/engines/CoachManagementController.js';
+        import { SaveLoadController } from './src/engines/SaveLoadController.js';
         import { GamePipeline } from './src/engines/GamePipeline.js';
         import { ChemistryEngine } from './src/engines/ChemistryEngine.js';
         import { InjuryEngine } from './src/engines/InjuryEngine.js';
@@ -1244,7 +1245,7 @@
             // Controllers
             OffseasonController, TradeController, DraftController,
             GameSimController, FinanceController, RosterController, FreeAgencyController,
-            DashboardController, CoachManagementController
+            DashboardController, CoachManagementController, SaveLoadController
         });
 
         // Initialize StorageEngine (async), then boot the game
@@ -1506,74 +1507,29 @@
             }
             return _coachMgmtController;
         }
-        
-// ============================================
-// GameEngine → Extracted to src/engines/GameEngine.js
-// ============================================
 
+        let _saveLoadController = null;
+        function getSaveLoadController() {
+            if (!_saveLoadController) {
+                _saveLoadController = new SaveLoadController({
+                    gameState,
+                    engines: { StorageEngine },
+                    helpers: { eventBus, GameEvents }
+                });
+            }
+            return _saveLoadController;
+        }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// STAT GENERATION ENGINE v1.0
-// ═══════════════════════════════════════════════════════════════════════════════
-// Pure function module: Takes two teams, returns player stat lines and game scores.
-// No side effects. No state mutation. No UI.
-//
-// Architecture notes:
-// - This replaces the old calculateGameOutcome's score generation with a bottom-up
-//   player-stats-first approach. Individual performances produce the team score.
-// - Designed for GM Mode accumulation now, Coach Mode game logs later.
-// - Player traits/sub-archetypes have injection points but default to position base.
-// - All randomness uses Math.random() — can be swapped for seeded RNG later.
-// ═══════════════════════════════════════════════════════════════════════════════
+        // saveGameState is a thin wrapper used by many controllers as a dependency
+        function saveGameState() {
+            getSaveLoadController().save();
+        }
 
+        // Global simulation controller instance
+        const simulationController = new SimulationController();
 
-// ============================================
-// SimulationController → Extracted to src/engines/SimulationController.js
-// ============================================
+        let gmMode = null;
 
-// ============================================
-// GLOBAL INSTANCE
-// ============================================
-const simulationController = new SimulationController();
-
-// ============================================
-// ============================================
-// CalendarEngine → Extracted to src/engines/CalendarEngine.js
-// ============================================
-
-// ============================================
-// PLAYOFF ENGINE
-// ============================================
-// Manages playoff bracket generation, simulation, and calendar scheduling
-// for all three tiers plus relegation brackets
-
-// ============================================
-// PLAYER ATTRIBUTES ENGINE
-// ============================================
-// Physical measurables + skill attributes that define each player.
-// Rating is derived as a weighted composite of attributes by position.
-
-
-        // ═══════════════════════════════════════════════════════════════════
-        // PlayerAttributes, CoachEngine, GameState
-        // → Extracted to src/engines/*.js modules
-        // ═══════════════════════════════════════════════════════════════════
-        // PlayoffEngine — extracted to src/engines/PlayoffEngine.js (Phase 3A)
-    
-
-        // GMMode — extracted to src/engines/GMMode.js (Phase 3B)
-
-// ============================================
-// GLOBAL INSTANCE
-// ============================================
-// Will be created during initialization
-let gmMode = null;
-
-        
-        // ============================================
-        // PHASE 3: MIGRATION COMPATIBILITY LAYER
-        // ============================================
-        
         /**
          * Create GameState instance from old gameState object
          * This allows gradual migration from old code to new
@@ -1747,15 +1703,7 @@ let gmMode = null;
         // Sources: US Census Bureau MSA estimates, Statistics Canada, INEGI Mexico
         // Population in millions (metro statistical area)
 
-        // ═══════════════════════════════════════════════════════════════════
-        // METRO_POPULATIONS + FinanceEngine
-        // → Extracted to src/engines/FinanceEngine.js module
-        // ═══════════════════════════════════════════════════════════════════
-
-
-        // ═══════════════════════════════════════════════════════════════════
-        // SALARY CAPS → Delegated to SalaryCapEngine
-        // ═══════════════════════════════════════════════════════════════════
+        // Salary cap constants — delegated to SalaryCapEngine
         const SALARY_CAPS = SalaryCapEngine.SALARY_CAPS;
         const SALARY_FLOORS = SalaryCapEngine.SALARY_FLOORS;
         const PARACHUTE_PAYMENTS = SalaryCapEngine.PARACHUTE_PAYMENTS;
@@ -2055,217 +2003,26 @@ let gmMode = null;
             
             getDashboardController().refresh();
         }
-        // Make it globally accessible
-        // Generate schedule
-        // Simulate game
-        // Calculate team strength from roster
-        // Get home court advantage (universal for all game simulations)
-        // Future: can be customized per team (altitude, crowd noise, etc.)
-        // ============================================
-        // PHASE 2 MIGRATION: Updated Functions
-        // ============================================
-        // This replaces the old GameEngine.simulateGame() and GameEngine.simulatePlayoffGame() functions
-        // to use the new SimulationController architecture
-        
-        /**
-         * MIGRATED: GameEngine.simulateGame() now uses simulationController
-         * This is the main function called throughout the codebase
-         * Now properly separated: calculation vs state updates
-         */
-        /**
-         * MIGRATED: GameEngine.simulatePlayoffGame() now uses GameEngine
-         * Pure calculation - doesn't modify team records
-         * Used by playoff series simulation
-         */
-        // ============================================
-        // ENHANCED SIMULATION CONTROLLER
-        // ============================================
-        // Add playoff-specific simulation method
-        
-        /**
-         * Simulate a playoff game (doesn't update team records, just returns result)
-         * @param {Object} homeTeam - Home team
-         * @param {Object} awayTeam - Away team
-         * @returns {Object} Game result
-         */
-        SimulationController.prototype.simulatePlayoffGame = function(homeTeam, awayTeam) {
-            // Use GameEngine for pure calculation (now powered by StatEngine)
-            const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, true);
-            
-            // Accumulate player stats for playoff games too
-            this.accumulatePlayerStats(homeTeam, result.homePlayerStats);
-            this.accumulatePlayerStats(awayTeam, result.awayPlayerStats);
-            
-            // Notify observers but don't update team records
-            this.notifyObservers('playoffGameComplete', result);
-            
-            return result;
-        };
-        
-        /**
-         * Simulate an entire playoff series
-         * @param {Object} higherSeed - Higher seeded team
-         * @param {Object} lowerSeed - Lower seeded team  
-         * @param {number} bestOf - Series length (5 or 7)
-         * @returns {Object} Series result with all game details
-         */
-        SimulationController.prototype.simulatePlayoffSeries = function(higherSeed, lowerSeed, bestOf) {
-            const gamesToWin = Math.ceil(bestOf / 2);
-            let higherSeedWins = 0;
-            let lowerSeedWins = 0;
-            const games = [];
-            
-            // Home court advantage pattern
-            const homePattern = bestOf === 7 
-                ? [true, true, false, false, true, false, true] // 2-2-1-1-1
-                : [true, true, false, false, true]; // 2-2-1
-            
-            let gameNum = 0;
-            while (higherSeedWins < gamesToWin && lowerSeedWins < gamesToWin) {
-                const isHigherSeedHome = homePattern[gameNum];
-                const homeTeam = isHigherSeedHome ? higherSeed : lowerSeed;
-                const awayTeam = isHigherSeedHome ? lowerSeed : higherSeed;
-                
-                // Use the playoff game simulation
-                const gameResult = this.simulatePlayoffGame(homeTeam, awayTeam);
-                
-                if (gameResult.winner.id === higherSeed.id) {
-                    higherSeedWins++;
-                } else {
-                    lowerSeedWins++;
-                }
-                
-                games.push({
-                    gameNumber: gameNum + 1,
-                    homeTeam: homeTeam,
-                    awayTeam: awayTeam,
-                    homeScore: gameResult.homeScore,
-                    awayScore: gameResult.awayScore,
-                    winner: gameResult.winner
-                });
-                
-                gameNum++;
-            }
-            
-            const result = {
-                higherSeed: higherSeed,
-                lowerSeed: lowerSeed,
-                winner: higherSeedWins >= gamesToWin ? higherSeed : lowerSeed,
-                loser: higherSeedWins >= gamesToWin ? lowerSeed : higherSeed,
-                higherSeedWins: higherSeedWins,
-                lowerSeedWins: lowerSeedWins,
-                games: games,
-                seriesScore: `${higherSeedWins}-${lowerSeedWins}`
-            };
-            
-            // Notify observers
-            this.notifyObservers('playoffSeriesComplete', result);
-            
-            return result;
-        };
-        
-        // ============================================
-        // LEGACY WRAPPER FOR PLAYOFF SERIES
-        // ============================================
-        // Keep the old function name working
-        
-        /**
-         * Legacy wrapper for simulatePlayoffSeries
-         * BACKWARD COMPATIBLE
-         */
-        // ============================================
-        // PHASE 2 MIGRATION COMPLETE
-        // ============================================
-        /*
-         * WHAT CHANGED:
-         * ✅ GameEngine.simulateGame() now uses simulationController.simulateFullGame()
-         * ✅ GameEngine.simulatePlayoffGame() now uses GameEngine.calculateGameOutcome()
-         * ✅ Added simulationController.GameEngine.simulatePlayoffGame() method
-         * ✅ Added simulationController.GameEngine.simulatePlayoffSeries() method
-         * ✅ All old function calls still work (backward compatible)
-         * 
-         * BENEFITS:
-         * ✅ No code duplication
-         * ✅ Single source of truth for game simulation
-         * ✅ Observer pattern works throughout
-         * ✅ Easier to add features (Coach mode, Board mode)
-         * ✅ Cleaner, more maintainable code
-         * 
-         * WHAT STILL WORKS:
-         * ✅ GameEngine.simulateGame(team1, team2) - works as before
-         * ✅ GameEngine.simulatePlayoffSeries(seed1, seed2, 7) - works as before
-         * ✅ All existing saves load correctly
-         * ✅ All UI functions work unchanged
-         */
-        
 
-        // Get current teams
         function getCurrentTeams() {
             if (gameState.currentTier === 1) return gameState.tier1Teams;
             if (gameState.currentTier === 2) return gameState.tier2Teams;
             return gameState.tier3Teams;
         }
-        // Helper function to get user's team
+
         function getUserTeam() {
-            // First try current tier
             const currentTierTeams = getCurrentTeams();
             let userTeam = currentTierTeams.find(t => t.id === gameState.userTeamId);
-            
-            // If not found in current tier, search all tiers
-            // (This can happen during promotion/relegation)
             if (!userTeam) {
                 const allTeams = [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams];
                 userTeam = allTeams.find(t => t.id === gameState.userTeamId);
-                
                 if (userTeam) {
                     console.log('⚠️ User team found in tier', userTeam.tier, 'but gameState.currentTier is', gameState.currentTier);
                 }
             }
-            
             return userTeam;
         }
 
-        // ============================================
-        // LEGACY SIMULATION FUNCTIONS REMOVED
-        // ============================================
-        // The following functions have been removed because they're replaced by GMMode class:
-        // - simNextGame() → GMMode.simulateNextGame()
-        // - simDay() → GMMode.simulateDay()
-        // - finishSeason() → GMMode.finishSeason()
-        // - finishSeasonBatch() → GMMode.finishSeasonBatch()
-        // - simulateOtherTiersProportionally() → GMMode.simulateOtherTiersProportionally()
-        // - continueAfterInjuries() → handled in injury modal flow
-        // 
-        // All game simulation now goes through the GMMode class which has proper
-        // injury checking, chemistry updates, and trade proposal handling integrated.
-        // ============================================
-
-        // Show season end modal
-        // Start playoff simulation
-        // Simulate playoff bracket
-        // Simulate single playoff game
-        // Simulate single playoff game (simple version for promotion/relegation playoffs)
-        // Show playoff results
-        // ===== TIER 1 CHAMPIONSHIP PLAYOFFS =====
-        
-        // ═══════════════════════════════════════════════════════════════════
-        // FINANCIAL TRANSITION BRIEFING
-        // ═══════════════════════════════════════════════════════════════════
-        // Shows after promotion/relegation, before draft/free agency.
-        // Gives the player a clear picture of their new financial reality
-        // so they can plan roster decisions accordingly.
-        
-        // Advance to next season
-        // Start next season
-        // OLD FUNCTION - DEPRECATED (kept for backward compatibility only)
-        // Flow: advanceToNextSeason → PlayoffEngine.simulateFullPostseason → continueAfterPostseason → executePromotionRelegationFromResults → proceedToDraftOrDevelopment → collegeGradFA → playerDevelopment → rosterCompliance → offseasonManagement → continueToSeasonSetup
-        function startNextSeason() {
-            console.error('⚠️ startNextSeason called - this function is deprecated!');
-            console.error('The new season flow is: Season End → Playoffs → Promotion/Relegation → Draft (T1 only) → Development → Roster Check → Season Setup');
-            console.error('If you see this message, there is a bug in the flow. Please report it.');
-        }
-
-        // Simulate all tiers (except user's) to completion for end-of-season
         // ═══════════════════════════════════════════════════════════════════
         // STEP 3b: COLLEGE GRADUATE FREE AGENCY
         // ═══════════════════════════════════════════════════════════════════
@@ -2548,170 +2305,6 @@ let gmMode = null;
             return all;
         }
 
-        function resetGame() {
-            if (confirm('Are you sure you want to reset? All progress will be lost.')) {
-                StorageEngine.clearAll().then(() => {
-                    location.reload();
-                }).catch(() => {
-                    // Fallback: clear localStorage manually and reload
-                    localStorage.removeItem('gbslMultiTierGameState');
-                    localStorage.removeItem('gbslSaveData');
-                    location.reload();
-                });
-            }
-        }
-
-        // Save game state to localStorage
-        function saveGameState() {
-            // Use StorageEngine (IndexedDB with localStorage fallback)
-            StorageEngine.save(gameState).then(result => {
-                if (result.success) {
-                    console.log(`💾 Saved (${result.sizeKB}KB via ${result.storage})`);
-                    eventBus.emit(GameEvents.GAME_SAVED, { sizeKB: result.sizeKB, storage: result.storage });
-                } else {
-                    console.error('❌ Save returned failure');
-                    // Emergency fallback: write directly to localStorage
-                    try {
-                        const data = gameState.serialize ? gameState.serialize() : JSON.stringify(gameState);
-                        localStorage.setItem('gbslSaveData', data);
-                        console.log('🆘 Emergency save to localStorage:', Math.round(data.length/1024), 'KB');
-                    } catch(e) {
-                        console.error('Emergency save also failed:', e);
-                    }
-                }
-            }).catch(err => {
-                console.error('❌ Save error:', err);
-                // Emergency fallback
-                try {
-                    const data = gameState.serialize ? gameState.serialize() : JSON.stringify(gameState);
-                    localStorage.setItem('gbslSaveData', data);
-                    console.log('🆘 Emergency save to localStorage:', Math.round(data.length/1024), 'KB');
-                } catch(e) {
-                    console.error('Emergency save also failed:', e);
-                }
-            });
-        }
-
-        // Load game state from localStorage
-        function loadGameState() {
-            try {
-                const saved = localStorage.getItem('gbslMultiTierGameState');
-                if (saved) {
-                    const loaded = JSON.parse(saved);
-                    if (loaded.userTeamId) {
-                        gameState = loaded;
-                        
-                        // Ensure tier3Teams exists (for old saves that don't have it)
-                        if (!gameState.tier3Teams || gameState.tier3Teams.length === 0) {
-                            console.log('Initializing Tier 3 for old save...');
-                            gameState.tier3Teams = TeamFactory.initializeTierTeams(3, generateRoster);
-                        }
-                        
-                        // Ensure viewingTier exists
-                        if (gameState.viewingTier === undefined) {
-                            gameState.viewingTier = null;
-                        }
-                        
-                        // Ensure tier schedules exist (for background simulation)
-                        if (!gameState.tier1Schedule || gameState.tier1Schedule.length === 0) {
-                            console.log('Initializing tier schedules for old save...');
-                            gameState.tier1Schedule = TeamFactory.generateSchedule(gameState.tier1Teams, 82);
-                            gameState.tier2Schedule = TeamFactory.generateSchedule(gameState.tier2Teams, 60);
-                            gameState.tier3Schedule = TeamFactory.generateSchedule(gameState.tier3Teams, 40);
-                        }
-                        
-                        // === CALENDAR MIGRATION ===
-                        // If loading an old save without calendar dates, migrate it
-                        if (!gameState.currentDate) {
-                            console.log('📅 Migrating old save to calendar system...');
-                            const startYear = gameState.currentSeason || 2025;
-                            gameState.seasonStartYear = startYear;
-                            const seasonDates = CalendarEngine.getSeasonDates(startYear);
-                            gameState.currentDate = CalendarEngine.toDateString(seasonDates.t1Start);
-                            
-                            // Check if schedules need date assignment
-                            if (gameState.tier1Schedule.length > 0 && !gameState.tier1Schedule[0].date) {
-                                console.log('  Regenerating schedules with calendar dates...');
-                                const t1Start = CalendarEngine.toDateString(seasonDates.t1Start);
-                                const t2Start = CalendarEngine.toDateString(seasonDates.t2Start);
-                                const t3Start = CalendarEngine.toDateString(seasonDates.t3Start);
-                                const seasonEnd = CalendarEngine.toDateString(seasonDates.seasonEnd);
-                                
-                                gameState.tier1Schedule = CalendarEngine.generateCalendarSchedule(
-                                    gameState.tier1Teams, 82, t1Start, seasonEnd, seasonDates
-                                );
-                                gameState.tier2Schedule = CalendarEngine.generateCalendarSchedule(
-                                    gameState.tier2Teams, 60, t2Start, seasonEnd, seasonDates
-                                );
-                                gameState.tier3Schedule = CalendarEngine.generateCalendarSchedule(
-                                    gameState.tier3Teams, 40, t3Start, seasonEnd, seasonDates
-                                );
-                                
-                                if (gameState.currentTier === 1) gameState.schedule = gameState.tier1Schedule;
-                                else if (gameState.currentTier === 2) gameState.schedule = gameState.tier2Schedule;
-                                else gameState.schedule = gameState.tier3Schedule;
-                                
-                                console.log('  ✅ Calendar migration complete');
-                            }
-                        }
-                        
-                        // Ensure all teams have rosters (backward compatibility)
-                        console.log('Checking rosters for backward compatibility...');
-                        let rostersGenerated = 0;
-                        let playersMigrated = 0;
-                        [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams].forEach(team => {
-                            if (!team.roster || team.roster.length === 0) {
-                                team.roster = generateRoster(team.tier, team.id);
-                                rostersGenerated++;
-                            }
-                            // === COACH MIGRATION: Ensure all teams have coaches ===
-                            if (!team.coach) {
-                                team.coach = CoachEngine.generateCoach(team.tier);
-                                team.coach.teamId = team.id;
-                            }
-                            // === ATTRIBUTE MIGRATION: Ensure all players have attributes ===
-                            if (team.roster) {
-                                team.roster.forEach(player => {
-                                    if (PlayerAttributes.ensureAttributes(player)) {
-                                        playersMigrated++;
-                                        // Update fatigue threshold based on new endurance attribute
-                                        if (player.attributes && player.attributes.endurance) {
-                                            player.fatigueThreshold = Math.max(60, Math.min(90, 65 + Math.round((player.attributes.endurance - 50) * 0.4)));
-                                        }
-                                    }
-                                });
-                            }
-                        });
-                        if (rostersGenerated > 0) {
-                            console.log(`Generated ${rostersGenerated} rosters for existing teams`);
-                        }
-                        if (playersMigrated > 0) {
-                            console.log(`🏋️ Migrated ${playersMigrated} players to attribute system`);
-                        }
-                        // Migrate free agents too
-                        if (gameState.freeAgents) {
-                            gameState.freeAgents.forEach(player => {
-                                PlayerAttributes.ensureAttributes(player);
-                            });
-                        }
-                        
-                        // Ensure free agents exist
-                        if (!gameState.freeAgents || gameState.freeAgents.length === 0) {
-                            console.log('Generating free agent pool...');
-                            gameState.freeAgents = generateFreeAgentPool();
-                        }
-                        
-                        return true;
-                    }
-                }
-            } catch(e) {
-                console.log('Could not load saved game');
-            }
-            return false;
-        }
-
-        // Make functions globally accessible for onclick handlers
-        // Note: simNextGame, simDay, finishSeason are now handled by GMMode class
         // ===== ROSTER MANAGEMENT FUNCTIONS =====
         
         let currentFreeAgentFilter = { position: 'ALL', tier: 'ALL', sort: 'rating' };
@@ -2904,8 +2497,6 @@ let gmMode = null;
             document.getElementById('complianceModal').classList.add('hidden');
             getOffseasonController().checkRosterComplianceAndContinue();
         }
-        
-        // ===== COACH MANAGEMENT → Extracted to CoachManagementController.js =====
         
         // ===== PLAYER ATTRIBUTE DISPLAY =====
         
@@ -3335,7 +2926,7 @@ let gmMode = null;
         window.openRosterManagementHub = openRosterManagementHub;
         window.openTradeScreenFromRoster = openTradeScreenFromRoster;
         window.recheckRosterCompliance = recheckRosterCompliance;
-        window.resetGame = resetGame;
+        window.resetGame = () => getSaveLoadController().reset();
         window.selectInjuryOption = selectInjuryOption;
         window.selectTeam = selectTeam;
         window.selectTier = selectTier;

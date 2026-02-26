@@ -64,40 +64,6 @@ export class UIRenderer {
         return tier === 1 ? 30 : tier === 2 ? 86 : 144;
     }
 
-    /**
-     * Render a small colored tier badge for a player.
-     * @param {Object} player - Player object (needs rating, age, position)
-     * @returns {string} HTML span with tier badge
-     */
-    static getTierBadge(player) {
-        const natTier = window.TeamFactory
-            ? window.TeamFactory.getPlayerNaturalTier(player)
-            : (player.rating >= 72 ? 1 : player.rating >= 60 ? 2 : 3);
-        const colors = { 1: '#ff6b6b', 2: '#4ecdc4', 3: '#95afc0' };
-        const labels = { 1: 'T1', 2: 'T2', 3: 'T3' };
-        return `<span style="background:${colors[natTier]};color:#fff;padding:1px 6px;border-radius:3px;font-size:0.75em;font-weight:bold;margin-left:5px;" title="Valued at Tier ${natTier} rates">${labels[natTier]}</span>`;
-    }
-
-    /**
-     * Format market value display with tier badge and cross-tier comparison.
-     * @param {Object} player - Player object
-     * @param {number} userTier - The user's current tier
-     * @returns {string} HTML string with market value and tier badge
-     */
-    static formatMarketDisplay(player, userTier) {
-        const TeamFactory = window.TeamFactory;
-        if (!TeamFactory) return UIRenderer.formatCurrency(player.salary || 0);
-        const natTier = TeamFactory.getPlayerNaturalTier(player);
-        const tierValue = TeamFactory.getMarketValue(player, userTier);
-        const badge = UIRenderer.getTierBadge(player);
-
-        if (natTier < userTier) {
-            const natValue = TeamFactory.getNaturalMarketValue(player);
-            return `${UIRenderer.formatCurrency(tierValue)} ${badge}<br><span style="font-size:0.8em;color:#ff6b6b;opacity:0.9;">T${natTier} value: ${UIRenderer.formatCurrency(natValue)}</span>`;
-        }
-        return `${UIRenderer.formatCurrency(tierValue)} ${badge}`;
-    }
-
     // ═══════════════════════════════════════════════════════════════
     // SEASON END MODAL
     // ═══════════════════════════════════════════════════════════════
@@ -433,59 +399,6 @@ export class UIRenderer {
     // ═══════════════════════════════════════════════════════════════
     // DEVELOPMENT SUMMARY
     // ═══════════════════════════════════════════════════════════════
-
-    static developmentSummary({ developmentLog, retirements, userTeamRetirements, notableRetirements }) {
-        let html = '<div style="text-align: center; padding: 15px;">';
-        html += '<h2 style="margin-bottom: 20px;">🌟 Player Development</h2>';
-
-        // User team development changes
-        if (developmentLog && developmentLog.length > 0) {
-            html += '<div style="background: rgba(255,255,255,0.05); border-radius: 10px; padding: 15px; margin-bottom: 15px; text-align: left;">';
-            html += '<h3 style="margin-bottom: 10px;">Your Team Changes</h3>';
-            for (const entry of developmentLog) {
-                const arrow = entry.change > 0 ? '⬆️' : entry.change < 0 ? '⬇️' : '➡️';
-                const changeColor = entry.change > 0 ? '#4ecdc4' : entry.change < 0 ? '#ff6b6b' : '#888';
-                html += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; ${developmentLog.indexOf(entry) % 2 === 0 ? 'background: rgba(255,255,255,0.03);' : ''} border-radius: 4px;">
-                        <span>${arrow} ${entry.name} (${entry.position})</span>
-                        <span style="color: ${changeColor}; font-weight: bold;">${entry.oldRating} → ${entry.newRating} (${entry.change > 0 ? '+' : ''}${entry.change})</span>
-                    </div>
-                `;
-            }
-            html += '</div>';
-        }
-
-        // User team retirements
-        if (userTeamRetirements && userTeamRetirements.length > 0) {
-            html += '<div style="background: rgba(234,67,53,0.1); border-radius: 10px; padding: 15px; margin-bottom: 15px; text-align: left; border: 1px solid rgba(234,67,53,0.2);">';
-            html += '<h3 style="margin-bottom: 10px;">🎓 Retirements (Your Team)</h3>';
-            for (const r of userTeamRetirements) {
-                html += `
-                    <div style="padding: 6px 8px;">
-                        <strong>${r.name}</strong> (${r.position}, Age ${r.age}) — Peak: ${r.peakRating} OVR
-                    </div>
-                `;
-            }
-            html += '</div>';
-        }
-
-        // Notable league retirements
-        if (notableRetirements && notableRetirements.length > 0) {
-            html += '<div style="background: rgba(255,255,255,0.03); border-radius: 10px; padding: 15px; margin-bottom: 15px; text-align: left;">';
-            html += '<h3 style="margin-bottom: 10px;">🎓 Notable League Retirements</h3>';
-            for (const r of notableRetirements) {
-                html += `
-                    <div style="padding: 4px 8px; font-size: 0.9em; opacity: 0.8;">
-                        ${r.name} (${r.team || ''}, Peak: ${r.peakRating} OVR, Age ${r.age})
-                    </div>
-                `;
-            }
-            html += '</div>';
-        }
-
-        html += '</div>';
-        return html;
-    }
 
     // ═══════════════════════════════════════════════════════════════
     // INJURY MODAL
@@ -1142,44 +1055,6 @@ export class UIRenderer {
     // STANDINGS
     // ═══════════════════════════════════════════════════════════════
 
-    static standingsTable({ teams, userTeamId, title, showTier, getRatingColor }) {
-        if (!teams || teams.length === 0) return '<p style="opacity: 0.7;">No teams.</p>';
-
-        let html = '';
-        if (title) html += `<h3 style="margin-bottom: 10px;">${title}</h3>`;
-        html += '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">';
-        html += `<thead><tr style="opacity: 0.6; border-bottom: 2px solid rgba(255,255,255,0.1);">
-            <th style="padding: 8px; text-align: left;">#</th>
-            <th style="padding: 8px; text-align: left;">Team</th>
-            <th style="padding: 8px; text-align: center;">W</th>
-            <th style="padding: 8px; text-align: center;">L</th>
-            <th style="padding: 8px; text-align: center;">PCT</th>
-            <th style="padding: 8px; text-align: center;">DIFF</th>
-            ${showTier ? '<th style="padding: 8px; text-align: center;">RTG</th>' : ''}
-        </tr></thead><tbody>`;
-
-        teams.forEach((team, i) => {
-            const isUser = team.id === userTeamId;
-            const bg = isUser ? 'background: rgba(102,126,234,0.2);' : (i % 2 === 0 ? 'background: rgba(255,255,255,0.02);' : '');
-            const winPct = ((team.wins || 0) / Math.max(1, (team.wins || 0) + (team.losses || 0))).toFixed(3);
-            const diff = (team.pointDiff || 0);
-            const diffColor = diff > 0 ? '#4ecdc4' : diff < 0 ? '#ff6b6b' : '';
-            html += `
-                <tr style="${bg}">
-                    <td style="padding: 6px 8px;">${i + 1}</td>
-                    <td style="padding: 6px 8px; ${isUser ? 'font-weight: bold; color: #667eea;' : ''}">${team.city || ''} ${team.name}</td>
-                    <td style="padding: 6px 8px; text-align: center;">${team.wins || 0}</td>
-                    <td style="padding: 6px 8px; text-align: center;">${team.losses || 0}</td>
-                    <td style="padding: 6px 8px; text-align: center;">${winPct}</td>
-                    <td style="padding: 6px 8px; text-align: center; ${diffColor ? 'color:' + diffColor + ';' : ''}">${diff > 0 ? '+' : ''}${diff}</td>
-                    ${showTier ? `<td style="padding: 6px 8px; text-align: center;">${Math.round(team.rating || 0)}</td>` : ''}
-                </tr>
-            `;
-        });
-        html += '</tbody></table></div>';
-        return html;
-    }
-
     // ═══════════════════════════════════════════════════════════════
     // FREE AGENCY
     // ═══════════════════════════════════════════════════════════════
@@ -1511,23 +1386,6 @@ export class UIRenderer {
     // TRADE SCREEN
     // ═══════════════════════════════════════════════════════════════
 
-    static tradePlayerRow({ player, side, ratingColor }) {
-        const action = side === 'user' ? 'addToTradeFromUser' : 'addToTradeFromAI';
-        return `
-            <div style="background: rgba(255,255,255,0.05); padding: 8px 10px; margin-bottom: 6px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="${action}(${player.id})">
-                <div>
-                    <strong>${player.name}</strong>
-                    <span style="opacity: 0.8; margin-left: 8px;">${player.position}</span>
-                </div>
-                <div>
-                    <span style="color: ${ratingColor}; font-weight: bold;">${player.rating}</span>
-                    <span style="opacity: 0.7; margin-left: 10px;">${UIRenderer.formatCurrency(player.salary)}</span>
-                    <span style="opacity: 0.5; margin-left: 8px;">Age ${player.age}</span>
-                </div>
-            </div>
-        `;
-    }
-
     // Trade roster player row (selectable, with checkbox)
     static tradeRosterRow({ player, isSelected, side, ratingColor, formatCurrency }) {
         const fc = formatCurrency || UIRenderer.formatCurrency;
@@ -1615,41 +1473,9 @@ export class UIRenderer {
     // ALL-STAR MODAL
     // ═══════════════════════════════════════════════════════════════
 
-    static allStarPlayerRow(p) {
-        return `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: rgba(255,255,255,0.03); border-radius: 4px; margin-bottom: 4px;">
-                <div>
-                    <strong>${p.player.name}</strong>
-                    <span style="opacity: 0.7; margin-left: 8px;">${p.player.position} · ${p.team.name}</span>
-                </div>
-                <div style="opacity: 0.8; font-size: 0.9em;">
-                    ${p.avgs ? `${p.avgs.pointsPerGame} PPG · ${p.avgs.reboundsPerGame} RPG · ${p.avgs.assistsPerGame} APG` : ''}
-                </div>
-            </div>
-        `;
-    }
-
     // ═══════════════════════════════════════════════════════════════
     // SCOUTING
     // ═══════════════════════════════════════════════════════════════
-
-    static scoutPlayerCard({ player, isWatchlisted, ratingColor }) {
-        return `
-            <div style="background: rgba(255,255,255,0.05); padding: 12px; margin-bottom: 8px; border-radius: 6px; cursor: pointer;" onclick="showPlayerScoutDetail(${player.id})">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <strong>${player.name}</strong>
-                        <span style="opacity: 0.8; margin-left: 10px;">${player.position} · Age ${player.age}</span>
-                        ${isWatchlisted ? '<span style="color: #fbbc04; margin-left: 8px;">⭐</span>' : ''}
-                    </div>
-                    <div>
-                        <span style="color: ${ratingColor}; font-weight: bold;">${player.rating} OVR</span>
-                        <span style="opacity: 0.7; margin-left: 10px;">${player.team || ''}</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
 
     // Scout player detail view
     static scoutPlayerDetail({ player, fit, watched, attrKeys, attrs, getRatingColor, formatCurrency, gradeColor, PlayerAttributes }) {
@@ -2001,39 +1827,9 @@ export class UIRenderer {
     // COACHING
     // ═══════════════════════════════════════════════════════════════
 
-    static coachCard({ coach, isCurrent, canAfford }) {
-        return `
-            <div style="background: rgba(255,255,255,0.05); padding: 15px; margin-bottom: 10px; border-radius: 8px; ${isCurrent ? 'border: 2px solid #667eea;' : ''}">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <strong style="font-size: 1.1em;">${coach.name}</strong>
-                        <span style="opacity: 0.7; margin-left: 10px;">${coach.archetype || 'Standard'}</span>
-                        ${isCurrent ? '<span style="color: #667eea; margin-left: 10px;">Current Coach</span>' : ''}
-                    </div>
-                    <div>
-                        <span style="font-weight: bold;">⭐ ${coach.rating || 'N/A'}</span>
-                        <span style="opacity: 0.7; margin-left: 10px;">💰 ${UIRenderer.formatCurrency(coach.salary || 0)}/yr</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
     // ═══════════════════════════════════════════════════════════════
     // CALENDAR
     // ═══════════════════════════════════════════════════════════════
-
-    static calendarGameRow({ game, userTeamId }) {
-        const isUserGame = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
-        const bg = isUserGame ? 'background: rgba(102,126,234,0.15);' : '';
-        const result = game.played ? `${game.homeScore}-${game.awayScore}` : 'Upcoming';
-        return `
-            <div style="padding: 6px 10px; ${bg} border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 0.9em;">
-                <span>${game.awayTeamName || 'Away'} @ ${game.homeTeamName || 'Home'}</span>
-                <span style="opacity: 0.8;">${result}</span>
-            </div>
-        `;
-    }
 
     // ═══════════════════════════════════════════════════════════════
     // POST-GAME SUMMARY (popup after user team games)
@@ -3764,62 +3560,7 @@ export class UIRenderer {
         </div>`;
     }
 
-    /**
-     * Render overall standings table rows with zone highlighting.
-     * Consolidates the two near-identical standings renderers.
-     */
     static standingsRows({ sortedTeams, tier, userTeamId }) {
-        return sortedTeams.map((team, index) => {
-            const winPct = team.wins + team.losses > 0
-                ? (team.wins / (team.wins + team.losses)).toFixed(3) : '.000';
-
-            let rowClass = '';
-            const rank = index + 1;
-            const totalTeams = sortedTeams.length;
-
-            if (team.id === userTeamId) {
-                rowClass = 'user-team';
-            } else if (tier === 2 || tier === 3) {
-                if (rank === 1) rowClass = 'promotion-zone';
-                else if (rank >= 2 && rank <= 4) rowClass = 'playoff-zone';
-            } else if (tier === 1) {
-                if (rank >= totalTeams - 2 && rank <= totalTeams - 1) rowClass = 'playoff-zone';
-                else if (rank === totalTeams) rowClass = 'auto-relegate';
-            }
-
-            return `<tr class="${rowClass}">
-                <td>${rank}</td>
-                <td><strong>${team.name}</strong></td>
-                <td>${team.division}</td>
-                <td>${team.wins}</td>
-                <td>${team.losses}</td>
-                <td>${winPct}</td>
-                <td>${team.pointDiff > 0 ? '+' : ''}${team.pointDiff}</td>
-            </tr>`;
-        }).join('');
-    }
-
-    /**
-     * Render the season history sidebar items.
-     */
-    static seasonHistoryRows({ history, getRankSuffix }) {
-        return history.map(season => `
-            <div class="history-item">
-                <span><strong>${season.season}</strong></span>
-                <span>Tier ${season.tier}</span>
-                <span>${season.wins}-${season.losses}</span>
-                <span>${season.rank}${getRankSuffix(season.rank)} place</span>
-                <span>${season.pointDiff > 0 ? '+' : ''}${season.pointDiff} diff</span>
-            </div>
-        `).join('');
-    }
-
-    /**
-     * Overall standings table rows with zone highlighting.
-     * Consolidates the two duplicate inline templates from displayOverallStandings
-     * and displayTierOverallStandings.
-     */
-    static overallStandingsRows({ sortedTeams, tier, userTeamId }) {
         return sortedTeams.map((team, index) => {
             const winPct = team.wins + team.losses > 0
                 ? (team.wins / (team.wins + team.losses)).toFixed(3) : '.000';
@@ -3862,58 +3603,6 @@ export class UIRenderer {
             });
         });
         return html;
-    }
-
-    /**
-     * Render overall standings rows with zone highlighting.
-     * Consolidates displayOverallStandings and displayTierOverallStandings.
-     * @param {Array} sortedTeams - Pre-sorted team array
-     * @param {number} tier - Tier number (determines zone highlighting rules)
-     * @param {number} userTeamId - User's team ID for highlighting
-     */
-    static overallStandingsRows({ sortedTeams, tier, userTeamId }) {
-        return sortedTeams.map((team, index) => {
-            const winPct = team.wins + team.losses > 0
-                ? (team.wins / (team.wins + team.losses)).toFixed(3) : '.000';
-            const rank = index + 1;
-            const totalTeams = sortedTeams.length;
-
-            let rowClass = '';
-            if (team.id === userTeamId) {
-                rowClass = 'user-team';
-            } else if (tier === 2 || tier === 3) {
-                if (rank === 1) rowClass = 'promotion-zone';
-                else if (rank >= 2 && rank <= 4) rowClass = 'playoff-zone';
-            } else if (tier === 1) {
-                if (rank >= totalTeams - 2 && rank <= totalTeams - 1) rowClass = 'playoff-zone';
-                else if (rank === totalTeams) rowClass = 'auto-relegate';
-            }
-
-            return `<tr class="${rowClass}">
-                <td>${rank}</td>
-                <td><strong>${team.name}</strong></td>
-                <td>${team.division}</td>
-                <td>${team.wins}</td>
-                <td>${team.losses}</td>
-                <td>${winPct}</td>
-                <td>${team.pointDiff > 0 ? '+' : ''}${team.pointDiff}</td>
-            </tr>`;
-        }).join('');
-    }
-
-    /**
-     * Render the season history sidebar items.
-     */
-    static seasonHistoryItems({ seasonHistory, getRankSuffix }) {
-        return seasonHistory.map(season => `
-            <div class="history-item">
-                <span><strong>${season.season}</strong></span>
-                <span>Tier ${season.tier}</span>
-                <span>${season.wins}-${season.losses}</span>
-                <span>${season.rank}${getRankSuffix(season.rank)} place</span>
-                <span>${season.pointDiff > 0 ? '+' : ''}${season.pointDiff} diff</span>
-            </div>
-        `).join('');
     }
 
     static teamSelectionCard({ team, tier, marketLabel, spendingLimit, fanbase, formatCurrency }) {

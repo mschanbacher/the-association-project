@@ -691,7 +691,7 @@ class GameState {
         };
         
         return JSON.stringify({
-            _v: 2, // Save format version for decompression
+            _v: 3, // Save format version — v3 adds offseason/persistent state
             currentSeason: this._currentSeason,
             currentTier: this._currentTier,
             userTeamId: this._userTeamId,
@@ -713,6 +713,11 @@ class GameState {
             seasonHistory: this._seasonHistory,
             championshipHistory: this._championshipHistory,
             fullSeasonHistory: this._fullSeasonHistory,
+            // v3: persistent state that previously wasn't saved
+            offseasonPhase: this._offseasonPhase,
+            retirementHistory: this._retirementHistory,
+            lastAiTradeCheck: this._lastAiTradeCheck,
+            scoutingWatchList: this._scoutingWatchList,
             lastSaveTime: new Date().toISOString(),
             gameVersion: this._gameVersion
         });
@@ -841,7 +846,13 @@ class GameState {
         state._lastSaveTime = data.lastSaveTime;
         state._gameVersion = data.gameVersion || '3.0';
         
-        console.log(`📁 Game loaded: Season ${state._currentSeason}, ${state._tier1Teams.length + state._tier2Teams.length + state._tier3Teams.length} teams${isV2 ? ' (v2 compressed)' : ''}`);
+        // v3: persistent state (safe defaults for v2 saves missing these fields)
+        state._offseasonPhase = data.offseasonPhase || 'none';
+        state._retirementHistory = data.retirementHistory || [];
+        state._lastAiTradeCheck = data.lastAiTradeCheck || 0;
+        state._scoutingWatchList = data.scoutingWatchList || [];
+        
+        console.log(`📁 Game loaded: Season ${state._currentSeason}, ${state._tier1Teams.length + state._tier2Teams.length + state._tier3Teams.length} teams${isV2 ? ' (v2+ compressed)' : ''}`);
         
         return state;
     }

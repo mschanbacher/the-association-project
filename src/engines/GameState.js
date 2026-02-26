@@ -49,6 +49,43 @@ class GameState {
         // === METADATA ===
         this._lastSaveTime = null;
         this._gameVersion = '4.0';
+        
+        // ══════════════════════════════════════════════════════════════
+        // SEASON / OFFSEASON FLOW STATE
+        // Previously ad-hoc properties set via proxy. Now formalized.
+        // Persistent = survives save/load. Transient = session only.
+        // ══════════════════════════════════════════════════════════════
+        
+        // --- Persistent: survives save/load ---
+        this._offseasonPhase = 'none';        // Current offseason phase (see OffseasonController.PHASES)
+        this._retirementHistory = [];          // Accumulates across seasons
+        this._lastAiTradeCheck = 0;            // Game number of last AI trade check
+        this._scoutingWatchList = [];           // User-curated scouting watch list
+        
+        // --- Transient: regenerated during gameplay, reset on load ---
+        this._pendingInjuries = [];             // Injuries awaiting user decision
+        this._postseasonResults = null;         // Playoff/promo-rel results for current offseason
+        this._championshipPlayoffData = null;   // Active playoff bracket data
+        this._userPlayoffResult = null;         // User's playoff outcome
+        this._seasonEndData = null;             // Cached season-end summary for modals
+        
+        // --- Transient: offseason working data ---
+        this._seasonRetirements = [];           // All retirements this offseason
+        this._userTeamRetirements = [];         // User's team retirements this offseason
+        this._pendingExpiredDecisions = [];     // Player IDs with expiring contracts pending decision
+        this._collegeGraduates = [];            // College players entering FA this offseason
+        this._userFreeAgencyOffers = [];        // User's pending FA offers
+        this._aiFreeAgencyOffers = [];          // AI-generated FA offers for display
+        
+        // --- Transient: All-Star event ---
+        this._allStarCompleted = false;         // Whether All-Star weekend has run this season
+        this._allStarResults = null;            // All-Star game results
+        
+        // --- Transient: UI state (candidates for relocation to controllers later) ---
+        this._viewingTier = null;               // Which tier's standings are displayed
+        this._standingsView = 'overall';        // 'overall' or 'division'
+        this._pipelinePreview = null;           // Cached pipeline preview class
+        this._pipelinePreviewSeason = null;     // Season the preview was generated for
     }
     
     // ============================================
@@ -59,6 +96,12 @@ class GameState {
     set currentSeason(value) {
         if (value < 2025) throw new Error('Invalid season year');
         this._currentSeason = value;
+    }
+    
+    // Convenience getter: returns formatted "2025-26" string.
+    // Fixes pre-existing bug where gameState.season was always undefined.
+    get season() {
+        return `${this._currentSeason}-${String(this._currentSeason + 1).slice(-2)}`;
     }
     
     get currentTier() { return this._currentTier; }
@@ -103,23 +146,92 @@ class GameState {
         this._currentMode = value;
     }
     
-    // Direct access to arrays (for compatibility)
+    // Direct access to arrays (with setters for assignment compatibility)
     get tier1Teams() { return this._tier1Teams; }
+    set tier1Teams(value) { this._tier1Teams = value; }
     get tier2Teams() { return this._tier2Teams; }
+    set tier2Teams(value) { this._tier2Teams = value; }
     get tier3Teams() { return this._tier3Teams; }
+    set tier3Teams(value) { this._tier3Teams = value; }
     get schedule() { return this._schedule; }
+    set schedule(value) { this._schedule = value; }
     get tier1Schedule() { return this._tier1Schedule; }
+    set tier1Schedule(value) { this._tier1Schedule = value; }
     get tier2Schedule() { return this._tier2Schedule; }
+    set tier2Schedule(value) { this._tier2Schedule = value; }
     get tier3Schedule() { return this._tier3Schedule; }
+    set tier3Schedule(value) { this._tier3Schedule = value; }
     get freeAgents() { return this._freeAgents; }
+    set freeAgents(value) { this._freeAgents = value; }
     get draftPickOwnership() { return this._draftPickOwnership; }
+    set draftPickOwnership(value) { this._draftPickOwnership = value; }
     get promotedToT1() { return this._promotedToT1; }
+    set promotedToT1(value) { this._promotedToT1 = value; }
     get relegatedFromT1() { return this._relegatedFromT1; }
+    set relegatedFromT1(value) { this._relegatedFromT1 = value; }
     get pendingTradeProposal() { return this._pendingTradeProposal; }
     set pendingTradeProposal(value) { this._pendingTradeProposal = value; }
     get seasonHistory() { return this._seasonHistory; }
+    set seasonHistory(value) { this._seasonHistory = value; }
     get championshipHistory() { return this._championshipHistory; }
+    set championshipHistory(value) { this._championshipHistory = value; }
     get fullSeasonHistory() { return this._fullSeasonHistory; }
+    set fullSeasonHistory(value) { this._fullSeasonHistory = value; }
+    
+    // ============================================
+    // SEASON / OFFSEASON FLOW (formalized from ad-hoc proxy properties)
+    // ============================================
+    
+    // --- Persistent ---
+    get offseasonPhase() { return this._offseasonPhase; }
+    set offseasonPhase(value) { this._offseasonPhase = value; }
+    
+    get retirementHistory() { return this._retirementHistory; }
+    set retirementHistory(value) { this._retirementHistory = value; }
+    
+    get lastAiTradeCheck() { return this._lastAiTradeCheck; }
+    set lastAiTradeCheck(value) { this._lastAiTradeCheck = value; }
+    
+    get scoutingWatchList() { return this._scoutingWatchList; }
+    set scoutingWatchList(value) { this._scoutingWatchList = value; }
+    
+    // --- Transient: season/offseason flow ---
+    get pendingInjuries() { return this._pendingInjuries; }
+    set pendingInjuries(value) { this._pendingInjuries = value; }
+    
+    get postseasonResults() { return this._postseasonResults; }
+    set postseasonResults(value) { this._postseasonResults = value; }
+    
+    get championshipPlayoffData() { return this._championshipPlayoffData; }
+    set championshipPlayoffData(value) { this._championshipPlayoffData = value; }
+    
+    get userPlayoffResult() { return this._userPlayoffResult; }
+    set userPlayoffResult(value) { this._userPlayoffResult = value; }
+    
+    // Using underscore-prefixed names to match existing access patterns.
+    // These are direct instance properties, not getter/setter pairs,
+    // because calling code accesses them as gameState._seasonEndData etc.
+    // No getter/setter indirection needed — direct property access works fine.
+    
+    // --- Transient: offseason working data ---
+    get pendingExpiredDecisions() { return this._pendingExpiredDecisions; }
+    set pendingExpiredDecisions(value) { this._pendingExpiredDecisions = value; }
+    
+    get collegeGraduates() { return this._collegeGraduates; }
+    set collegeGraduates(value) { this._collegeGraduates = value; }
+    
+    get userFreeAgencyOffers() { return this._userFreeAgencyOffers; }
+    set userFreeAgencyOffers(value) { this._userFreeAgencyOffers = value; }
+    
+    get aiFreeAgencyOffers() { return this._aiFreeAgencyOffers; }
+    set aiFreeAgencyOffers(value) { this._aiFreeAgencyOffers = value; }
+    
+    // --- Transient: UI state ---
+    get viewingTier() { return this._viewingTier; }
+    set viewingTier(value) { this._viewingTier = value; }
+    
+    get standingsView() { return this._standingsView; }
+    set standingsView(value) { this._standingsView = value; }
     
     // ============================================
     // TEAM MANAGEMENT

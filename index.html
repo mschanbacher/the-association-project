@@ -1530,147 +1530,6 @@
 
         let gmMode = null;
 
-        /**
-         * Create GameState instance from old gameState object
-         * This allows gradual migration from old code to new
-         */
-        function migrateToGameStateClass(oldGameState) {
-            const newState = new GameState();
-            
-            // Copy all properties
-            newState._currentSeason = oldGameState.currentSeason;
-            newState._currentTier = oldGameState.currentTier;
-            newState._userTeamId = oldGameState.userTeamId;
-            newState._currentGame = oldGameState.currentGame || 0;
-            newState._tier1Teams = oldGameState.tier1Teams;
-            newState._tier2Teams = oldGameState.tier2Teams;
-            newState._tier3Teams = oldGameState.tier3Teams;
-            newState._schedule = oldGameState.schedule;
-            newState._tier1Schedule = oldGameState.tier1Schedule || [];
-            newState._tier2Schedule = oldGameState.tier2Schedule || [];
-            newState._tier3Schedule = oldGameState.tier3Schedule || [];
-            newState._draftPickOwnership = oldGameState.draftPickOwnership || {};
-            newState._promotedToT1 = oldGameState.promotedToT1 || [];
-            newState._relegatedFromT1 = oldGameState.relegatedFromT1 || [];
-            newState._freeAgents = oldGameState.freeAgents || [];
-            newState._pendingTradeProposal = oldGameState.pendingTradeProposal || null;
-            newState._seasonHistory = oldGameState.seasonHistory || [];
-            newState._championshipHistory = oldGameState.championshipHistory || [];
-            newState._fullSeasonHistory = oldGameState.fullSeasonHistory || [];
-            
-            return newState;
-        }
-        
-        /**
-         * Backward compatibility: Keep global gameState working
-         * This proxy makes old code work while using new GameState class
-         */
-        function createGameStateProxy(gameStateInstance) {
-            return new Proxy(gameStateInstance, {
-                get(target, prop) {
-                    // Direct property access
-                    if (prop in target) {
-                        return target[prop];
-                    }
-                    
-                    // Try getter
-                    const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(target), prop);
-                    if (descriptor && descriptor.get) {
-                        return descriptor.get.call(target);
-                    }
-                    
-                    // Try method
-                    if (typeof target[prop] === 'function') {
-                        return target[prop].bind(target);
-                    }
-                    
-                    // Try private property (with underscore)
-                    if (target['_' + prop] !== undefined) {
-                        return target['_' + prop];
-                    }
-                    
-                    return undefined;
-                },
-                
-                set(target, prop, value) {
-                    // Try setter
-                    const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(target), prop);
-                    if (descriptor && descriptor.set) {
-                        descriptor.set.call(target, value);
-                        return true;
-                    }
-                    
-                    // Try private property
-                    if (target['_' + prop] !== undefined) {
-                        target['_' + prop] = value;
-                        return true;
-                    }
-                    
-                    // Direct set
-                    target[prop] = value;
-                    return true;
-                }
-            });
-        }
-        
-// BACKWARD COMPATIBILITY WRAPPERS
-// ============================================
-// These functions maintain compatibility with existing code
-// by wrapping the new architecture
-        
-        // Initialize GameState (Phase 3)
-        function initializeGameState() {
-            // Check if there's a saved game
-            const savedData = localStorage.getItem('gbslSaveData');
-            
-            if (savedData) {
-                try {
-                    // Try to load as new GameState
-                    const parsed = JSON.parse(savedData);
-                    if (parsed.gameVersion && parseFloat(parsed.gameVersion) >= 4.0) {
-                        // New format - deserialize directly
-                        gameState = GameState.deserialize(savedData);
-                    } else {
-                        // Old format - migrate
-                        const oldState = parsed;
-                        const newState = migrateToGameStateClass(oldState);
-                        gameState = createGameStateProxy(newState);
-                    }
-                    console.log('✅ Game loaded from save');
-                } catch (error) {
-                    console.error('Load error, creating new game:', error);
-                    gameState = createGameStateProxy(new GameState());
-                }
-            } else {
-                // New game
-                gameState = createGameStateProxy(new GameState());
-            }
-            
-            return gameState;
-        }
-        
-        let _oldGameState = {
-            currentSeason: 2024,
-            currentTier: 1,
-            currentGame: 0,
-            userTeamId: null,
-            tier1Teams: [],
-            tier2Teams: [],
-            tier3Teams: [],
-            schedule: [], // User's tier schedule
-            tier1Schedule: [], // Tier 1 background schedule
-            tier2Schedule: [], // Tier 2 background schedule
-            tier3Schedule: [], // Tier 3 background schedule
-            seasonHistory: [],
-            viewingTier: null, // Track which tier's standings are being viewed (null = current tier)
-            standingsView: 'overall', // 'overall' or 'division'
-            freeAgents: [], // Pool of available free agents
-            pendingTradeProposal: null, // AI-proposed trade waiting for user response
-            lastAiTradeCheck: 0, // Game number when we last checked for AI trades
-            promotedToT1: [], // Track teams promoted to Tier 1 (for compensatory picks)
-            draftPickOwnership: {} // Track who owns which draft picks { teamId: { year: { round: ownerId } } }
-        };
-
         // ═══════════════════════════════════════════════════════════════════
         // FINANCE ENGINE — Revenue-Based Economics
         // ═══════════════════════════════════════════════════════════════════
@@ -2748,23 +2607,16 @@
                 if (savedData) {
                     // Load saved game
                     try {
-                        const parsed = JSON.parse(savedData);
-                        if (parsed.gameVersion && parseFloat(parsed.gameVersion) >= 4.0) {
-                            // New format
-                            gameState = GameState.deserialize(savedData);
-                        } else {
-                            // Old format - need to migrate
-                            gameState = migrateToGameStateClass(parsed);
-                        }
-                        gameState = createGameStateProxy(gameState);
+                        gameState = GameState.deserialize(savedData);
                         console.log('✅ Loaded existing save');
                     } catch (error) {
                         console.error('Error loading save:', error);
-                        gameState = createGameStateProxy(new GameState());
+                        console.warn('Save file is incompatible — starting fresh. (Old pre-v4 saves are no longer supported.)');
+                        gameState = new GameState();
                     }
                 } else {
                     // Fresh initialization for team selection
-                    gameState = createGameStateProxy(new GameState());
+                    gameState = new GameState();
                 }
                 
                 // Determine if we have an existing game

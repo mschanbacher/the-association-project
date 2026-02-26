@@ -65,6 +65,36 @@ export class UIRenderer {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    /**
+     * Render a small colored tier badge for a player.
+     */
+    static getTierBadge(player) {
+        const natTier = window.TeamFactory
+            ? window.TeamFactory.getPlayerNaturalTier(player)
+            : (player.rating >= 72 ? 1 : player.rating >= 60 ? 2 : 3);
+        const colors = { 1: '#ff6b6b', 2: '#4ecdc4', 3: '#95afc0' };
+        const labels = { 1: 'T1', 2: 'T2', 3: 'T3' };
+        return `<span style="background:${colors[natTier]};color:#fff;padding:1px 6px;border-radius:3px;font-size:0.75em;font-weight:bold;margin-left:5px;" title="Valued at Tier ${natTier} rates">${labels[natTier]}</span>`;
+    }
+
+    /**
+     * Format market value display with tier badge and cross-tier comparison.
+     */
+    static formatMarketDisplay(player, userTier) {
+        const TeamFactory = window.TeamFactory;
+        if (!TeamFactory) return UIRenderer.formatCurrency(player.salary || 0);
+        const natTier = TeamFactory.getPlayerNaturalTier(player);
+        const tierValue = TeamFactory.getMarketValue(player, userTier);
+        const badge = UIRenderer.getTierBadge(player);
+
+        if (natTier < userTier) {
+            const natValue = TeamFactory.getNaturalMarketValue(player);
+            return `${UIRenderer.formatCurrency(tierValue)} ${badge}<br><span style="font-size:0.8em;color:#ff6b6b;opacity:0.9;">T${natTier} value: ${UIRenderer.formatCurrency(natValue)}</span>`;
+        }
+        return `${UIRenderer.formatCurrency(tierValue)} ${badge}`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // SEASON END MODAL
     // ═══════════════════════════════════════════════════════════════
 

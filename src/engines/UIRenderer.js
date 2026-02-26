@@ -64,6 +64,40 @@ export class UIRenderer {
         return tier === 1 ? 30 : tier === 2 ? 86 : 144;
     }
 
+    /**
+     * Render a small colored tier badge for a player.
+     * @param {Object} player - Player object (needs rating, age, position)
+     * @returns {string} HTML span with tier badge
+     */
+    static getTierBadge(player) {
+        const natTier = window.TeamFactory
+            ? window.TeamFactory.getPlayerNaturalTier(player)
+            : (player.rating >= 72 ? 1 : player.rating >= 60 ? 2 : 3);
+        const colors = { 1: '#ff6b6b', 2: '#4ecdc4', 3: '#95afc0' };
+        const labels = { 1: 'T1', 2: 'T2', 3: 'T3' };
+        return `<span style="background:${colors[natTier]};color:#fff;padding:1px 6px;border-radius:3px;font-size:0.75em;font-weight:bold;margin-left:5px;" title="Valued at Tier ${natTier} rates">${labels[natTier]}</span>`;
+    }
+
+    /**
+     * Format market value display with tier badge and cross-tier comparison.
+     * @param {Object} player - Player object
+     * @param {number} userTier - The user's current tier
+     * @returns {string} HTML string with market value and tier badge
+     */
+    static formatMarketDisplay(player, userTier) {
+        const TeamFactory = window.TeamFactory;
+        if (!TeamFactory) return UIRenderer.formatCurrency(player.salary || 0);
+        const natTier = TeamFactory.getPlayerNaturalTier(player);
+        const tierValue = TeamFactory.getMarketValue(player, userTier);
+        const badge = UIRenderer.getTierBadge(player);
+
+        if (natTier < userTier) {
+            const natValue = TeamFactory.getNaturalMarketValue(player);
+            return `${UIRenderer.formatCurrency(tierValue)} ${badge}<br><span style="font-size:0.8em;color:#ff6b6b;opacity:0.9;">T${natTier} value: ${UIRenderer.formatCurrency(natValue)}</span>`;
+        }
+        return `${UIRenderer.formatCurrency(tierValue)} ${badge}`;
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // SEASON END MODAL
     // ═══════════════════════════════════════════════════════════════
@@ -3730,6 +3764,92 @@ export class UIRenderer {
         </div>`;
     }
 
+    /**
+     * Render overall standings table rows with zone highlighting.
+     * Consolidates the two near-identical standings renderers.
+     */
+    static standingsRows({ sortedTeams, tier, userTeamId }) {
+        return sortedTeams.map((team, index) => {
+            const winPct = team.wins + team.losses > 0
+                ? (team.wins / (team.wins + team.losses)).toFixed(3) : '.000';
+
+            let rowClass = '';
+            const rank = index + 1;
+            const totalTeams = sortedTeams.length;
+
+            if (team.id === userTeamId) {
+                rowClass = 'user-team';
+            } else if (tier === 2 || tier === 3) {
+                if (rank === 1) rowClass = 'promotion-zone';
+                else if (rank >= 2 && rank <= 4) rowClass = 'playoff-zone';
+            } else if (tier === 1) {
+                if (rank >= totalTeams - 2 && rank <= totalTeams - 1) rowClass = 'playoff-zone';
+                else if (rank === totalTeams) rowClass = 'auto-relegate';
+            }
+
+            return `<tr class="${rowClass}">
+                <td>${rank}</td>
+                <td><strong>${team.name}</strong></td>
+                <td>${team.division}</td>
+                <td>${team.wins}</td>
+                <td>${team.losses}</td>
+                <td>${winPct}</td>
+                <td>${team.pointDiff > 0 ? '+' : ''}${team.pointDiff}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    /**
+     * Render the season history sidebar items.
+     */
+    static seasonHistoryRows({ history, getRankSuffix }) {
+        return history.map(season => `
+            <div class="history-item">
+                <span><strong>${season.season}</strong></span>
+                <span>Tier ${season.tier}</span>
+                <span>${season.wins}-${season.losses}</span>
+                <span>${season.rank}${getRankSuffix(season.rank)} place</span>
+                <span>${season.pointDiff > 0 ? '+' : ''}${season.pointDiff} diff</span>
+            </div>
+        `).join('');
+    }
+
+    /**
+     * Overall standings table rows with zone highlighting.
+     * Consolidates the two duplicate inline templates from displayOverallStandings
+     * and displayTierOverallStandings.
+     */
+    static overallStandingsRows({ sortedTeams, tier, userTeamId }) {
+        return sortedTeams.map((team, index) => {
+            const winPct = team.wins + team.losses > 0
+                ? (team.wins / (team.wins + team.losses)).toFixed(3) : '.000';
+
+            let rowClass = '';
+            const rank = index + 1;
+            const totalTeams = sortedTeams.length;
+
+            if (team.id === userTeamId) {
+                rowClass = 'user-team';
+            } else if (tier === 2 || tier === 3) {
+                if (rank === 1) rowClass = 'promotion-zone';
+                else if (rank >= 2 && rank <= 4) rowClass = 'playoff-zone';
+            } else if (tier === 1) {
+                if (rank >= totalTeams - 2 && rank <= totalTeams - 1) rowClass = 'playoff-zone';
+                else if (rank === totalTeams) rowClass = 'auto-relegate';
+            }
+
+            return `<tr class="${rowClass}">
+                <td>${rank}</td>
+                <td><strong>${team.name}</strong></td>
+                <td>${team.division}</td>
+                <td>${team.wins}</td>
+                <td>${team.losses}</td>
+                <td>${winPct}</td>
+                <td>${team.pointDiff > 0 ? '+' : ''}${team.pointDiff}</td>
+            </tr>`;
+        }).join('');
+    }
+
     static divisionStandingsRows({ sortedDivisions, divisions, userTeamId }) {
         let html = '';
         sortedDivisions.forEach(divisionName => {
@@ -3742,6 +3862,58 @@ export class UIRenderer {
             });
         });
         return html;
+    }
+
+    /**
+     * Render overall standings rows with zone highlighting.
+     * Consolidates displayOverallStandings and displayTierOverallStandings.
+     * @param {Array} sortedTeams - Pre-sorted team array
+     * @param {number} tier - Tier number (determines zone highlighting rules)
+     * @param {number} userTeamId - User's team ID for highlighting
+     */
+    static overallStandingsRows({ sortedTeams, tier, userTeamId }) {
+        return sortedTeams.map((team, index) => {
+            const winPct = team.wins + team.losses > 0
+                ? (team.wins / (team.wins + team.losses)).toFixed(3) : '.000';
+            const rank = index + 1;
+            const totalTeams = sortedTeams.length;
+
+            let rowClass = '';
+            if (team.id === userTeamId) {
+                rowClass = 'user-team';
+            } else if (tier === 2 || tier === 3) {
+                if (rank === 1) rowClass = 'promotion-zone';
+                else if (rank >= 2 && rank <= 4) rowClass = 'playoff-zone';
+            } else if (tier === 1) {
+                if (rank >= totalTeams - 2 && rank <= totalTeams - 1) rowClass = 'playoff-zone';
+                else if (rank === totalTeams) rowClass = 'auto-relegate';
+            }
+
+            return `<tr class="${rowClass}">
+                <td>${rank}</td>
+                <td><strong>${team.name}</strong></td>
+                <td>${team.division}</td>
+                <td>${team.wins}</td>
+                <td>${team.losses}</td>
+                <td>${winPct}</td>
+                <td>${team.pointDiff > 0 ? '+' : ''}${team.pointDiff}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    /**
+     * Render the season history sidebar items.
+     */
+    static seasonHistoryItems({ seasonHistory, getRankSuffix }) {
+        return seasonHistory.map(season => `
+            <div class="history-item">
+                <span><strong>${season.season}</strong></span>
+                <span>Tier ${season.tier}</span>
+                <span>${season.wins}-${season.losses}</span>
+                <span>${season.rank}${getRankSuffix(season.rank)} place</span>
+                <span>${season.pointDiff > 0 ? '+' : ''}${season.pointDiff} diff</span>
+            </div>
+        `).join('');
     }
 
     static teamSelectionCard({ team, tier, marketLabel, spendingLimit, fanbase, formatCurrency }) {

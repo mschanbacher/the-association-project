@@ -1206,6 +1206,9 @@
         import { GameSimController } from './src/engines/GameSimController.js';
         import { FinanceController } from './src/engines/FinanceController.js';
         import { RosterController } from './src/engines/RosterController.js';
+        import { FreeAgencyController } from './src/engines/FreeAgencyController.js';
+        import { DashboardController } from './src/engines/DashboardController.js';
+        import { CoachManagementController } from './src/engines/CoachManagementController.js';
         import { GamePipeline } from './src/engines/GamePipeline.js';
         import { ChemistryEngine } from './src/engines/ChemistryEngine.js';
         import { InjuryEngine } from './src/engines/InjuryEngine.js';
@@ -1240,7 +1243,8 @@
             getFatiguePenalty: (fatigue) => FatigueEngine.getPenalty(fatigue),
             // Controllers
             OffseasonController, TradeController, DraftController,
-            GameSimController, FinanceController, RosterController
+            GameSimController, FinanceController, RosterController, FreeAgencyController,
+            DashboardController, CoachManagementController
         });
 
         // Initialize StorageEngine (async), then boot the game
@@ -1281,7 +1285,7 @@
                         applyPromotionBonus: (...args) => SalaryCapEngine.applyPromotionBonus(...args),
                         getMarketValue,
                         getRetirementProbability: (...args) => PlayerDevelopmentEngine.getRetirementProbability(...args),
-                        saveGameState, updateUI,
+                        saveGameState, updateUI: () => getDashboardController().refresh(),
                         developTeamPlayers: (team, maxGames) => {
                             if (!gameState.retirementHistory) gameState.retirementHistory = [];
                             return PlayerDevelopmentEngine.developTeamPlayers(team, maxGames,
@@ -1299,11 +1303,11 @@
                         clearMarketValueCache: (players) => TeamFactory.clearMarketValueCache(players),
                         runDraft: () => getDraftController().runDraft(),
                         startCollegeGraduateFA: () => getDraftController().startCollegeGraduateFA(),
-                        showFreeAgencyModal,
+                        showFreeAgencyModal: () => getFreeAgencyController().show(),
                         generateSponsorOffers: (team) => OwnerEngine.generateSponsorOffers(team),
                         applyAIFinancialDefaults: (team) => OwnerEngine.applyAIFinancialDefaults(team),
                         showOwnerModeModal: (team) => getFinanceController().showOwnerModeModal(team),
-                        buildCurrentCoachHTML, calculateTeamChemistry,
+                        calculateTeamChemistry,
                         getGameSimController: () => getGameSimController()
                     }
                 });
@@ -1349,7 +1353,7 @@
                             DraftEngine.tradePick(gameState.draftPickOwnership, originalTeamId, toTeamId, year, round);
                         },
                         applyTradePenalty: (team, tradedPlayer) => ChemistryEngine.applyTradePenalty(team, tradedPlayer),
-                        generatePositionBreakdownHTML, updateUI
+                        generatePositionBreakdownHTML, updateUI: () => getDashboardController().refresh()
                     },
                     simulationController
                 });
@@ -1393,7 +1397,7 @@
                     helpers: {
                         getUserTeam, getCurrentTeams, sortTeamsByStandings,
                         sortTeamsWithTiebreakers: (...args) => LeagueManager.sortTeamsWithTiebreakers(...args),
-                        getRatingColor, formatCurrency, getRankSuffix, saveGameState, updateUI,
+                        getRatingColor, formatCurrency, getRankSuffix, saveGameState, updateUI: () => getDashboardController().refresh(),
                         applyFatigueAutoRest: (team, isPlayoffs) => FatigueEngine.applyAutoRest(team, isPlayoffs),
                         processFatigueAfterGame: (...args) => FatigueEngine.processAfterGame(...args),
                         updateInjuries: (team) => InjuryEngine.updateInjuries(team),
@@ -1450,6 +1454,57 @@
                 });
             }
             return _rosterController;
+        }
+
+        let _freeAgencyController = null;
+        function getFreeAgencyController() {
+            if (!_freeAgencyController) {
+                _freeAgencyController = new FreeAgencyController({
+                    gameState,
+                    engines: {
+                        FreeAgencyEngine, SalaryCapEngine, TeamFactory,
+                        ScoutingEngine, UIRenderer
+                    },
+                    helpers: {
+                        getUserTeam, getTeamById, formatCurrency,
+                        aiSigningPhase,
+                        getRosterController: () => getRosterController(),
+                        getOffseasonController: () => getOffseasonController()
+                    }
+                });
+            }
+            return _freeAgencyController;
+        }
+
+        let _dashboardController = null;
+        function getDashboardController() {
+            if (!_dashboardController) {
+                _dashboardController = new DashboardController({
+                    gameState,
+                    engines: {
+                        CalendarEngine, LeagueManager, SalaryCapEngine, FinanceEngine,
+                        CoachEngine, UIHelpers, UIRenderer
+                    },
+                    helpers: { getCurrentTeams, getUserTeam, getRankSuffix }
+                });
+            }
+            return _dashboardController;
+        }
+        
+        let _coachMgmtController = null;
+        function getCoachManagementController() {
+            if (!_coachMgmtController) {
+                _coachMgmtController = new CoachManagementController({
+                    gameState,
+                    engines: { CoachEngine, SalaryCapEngine, UIRenderer },
+                    helpers: {
+                        getUserTeam, formatCurrency, saveGameState,
+                        getDashboardController,
+                        eventBus, GameEvents
+                    }
+                });
+            }
+            return _coachMgmtController;
         }
         
 // ============================================
@@ -1760,12 +1815,6 @@ let gmMode = null;
         const getRatingColor = UIHelpers.getRatingColor;
         const getRankSuffix = UIHelpers.getRankSuffix;
         const generatePositionBreakdownHTML = UIHelpers.generatePositionBreakdownHTML;
-        function getTierBadge(player) {
-            const natTier = getPlayerNaturalTier(player);
-            const colors = { 1: '#ff6b6b', 2: '#4ecdc4', 3: '#95afc0' };
-            const labels = { 1: 'T1', 2: 'T2', 3: 'T3' };
-            return `<span style="background:${colors[natTier]};color:#fff;padding:1px 6px;border-radius:3px;font-size:0.75em;font-weight:bold;margin-left:5px;" title="Valued at Tier ${natTier} rates">${labels[natTier]}</span>`;
-        }
         const sortTeamsByStandings = LeagueManager.sortTeamsByStandings;
         const calculateTeamStrength = LeagueManager.calculateTeamStrength;
         const calculateTeamChemistry = ChemistryEngine.calculate;
@@ -1881,20 +1930,6 @@ let gmMode = null;
         //   T3: 50+ can play in Tier 3
         // Returns the HIGHEST tier a player would realistically target,
         // which drives their market value expectations.
-        // Get a colored tier badge for display (UI - stays inline)
-        // Format market value display (UI - stays inline)
-        function formatMarketDisplay(player, userTier) {
-            const natTier = TeamFactory.getPlayerNaturalTier(player);
-            const tierValue = TeamFactory.getMarketValue(player, userTier);
-            const badge = getTierBadge(player);
-            
-            if (natTier < userTier) {
-                const natValue = TeamFactory.getNaturalMarketValue(player);
-                return `${SalaryCapEngine.formatCurrency(tierValue)} ${badge}<br><span style="font-size:0.8em;color:#ff6b6b;opacity:0.9;">T${natTier} value: ${SalaryCapEngine.formatCurrency(natValue)}</span>`;
-            }
-            return `${SalaryCapEngine.formatCurrency(tierValue)} ${badge}`;
-        }
-        
         // Generate a roster for a team (cap-compliant with realistic salary distribution)
         // Ensure a team has a roster (backward compatibility)
         // Generate free agent pool
@@ -2018,7 +2053,7 @@ let gmMode = null;
             console.log('📅 Starting date:', gameState.currentDate);
             console.log('Initial tier counts: T1=' + gameState.tier1Teams.length + ', T2=' + gameState.tier2Teams.length + ', T3=' + gameState.tier3Teams.length);
             
-            updateUI();
+            getDashboardController().refresh();
         }
         // Make it globally accessible
         // Generate schedule
@@ -2496,400 +2531,8 @@ let gmMode = null;
         }
         
         // Close season end modal
-        // Update UI
-        function updateUI() {
-            const teams = getCurrentTeams();
-            const userTeam = teams.find(t => t.id === gameState.userTeamId);
-            const numGames = gameState.currentTier === 1 ? 82 : gameState.currentTier === 2 ? 60 : 40;
+        window._scoutFilters = { pos: 'ALL', tier: 'ALL', minAge: '', maxAge: '', minRating: '', maxRating: '', contractStatus: 'ALL', sort: 'fit' };
 
-            // Update tier badge
-            const tierBadge = document.getElementById('tierBadge');
-            tierBadge.textContent = `TIER ${gameState.currentTier}`;
-            tierBadge.className = `tier-badge tier-${gameState.currentTier}`;
-
-            // Update league name
-            const leagueName = gameState.currentTier === 1 ? 
-                'North American Premier League' : 
-                gameState.currentTier === 2 ?
-                'North American Regional Basketball League' :
-                'Metro Basketball League';
-            document.getElementById('leagueName').textContent = leagueName;
-
-            // Update info cards
-            document.getElementById('currentSeason').textContent = `${gameState.currentSeason}-${(gameState.currentSeason + 1) % 100}`;
-            document.getElementById('currentGame').textContent = userTeam.wins + userTeam.losses;
-            document.getElementById('totalGames').textContent = numGames;
-            document.getElementById('userTeamName').textContent = userTeam.name;
-            document.getElementById('userRecord').textContent = `${userTeam.wins}-${userTeam.losses}`;
-            
-            // Update current date display
-            const dateDisplay = document.getElementById('currentDateDisplay');
-            if (dateDisplay && gameState.currentDate) {
-                dateDisplay.textContent = CalendarEngine.formatDateDisplay(gameState.currentDate);
-            } else if (dateDisplay) {
-                dateDisplay.textContent = '-';
-            }
-            
-            // Show calendar events (All-Star, Trade Deadline, etc.)
-            const calEventEl = document.getElementById('calendarEvent');
-            if (calEventEl && gameState.currentDate) {
-                const seasonDates = gameState.seasonDates;
-                const calEvent = CalendarEngine.getCalendarEvent(gameState.currentDate, seasonDates);
-                if (calEvent) {
-                    calEventEl.textContent = calEvent;
-                    calEventEl.style.display = 'block';
-                } else {
-                    calEventEl.style.display = 'none';
-                }
-            }
-            
-            // Display roster strength
-            const rosterStrength = LeagueManager.calculateTeamStrength(userTeam);
-            const strengthDisplay = document.getElementById('rosterStrength');
-            if (strengthDisplay) {
-                strengthDisplay.textContent = `⭐ ${Math.round(rosterStrength)}`;
-                strengthDisplay.style.color = UIHelpers.getRatingColor(Math.round(rosterStrength));
-            }
-            
-            // Update budget display
-            const budgetDisplay = document.getElementById('budgetDisplay');
-            const budgetSubDisplay = document.getElementById('budgetSubDisplay');
-            if (budgetDisplay) {
-                FinanceEngine.ensureFinances(userTeam);
-                const capSpace = SalaryCapEngine.getRemainingCap(userTeam);
-                const spLimit = SalaryCapEngine.getEffectiveCap(userTeam);
-                budgetDisplay.textContent = SalaryCapEngine.formatCurrency(capSpace);
-                budgetDisplay.style.color = capSpace > 0 ? '#34a853' : '#ea4335';
-                budgetSubDisplay.textContent = `of ${SalaryCapEngine.formatCurrency(spLimit)} ${userTeam.tier === 1 ? 'cap' : 'limit'}`;
-            }
-            
-            // Update coach display
-            const coachNameEl = document.getElementById('coachNameDisplay');
-            const coachOvrEl = document.getElementById('coachOverallDisplay');
-            if (coachNameEl) {
-                if (userTeam.coach) {
-                    coachNameEl.textContent = userTeam.coach.name;
-                    coachOvrEl.textContent = `${userTeam.coach.overall} OVR · ${userTeam.coach.archetype}`;
-                    coachOvrEl.style.color = CoachEngine.getOverallColor(userTeam.coach.overall);
-                } else {
-                    coachNameEl.textContent = '⚠️ No Coach';
-                    coachNameEl.style.color = '#ea4335';
-                    coachOvrEl.textContent = 'Click to hire';
-                    coachOvrEl.style.color = '#ffa07a';
-                }
-            }
-
-            // Update legend for tier
-            if (gameState.currentTier === 2) {
-                document.getElementById('promotionLegend').style.display = 'flex';
-                document.getElementById('playoffLegendText').textContent = 'Promotion Playoff';
-                document.getElementById('autoZoneLegendText').textContent = 'Safe';
-            } else {
-                document.getElementById('promotionLegend').style.display = 'none';
-                document.getElementById('playoffLegendText').textContent = 'Relegation Playoff';
-                document.getElementById('autoZoneLegendText').textContent = 'Auto-Relegation';
-            }
-            
-            // Update sim button states
-            const seasonComplete = gameState.isSeasonComplete();
-            const inOffseason = gameState.offseasonPhase && gameState.offseasonPhase !== 'none';
-            const simNextBtn = document.getElementById('simNextBtn');
-            const simDayBtn = document.getElementById('simDayBtn');
-            const simWeekBtn = document.getElementById('simWeekBtn');
-            const finishBtn = document.getElementById('finishBtn');
-            if (simNextBtn) simNextBtn.disabled = seasonComplete;
-            if (simDayBtn) simDayBtn.disabled = seasonComplete;
-            if (simWeekBtn) simWeekBtn.disabled = seasonComplete;
-            // Keep finishBtn enabled during offseason so user can resume
-            if (finishBtn) finishBtn.disabled = seasonComplete && !inOffseason;
-            
-            updateStandings();
-            updateNextGames();
-            updateSeasonHistory();
-        }
-
-        // View standings for a specific tier
-        function viewTierStandings(tier) {
-            gameState.viewingTier = tier;
-            
-            // Get teams from the requested tier
-            let teams;
-            let leagueName;
-            let numGames;
-            
-            if (tier === 1) {
-                teams = gameState.tier1Teams;
-                leagueName = 'North American Premier League (Tier 1)';
-                numGames = 82;
-            } else if (tier === 2) {
-                teams = gameState.tier2Teams;
-                leagueName = 'North American Regional Basketball League (Tier 2)';
-                numGames = 60;
-            } else {
-                teams = gameState.tier3Teams;
-                leagueName = 'Metro Basketball League (Tier 3)';
-                numGames = 40;
-            }
-            
-            // Update the league info display
-            document.getElementById('standingsLeagueInfo').textContent = `Viewing: ${leagueName}`;
-            
-            // Check if division view is selected
-            if (gameState.standingsView === 'division') {
-                displayDivisionStandings(teams);
-            } else {
-                displayTierOverallStandings(teams, tier);
-            }
-        }
-        
-        // Display overall standings for a specific tier (used by viewTierStandings)
-        function displayTierOverallStandings(teams, tier) {
-            // Sort teams by record
-            const sortedTeams = LeagueManager.sortTeamsByStandings(teams, gameState.schedule);
-
-            const tbody = document.getElementById('standingsBody');
-            tbody.innerHTML = sortedTeams.map((team, index) => {
-                const winPct = team.wins + team.losses > 0 ? 
-                    (team.wins / (team.wins + team.losses)).toFixed(3) : '.000';
-                
-                let rowClass = '';
-                const rank = index + 1;
-                const totalTeams = teams.length;
-                
-                // Highlight user's team
-                if (team.id === gameState.userTeamId) {
-                    rowClass = 'user-team';
-                } else if (tier === 2 || tier === 3) {
-                    // Tier 2 & 3: rank 1 = auto-promote, 2-4 = playoff
-                    if (rank === 1) {
-                        rowClass = 'promotion-zone';
-                    } else if (rank >= 2 && rank <= 4) {
-                        rowClass = 'playoff-zone';
-                    }
-                } else if (tier === 1) {
-                    // Tier 1: rank 30 = auto-relegate, 28-29 = playoff
-                    if (rank >= totalTeams - 2 && rank <= totalTeams - 1) {
-                        rowClass = 'playoff-zone';
-                    } else if (rank === totalTeams) {
-                        rowClass = 'auto-relegate';
-                    }
-                }
-
-                return `
-                    <tr class="${rowClass}">
-                        <td>${rank}</td>
-                        <td><strong>${team.name}</strong></td>
-                        <td>${team.division}</td>
-                        <td>${team.wins}</td>
-                        <td>${team.losses}</td>
-                        <td>${winPct}</td>
-                        <td>${team.pointDiff > 0 ? '+' : ''}${team.pointDiff}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-        // Make it globally accessible
-        // Update standings table
-        // Toggle between overall and division standings
-        function toggleStandingsView(view) {
-            gameState.standingsView = view;
-            
-            // Update button styles
-            const overallBtn = document.getElementById('viewOverallBtn');
-            const divisionBtn = document.getElementById('viewDivisionBtn');
-            
-            if (view === 'overall') {
-                overallBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #5568d3 100%)';
-                divisionBtn.style.background = '';
-            } else {
-                overallBtn.style.background = '';
-                divisionBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #5568d3 100%)';
-            }
-            
-            updateStandings();
-        }
-
-        function updateStandings() {
-            // If viewing a specific tier, show that instead
-            if (gameState.viewingTier !== null && gameState.viewingTier !== gameState.currentTier) {
-                viewTierStandings(gameState.viewingTier);
-                return;
-            }
-            
-            // Reset to show current tier
-            gameState.viewingTier = null;
-            document.getElementById('standingsLeagueInfo').textContent = '';
-            
-            const teams = getCurrentTeams();
-            
-            // Check if division view is selected
-            if (gameState.standingsView === 'division') {
-                displayDivisionStandings(teams);
-            } else {
-                displayOverallStandings(teams);
-            }
-        }
-        
-        // Display overall standings
-        function displayOverallStandings(teams) {
-            const sortedTeams = LeagueManager.sortTeamsByStandings(teams, gameState.schedule);
-
-            const tbody = document.getElementById('standingsBody');
-            tbody.innerHTML = sortedTeams.map((team, index) => {
-                const winPct = team.wins + team.losses > 0 ? 
-                    (team.wins / (team.wins + team.losses)).toFixed(3) : '.000';
-                
-                let rowClass = '';
-                const rank = index + 1;
-                const totalTeams = teams.length;
-                
-                if (team.id === gameState.userTeamId) {
-                    rowClass = 'user-team';
-                } else if (gameState.currentTier === 2 || gameState.currentTier === 3) {
-                    // Tier 2 & 3: rank 1 = auto-promote, 2-4 = playoff
-                    if (rank === 1) {
-                        rowClass = 'promotion-zone';
-                    } else if (rank >= 2 && rank <= 4) {
-                        rowClass = 'playoff-zone';
-                    }
-                } else {
-                    // Tier 1: rank 30 = auto-relegate, 28-29 = playoff
-                    if (rank >= totalTeams - 2 && rank <= totalTeams - 1) {
-                        rowClass = 'playoff-zone';
-                    } else if (rank === totalTeams) {
-                        rowClass = 'auto-relegate';
-                    }
-                }
-
-                return `
-                    <tr class="${rowClass}">
-                        <td>${rank}</td>
-                        <td><strong>${team.name}</strong></td>
-                        <td>${team.division}</td>
-                        <td>${team.wins}</td>
-                        <td>${team.losses}</td>
-                        <td>${winPct}</td>
-                        <td>${team.pointDiff > 0 ? '+' : ''}${team.pointDiff}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-        
-        // Display division standings
-        function displayDivisionStandings(teams) {
-            const divisions = {};
-            teams.forEach(team => {
-                if (!divisions[team.division]) divisions[team.division] = [];
-                divisions[team.division].push(team);
-            });
-            
-            Object.keys(divisions).forEach(division => {
-                divisions[division].sort((a, b) => {
-                    if (b.wins !== a.wins) return b.wins - a.wins;
-                    return b.pointDiff - a.pointDiff;
-                });
-            });
-            
-            const sortedDivisions = Object.keys(divisions).sort();
-            
-            document.getElementById('standingsBody').innerHTML = UIRenderer.divisionStandingsRows({
-                sortedDivisions, divisions, userTeamId: gameState.userTeamId
-            });
-        }
-
-        // Update next games
-        function updateNextGames() {
-            const currentDate = gameState.currentDate;
-            if (!currentDate) {
-                const container = document.getElementById('nextGamesContainer');
-                if (container) container.innerHTML = '<p style="text-align: center; opacity: 0.7;">No schedule yet</p>';
-                return;
-            }
-            
-            // === TODAY'S GAMES PANEL ===
-            const todaysContainer = document.getElementById('todaysGamesContainer');
-            if (todaysContainer) {
-                const todaysGames = CalendarEngine.getGamesForDate(currentDate, gameState);
-                const unplayedToday = todaysGames.tier1.filter(g => !g.played).length +
-                                     todaysGames.tier2.filter(g => !g.played).length +
-                                     todaysGames.tier3.filter(g => !g.played).length;
-                
-                if (unplayedToday > 0) {
-                    const userTier = gameState.currentTier;
-                    let userTierTeams = [];
-                    if (userTier === 1) userTierTeams = gameState.tier1Teams;
-                    else if (userTier === 2) userTierTeams = gameState.tier2Teams;
-                    else userTierTeams = gameState.tier3Teams;
-                    
-                    todaysContainer.innerHTML = UIRenderer.todaysGamesPanel({
-                        todaysGames, userTier, userTeams: userTierTeams,
-                        userTeamId: gameState.userTeamId, currentDate, CalendarEngine
-                    });
-                } else {
-                    todaysContainer.innerHTML = '';
-                }
-            }
-            
-            // === UPCOMING USER SCHEDULE ===
-            const container = document.getElementById('nextGamesContainer');
-            if (!container) return;
-            
-            const userTeamId = gameState.userTeamId;
-            const userTier = gameState.currentTier;
-            let userSchedule;
-            let userTeams;
-            if (userTier === 1) { userSchedule = gameState.tier1Schedule; userTeams = gameState.tier1Teams; }
-            else if (userTier === 2) { userSchedule = gameState.tier2Schedule; userTeams = gameState.tier2Teams; }
-            else { userSchedule = gameState.tier3Schedule; userTeams = gameState.tier3Teams; }
-            
-            if (!userSchedule) {
-                container.innerHTML = '<p style="text-align: center; opacity: 0.7;">No schedule available</p>';
-                return;
-            }
-            
-            const upcomingGames = userSchedule.filter(g => 
-                !g.played && 
-                g.date >= currentDate &&
-                (g.homeTeamId === userTeamId || g.awayTeamId === userTeamId)
-            ).slice(0, 5);
-            
-            if (upcomingGames.length === 0) {
-                container.innerHTML = '<p style="text-align: center; opacity: 0.7;">Season complete!</p>';
-                return;
-            }
-            
-            container.innerHTML = UIRenderer.upcomingGamesPanel({
-                upcomingGames, userTeams, userTeamId, CalendarEngine
-            });
-        }
-
-        // Update season history
-        function updateSeasonHistory() {
-            if (gameState.seasonHistory.length === 0) {
-                document.getElementById('seasonHistory').style.display = 'none';
-                return;
-            }
-
-            document.getElementById('seasonHistory').style.display = 'block';
-            
-            const historyList = document.getElementById('historyList');
-            historyList.innerHTML = gameState.seasonHistory.map(season => `
-                <div class="history-item">
-                    <span><strong>${season.season}</strong></span>
-                    <span>Tier ${season.tier}</span>
-                    <span>${season.wins}-${season.losses}</span>
-                    <span>${season.rank}${UIHelpers.getRankSuffix(season.rank)} place</span>
-                    <span>${season.pointDiff > 0 ? '+' : ''}${season.pointDiff} diff</span>
-                </div>
-            `).join('');
-        }
-
-        // Reset game
-        // ═══════════════════════════════════════════════════════════════════
-        // SCOUTING SYSTEM
-        // ═══════════════════════════════════════════════════════════════════
-        
-        // Watch list persists across sessions via gameState
         function getAllLeaguePlayers() {
             const all = [];
             [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams].forEach(team => {
@@ -2904,30 +2547,7 @@ let gmMode = null;
             });
             return all;
         }
-        
-        // ─── SYSTEM FIT CALCULATION ───
-        // How well a player's attributes match the user's coach system
-        // ─── UI FUNCTIONS ───
-        
-        // Store current scanner filters
-        window._scoutFilters = { pos: 'ALL', tier: 'ALL', minAge: '', maxAge: '', minRating: '', maxRating: '', contractStatus: 'ALL', sort: 'fit' };
-        
-        // ─── COLLEGE PIPELINE TAB ───
-        // ─── WATCH LIST TAB ───
-        // ─── TEAM NEEDS TAB ───
-        // ═══════════════════════════════════════════════════════════════════
-        // FRANCHISE HISTORY
-        // ═══════════════════════════════════════════════════════════════════
-        
-        function openFranchiseHistory() {
-            const history = gameState._fullSeasonHistory || gameState.fullSeasonHistory || [];
-            document.getElementById('franchiseHistoryContent').innerHTML = UIRenderer.franchiseHistory({
-                history,
-                getRankSuffix
-            });
-            document.getElementById('franchiseHistoryModal').classList.remove('hidden');
-        }
-        
+
         function resetGame() {
             if (confirm('Are you sure you want to reset? All progress will be lost.')) {
                 StorageEngine.clearAll().then(() => {
@@ -3164,7 +2784,7 @@ let gmMode = null;
         function closeRosterManagementToGame() {
             document.getElementById('rosterModal').classList.add('hidden');
             saveGameState();
-            updateUI();
+            getDashboardController().refresh();
             
             // Don't show any modal - return to game
             console.log('Closed roster management, returning to game');
@@ -3271,427 +2891,6 @@ let gmMode = null;
             document.getElementById('freeAgentsList').innerHTML = freeAgentsHtml || '<p style="text-align: center; opacity: 0.7;">No free agents match filters</p>';
         }
 
-        /**
-         * Generate position breakdown HTML for a roster
-         * @param {Array} roster - Array of player objects
-         * @param {string} title - Optional title (default: "Position Breakdown")
-         * @returns {string} HTML string
-         */
-        // Make roster management functions globally accessible
-        // ===== PLAYER DEVELOPMENT DISPLAY =====
-        
-        // Keep old function for compatibility
-        // ═══════════════════════════════════════════════════════════════════
-        // Expired contract decision handlers
-        // ═══════════════════════════════════════════════════════════════════
-        // ═══════════════════════════════════════════════════════════════════
-        // FREE AGENCY SYSTEM - Player gets priority access to free agents
-        // ═══════════════════════════════════════════════════════════════════
-        
-        function buildCurrentRosterDisplay(team) {
-            if (!team.roster || team.roster.length === 0) {
-                return '<p style="text-align: center; opacity: 0.6; padding: 20px;">No players on roster</p>';
-            }
-            
-            const sortedRoster = [...team.roster].sort((a, b) => b.rating - a.rating);
-            const byPosition = {
-                'PG': sortedRoster.filter(p => p.position === 'PG'),
-                'SG': sortedRoster.filter(p => p.position === 'SG'),
-                'SF': sortedRoster.filter(p => p.position === 'SF'),
-                'PF': sortedRoster.filter(p => p.position === 'PF'),
-                'C': sortedRoster.filter(p => p.position === 'C')
-            };
-            
-            const teamEffCap = SalaryCapEngine.getEffectiveCap(team);
-            const baseCap = SalaryCapEngine.getSalaryCap(team.tier);
-            const totalSalary = SalaryCapEngine.calculateTeamSalary(team);
-            
-            return UIRenderer.currentRosterSidebar({
-                roster: team.roster, byPosition, teamEffCap, baseCap,
-                tier: team.tier, totalSalary, formatCurrency
-            });
-        }
-        
-        // Shared helper: builds the free agency player list HTML using UIRenderer
-        function isOnWatchList(playerId) { return getRosterController()._isOnWatchList(playerId); }
-        function buildFAListHTML(formerPlayers, otherPlayers, hiddenCount, positionFilter, selectedIds) {
-            const userTeam = getUserTeam();
-            const selected = selectedIds || new Set();
-            
-            if (gameState.freeAgents.length === 0) {
-                return UIRenderer.faEmptyState();
-            }
-            
-            const shownCount = formerPlayers.length + otherPlayers.length;
-            let html = UIRenderer.faListHeader({
-                totalCount: gameState.freeAgents.length,
-                shownCount, formerCount: formerPlayers.length, hiddenCount,
-                positionFilter
-            });
-            
-            html += UIRenderer.faTableHeader();
-            
-            // Former players
-            const filteredFormer = positionFilter && positionFilter !== 'ALL'
-                ? formerPlayers.filter(p => p.position === positionFilter) : formerPlayers;
-            filteredFormer.forEach(player => {
-                const fit = ScoutingEngine.calculateTeamFit(player, userTeam, userTeam.coach);
-                html += UIRenderer.faFormerPlayerRow({
-                    player, isChecked: selected.has(String(player.id)),
-                    fitGrade: fit.grade, gradeColor: ScoutingEngine.gradeColor(fit.grade),
-                    watched: isOnWatchList(player.id),
-                    marketDisplay: formatMarketDisplay(player, userTeam.tier),
-                    teamName: userTeam.name
-                });
-            });
-            
-            // Separate watched from unwatched
-            const watchedFAs = otherPlayers.filter(p => isOnWatchList(p.id));
-            const unwatchedFAs = otherPlayers.filter(p => !isOnWatchList(p.id));
-            
-            if (watchedFAs.length > 0) {
-                html += UIRenderer.faSectionDivider({ label: '🔍 WATCHED PLAYERS', count: watchedFAs.length, color: '#bb86fc', borderColor: 'rgba(155,89,182,0.4)' });
-                watchedFAs.forEach(player => {
-                    const previousTeam = player.previousTeamId ? getTeamById(player.previousTeamId) : null;
-                    const previousTeamName = previousTeam ? previousTeam.name : (player.isCollegeGrad ? `🎓 ${player.college}` : 'N/A');
-                    const fit = ScoutingEngine.calculateTeamFit(player, userTeam, userTeam.coach);
-                    player._marketDisplay = formatMarketDisplay(player, userTeam.tier);
-                    html += UIRenderer.faPlayerRow({
-                        player, isChecked: selected.has(String(player.id)),
-                        fitGrade: fit.grade, gradeColor: ScoutingEngine.gradeColor(fit.grade),
-                        previousTeamName, isWatched: true
-                    });
-                });
-            }
-            
-            if (unwatchedFAs.length > 0) {
-                const label = positionFilter && positionFilter !== 'ALL'
-                    ? `OTHER AVAILABLE FREE AGENTS (${positionFilter})`
-                    : 'OTHER AVAILABLE FREE AGENTS';
-                html += UIRenderer.faSectionDivider({ label, count: unwatchedFAs.length, color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.2)' });
-                if (hiddenCount > 0) {
-                    html += `<tr><td colspan="8" style="padding: 5px 15px; font-size: 0.85em; opacity: 0.6; text-align: center;">${hiddenCount} more lower-rated players not shown</td></tr>`;
-                }
-            }
-            
-            unwatchedFAs.forEach(player => {
-                const previousTeam = player.previousTeamId ? getTeamById(player.previousTeamId) : null;
-                const previousTeamName = previousTeam ? previousTeam.name : (player.isCollegeGrad ? `🎓 ${player.college}` : 'N/A');
-                const fit = ScoutingEngine.calculateTeamFit(player, userTeam, userTeam.coach);
-                player._marketDisplay = formatMarketDisplay(player, userTeam.tier);
-                html += UIRenderer.faPlayerRow({
-                    player, isChecked: selected.has(String(player.id)),
-                    fitGrade: fit.grade, gradeColor: ScoutingEngine.gradeColor(fit.grade),
-                    previousTeamName, isWatched: false
-                });
-            });
-            
-            html += '</tbody></table>';
-            return html;
-        }
-
-        function showFreeAgencyModal() {
-            const userTeam = getUserTeam();
-            const capSpace = SalaryCapEngine.getRemainingCap(userTeam);
-            
-            window.faSelectedIds = new Set();
-            
-            document.getElementById('faCapSpace').textContent = SalaryCapEngine.formatCurrency(capSpace);
-            document.getElementById('faCurrentRoster').innerHTML = buildCurrentRosterDisplay(userTeam);
-            
-            const formerPlayers = gameState.freeAgents.filter(p => p.previousTeamId && p.previousTeamId === userTeam.id);
-            const otherPlayers = gameState.freeAgents.filter(p => !p.previousTeamId || p.previousTeamId !== userTeam.id);
-            
-            // Pre-select former players
-            formerPlayers.forEach(p => window.faSelectedIds.add(String(p.id)));
-            
-            formerPlayers.sort((a, b) => b.rating - a.rating);
-            otherPlayers.sort((a, b) => b.rating - a.rating);
-            
-            const MAX_OTHER_PLAYERS = 150;
-            const displayedOtherPlayers = otherPlayers.slice(0, MAX_OTHER_PLAYERS);
-            const hiddenCount = otherPlayers.length - displayedOtherPlayers.length;
-            
-            // Empty state
-            if (gameState.freeAgents.length === 0) {
-                document.getElementById('freeAgencyPlayersList').innerHTML = UIRenderer.faEmptyState();
-                document.getElementById('submitOffersBtn').disabled = true;
-                document.getElementById('freeAgencyModal').classList.remove('hidden');
-                return;
-            }
-            
-            const html = buildFAListHTML(formerPlayers, displayedOtherPlayers, hiddenCount, 'ALL', window.faSelectedIds);
-            document.getElementById('freeAgencyPlayersList').innerHTML = html;
-            
-            document.getElementById('freeAgencyModal').classList.remove('hidden');
-            
-            window.faFormerPlayers = formerPlayers;
-            window.faOtherPlayers = displayedOtherPlayers;
-            window.faHiddenCount = hiddenCount;
-            
-            if (formerPlayers.length > 0) {
-                updateOffersPanel();
-            }
-            updateOfferTally();
-        }
-        
-        function filterFreeAgentsByPosition() {
-            const positionFilter = document.getElementById('faPositionFilter').value;
-            
-            // Sync any visible checkbox changes into the persistent Set before rebuild
-            const selected = window.faSelectedIds || new Set();
-            gameState.freeAgents.forEach(fa => {
-                const cb = document.getElementById(`fa_${fa.id}`);
-                if (cb) {
-                    if (cb.checked) selected.add(String(fa.id));
-                    else selected.delete(String(fa.id));
-                }
-            });
-            
-            const formerPlayers = window.faFormerPlayers || [];
-            const allOtherPlayers = window.faOtherPlayers || [];
-            
-            let filteredOtherPlayers = allOtherPlayers;
-            if (positionFilter !== 'ALL') {
-                filteredOtherPlayers = allOtherPlayers.filter(p => p.position === positionFilter);
-            }
-            
-            const html = buildFAListHTML(formerPlayers, filteredOtherPlayers, window.faHiddenCount || 0, positionFilter, selected);
-            document.getElementById('freeAgencyPlayersList').innerHTML = html;
-            
-            updateOffersPanel();
-            updateOfferTally();
-        }
-        
-        function toggleFreeAgentSelection(playerId) {
-            const checkbox = document.getElementById(`fa_${playerId}`);
-            const idStr = String(playerId);
-            
-            // Update the persistent selection Set
-            if (checkbox && checkbox.checked) {
-                window.faSelectedIds.add(idStr);
-            } else {
-                window.faSelectedIds.delete(idStr);
-            }
-            
-            // Update offers panel and tally
-            updateOffersPanel();
-            updateOfferTally();
-        }
-        
-        function updateOfferTally() {
-            const userTeam = getUserTeam();
-            if (!userTeam) return;
-            
-            const selected = window.faSelectedIds || new Set();
-            const selectedPlayers = gameState.freeAgents.filter(fa => selected.has(String(fa.id)));
-            
-            const tallyEl = document.getElementById('faOfferTally');
-            if (!tallyEl) return;
-            
-            if (selectedPlayers.length === 0) {
-                tallyEl.style.display = 'none';
-                return;
-            }
-            
-            tallyEl.style.display = 'block';
-            
-            // Calculate estimated cost (market value for each selected player)
-            const estCost = selectedPlayers.reduce((sum, p) => sum + TeamFactory.getMarketValue(p, userTeam.tier), 0);
-            const capSpace = SalaryCapEngine.getRemainingCap(userTeam);
-            const remaining = capSpace - estCost;
-            
-            document.getElementById('faOfferCount').textContent = selectedPlayers.length;
-            document.getElementById('faOfferTotal').textContent = SalaryCapEngine.formatCurrency(estCost);
-            
-            const remEl = document.getElementById('faOfferRemaining');
-            remEl.textContent = SalaryCapEngine.formatCurrency(remaining);
-            remEl.style.color = remaining >= 0 ? '#34a853' : '#ea4335';
-        }
-        
-        function updateOffersPanel() {
-            const userTeam = getUserTeam();
-            const selected = window.faSelectedIds || new Set();
-            const selectedPlayers = gameState.freeAgents.filter(fa => selected.has(String(fa.id)));
-            
-            const offerCount = selectedPlayers.length;
-            document.getElementById('offerCount').textContent = offerCount;
-            
-            if (offerCount === 0) {
-                document.getElementById('selectedOffersPanel').style.display = 'none';
-                document.getElementById('submitOffersBtn').disabled = true;
-                return;
-            }
-            
-            document.getElementById('selectedOffersPanel').style.display = 'block';
-            document.getElementById('submitOffersBtn').disabled = false;
-            
-            let html = '';
-            selectedPlayers.forEach(player => {
-                const marketValue = TeamFactory.getMarketValue(player, userTeam.tier);
-                const playerNatTier = TeamFactory.getPlayerNaturalTier(player);
-                const minOffer = Math.round(marketValue * 0.8);
-                const maxOffer = Math.round(marketValue * 1.2);
-                const suggestedYears = TeamFactory.determineContractLength(player.age, player.rating);
-                const isFormerPlayer = player.previousTeamId === userTeam.id;
-                const isAboveTier = playerNatTier < userTeam.tier;
-                
-                player._faMarketValue = marketValue;
-                player._faMinOffer = minOffer;
-                player._faMaxOffer = maxOffer;
-                
-                html += UIRenderer.faOfferCard({
-                    player, marketValue, minOffer, maxOffer, suggestedYears,
-                    isFormerPlayer, isAboveTier, playerNatTier, userTier: userTeam.tier,
-                    formatCurrency, formatMarketDisplay
-                });
-            });
-            
-            document.getElementById('offersList').innerHTML = html;
-        }
-        
-        function submitFreeAgencyOffers() {
-            const userTeam = getUserTeam();
-            const selected = window.faSelectedIds || new Set();
-            const selectedPlayers = gameState.freeAgents.filter(fa => selected.has(String(fa.id)));
-            
-            if (selectedPlayers.length === 0) {
-                alert('Please select at least one player to make an offer to.');
-                return;
-            }
-            
-            // Validate and collect offers
-            gameState.userFreeAgencyOffers = [];
-            let totalCommitment = 0;
-            
-            for (const player of selectedPlayers) {
-                const salaryInput = document.getElementById(`offer_salary_${player.id}`);
-                const yearsInput = document.getElementById(`offer_years_${player.id}`);
-                
-                const offeredSalary = parseInt(salaryInput.value);
-                const offeredYears = parseInt(yearsInput.value);
-                
-                // Use the stored market value from when we generated the offer panel
-                // This avoids random variation from calling TeamFactory.generateSalary() again
-                const minOffer = player._faMinOffer;
-                const maxOffer = player._faMaxOffer;
-                
-                if (offeredSalary < minOffer || offeredSalary > maxOffer) {
-                    alert(`Your offer to ${player.name} is outside the acceptable range (${SalaryCapEngine.formatCurrency(minOffer)} - ${SalaryCapEngine.formatCurrency(maxOffer)})`);
-                    return;
-                }
-                
-                totalCommitment += offeredSalary;
-                
-                gameState.userFreeAgencyOffers.push({
-                    teamId: userTeam.id,
-                    playerId: player.id,
-                    salary: offeredSalary,
-                    years: offeredYears,
-                    tier: userTeam.tier,
-                    teamRating: userTeam.rating,
-                    teamSuccess: userTeam.wins / (userTeam.wins + userTeam.losses || 1)
-                });
-            }
-            
-            // Check cap space (only first year counts)
-            const capSpace = SalaryCapEngine.getRemainingCap(userTeam);
-            if (totalCommitment > capSpace) {
-                alert(`Your offers total ${SalaryCapEngine.formatCurrency(totalCommitment)}, but you only have ${SalaryCapEngine.formatCurrency(capSpace)} in cap space.\n\nReduce your offers or target fewer players.`);
-                return;
-            }
-            
-            console.log(`✅ User submitted ${gameState.userFreeAgencyOffers.length} offers`);
-            
-            // Close modal and process
-            document.getElementById('freeAgencyModal').classList.add('hidden');
-            
-            // Generate AI offers and process decisions
-            processFreeAgency();
-        }
-        
-        function skipFreeAgency() {
-            if (confirm('Are you sure you want to skip free agency? You won\'t be able to sign any free agents this off-season.')) {
-                console.log('⏭️ User skipped free agency');
-                document.getElementById('freeAgencyModal').classList.add('hidden');
-                
-                // Let AI sign normally, then check roster
-                getOffseasonController().runAISigningAndContinue();
-            }
-        }
-        
-        function processFreeAgency() {
-            console.log('🤖 Processing free agency...');
-            
-            // Step 1: Generate AI offers
-            generateAIFreeAgencyOffers();
-            
-            // Step 2: Process player decisions
-            const results = processFreeAgentDecisions();
-            
-            // Step 3: Execute signings
-            executeFreeAgencySignings(results);
-            
-            // Step 4: Show results
-            showFreeAgencyResults(results);
-        }
-        
-        function generateAIFreeAgencyOffers() {
-            const userTeam = getUserTeam();
-            const allTeams = [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams];
-            const aiTeams = allTeams.filter(t => t.id !== userTeam.id);
-            
-            gameState.aiFreeAgencyOffers = FreeAgencyEngine.generateAIOffers(
-                { freeAgents: gameState.freeAgents, aiTeams },
-                { TeamFactory, SalaryCapEngine }
-            );
-            
-            console.log(`  AI teams made ${gameState.aiFreeAgencyOffers.length} offers to free agents`);
-        }
-        
-        function processFreeAgentDecisions() {
-            const userTeam = getUserTeam();
-            
-            return FreeAgencyEngine.processDecisions(
-                {
-                    freeAgents: gameState.freeAgents,
-                    userOffers: gameState.userFreeAgencyOffers,
-                    aiOffers: gameState.aiFreeAgencyOffers,
-                    userTeamId: userTeam.id
-                },
-                { SalaryCapEngine }
-            );
-        }
-        
-        function executeFreeAgencySignings(results) {
-            FreeAgencyEngine.executeSignings({
-                results,
-                freeAgentPool: gameState.freeAgents,
-                getTeamById
-            });
-        }
-        
-        function showFreeAgencyResults(results) {
-            document.getElementById('freeAgencyResultsContent').innerHTML = UIRenderer.freeAgencyResults({
-                results, formatCurrency, getTeamById,
-                userOffers: gameState.userFreeAgencyOffers
-            });
-            document.getElementById('freeAgencyResultsModal').classList.remove('hidden');
-        }
-        
-        function continueFreeAgency() {
-            document.getElementById('freeAgencyResultsModal').classList.add('hidden');
-            
-            // Now let AI teams fill remaining needs from leftover free agents
-            console.log('🤖 AI teams filling remaining roster needs...');
-            aiSigningPhase();
-            
-            // Then proceed to roster compliance check
-            getOffseasonController().checkRosterComplianceAndContinue();
-        }
-        
-        // Make free agency functions globally accessible
-        // Step 4.5: Check roster compliance (salary cap + minimum roster)
         // Show modal forcing user to fix roster issues
         function openRosterManagementFromCompliance() {
             // Set return context so closeRosterManagement knows where to go back
@@ -3706,197 +2905,7 @@ let gmMode = null;
             getOffseasonController().checkRosterComplianceAndContinue();
         }
         
-        // ===== COACH MANAGEMENT SYSTEM =====
-        
-        let coachMarketPool = []; // Available free agent coaches
-        
-        function openCoachManagement() {
-            const userTeam = getUserTeam();
-            if (!userTeam) return;
-            const coach = userTeam.coach;
-            const synergy = CoachEngine.calculateSynergy(coach, userTeam.roster);
-            
-            let coachSection = '';
-            if (coach) {
-                coachSection = buildCurrentCoachHTML(coach, synergy);
-            } else {
-                coachSection = UIRenderer.noCoachWarning();
-            }
-            
-            document.getElementById('coachModalContent').innerHTML = UIRenderer.coachManagementPage({
-                coachSection, hasCoach: !!coach
-            });
-            document.getElementById('coachModal').classList.remove('hidden');
-        }
-        
-        function buildCurrentCoachHTML(coach, synergy) {
-            let traitBars = '';
-            for (const [key, def] of Object.entries(CoachEngine.TRAITS)) {
-                const val = coach.traits[key] || 50;
-                const color = CoachEngine.getTraitColor(val);
-                const label = CoachEngine.getTraitLabel(key, val);
-                traitBars += UIRenderer.coachTraitBar({ def, val, color, label });
-            }
-            
-            return UIRenderer.currentCoachDisplay({
-                coach: { ...coach, overallColor: CoachEngine.getOverallColor(coach.overall) },
-                synergy, traitBars, formatCurrency
-            });
-        }
-        
-        function showCoachMarket() {
-            const userTeam = getUserTeam();
-            if (!userTeam) return;
-            
-            // Generate pool if not already done
-            if (coachMarketPool.length === 0) {
-                coachMarketPool = CoachEngine.generateCoachPool(10, userTeam.tier);
-            }
-            
-            // Also collect poachable coaches from other teams in same tier
-            const tierTeams = gameState.getTeamsByTier(userTeam.tier);
-            const poachable = tierTeams
-                .filter(t => t.id !== userTeam.id && t.coach)
-                .map(t => ({ ...t.coach, _fromTeam: t.name, _fromTeamId: t.id }))
-                .sort((a, b) => b.overall - a.overall)
-                .slice(0, 8);
-            
-            document.getElementById('coachMarketContainer').innerHTML = UIRenderer.coachMarketContainer({
-                freeAgentCount: coachMarketPool.length,
-                poachableCount: poachable.length,
-                freeAgentListHTML: buildCoachListHTML(coachMarketPool, userTeam, false),
-                poachListHTML: buildCoachListHTML(poachable, userTeam, true)
-            });
-        }
-        
-        function showCoachTab(tab) {
-            const faList = document.getElementById('freeAgentCoachList');
-            const poachList = document.getElementById('poachCoachList');
-            const faTab = document.getElementById('freeAgentCoachTab');
-            const poachTab = document.getElementById('poachCoachTab');
-            
-            if (tab === 'freeAgent') {
-                faList.style.display = 'block';
-                poachList.style.display = 'none';
-                faTab.style.background = 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)';
-                poachTab.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            } else {
-                faList.style.display = 'none';
-                poachList.style.display = 'block';
-                poachTab.style.background = 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)';
-                faTab.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            }
-        }
-        
-        function buildCoachListHTML(coaches, userTeam, isPoach) {
-            if (coaches.length === 0) return '<div style="text-align: center; padding: 20px; opacity: 0.6;">No coaches available</div>';
-            
-            let html = '<div style="max-height: 500px; overflow-y: auto;">';
-            for (const coach of coaches) {
-                const synergy = CoachEngine.calculateSynergy(coach, userTeam.roster);
-                const buyout = isPoach ? CoachEngine.calculateBuyoutCost(coach) : 0;
-                const topTraits = Object.entries(coach.traits)
-                    .sort(([,a],[,b]) => b - a)
-                    .slice(0, 3)
-                    .map(([key, val]) => `${CoachEngine.TRAITS[key].icon} ${CoachEngine.TRAITS[key].name}: ${val}`)
-                    .join(' · ');
-                
-                html += UIRenderer.coachMarketCard({ coach, synergy, topTraits, isPoach, buyout, formatCurrency, CoachEngine });
-            }
-            html += '</div>';
-            return html;
-        }
-        
-        function hireCoach(coachId, isPoach) {
-            const userTeam = getUserTeam();
-            if (!userTeam) return;
-            
-            let newCoach = null;
-            
-            if (isPoach) {
-                // Find coach from another team
-                const tierTeams = gameState.getTeamsByTier(userTeam.tier);
-                const sourceTeam = tierTeams.find(t => t.coach && t.coach.id === coachId);
-                if (!sourceTeam) { alert('Coach no longer available.'); return; }
-                
-                const buyout = CoachEngine.calculateBuyoutCost(sourceTeam.coach);
-                if (!confirm(`Poach ${sourceTeam.coach.name} from ${sourceTeam.name}?\n\nBuyout cost: ${SalaryCapEngine.formatCurrency(buyout)}\nSalary: ${SalaryCapEngine.formatCurrency(sourceTeam.coach.salary)}/yr\n\nThis will remove their coach and may affect their performance.`)) return;
-                
-                newCoach = sourceTeam.coach;
-                // Give the source team a replacement coach (lower quality)
-                sourceTeam.coach = CoachEngine.generateCoach(sourceTeam.tier);
-                sourceTeam.coach.overall = Math.max(35, sourceTeam.coach.overall - 10); // Interim coach penalty
-                sourceTeam.coach.teamId = sourceTeam.id;
-                sourceTeam.coach.archetype = 'Interim ' + sourceTeam.coach.archetype;
-                console.log(`🔄 ${sourceTeam.name} assigned interim coach: ${sourceTeam.coach.name}`);
-            } else {
-                // Find from free agent pool
-                newCoach = coachMarketPool.find(c => c.id === coachId);
-                if (!newCoach) { alert('Coach no longer available.'); return; }
-                
-                if (!confirm(`Hire ${newCoach.name}?\n\nOverall: ${newCoach.overall}\nSalary: ${SalaryCapEngine.formatCurrency(newCoach.salary)}/yr × ${newCoach.contractYears} years\nStyle: ${newCoach.archetype}`)) return;
-                
-                // Remove from pool
-                coachMarketPool = coachMarketPool.filter(c => c.id !== coachId);
-            }
-            
-            // If team already has a coach, release them
-            if (userTeam.coach) {
-                console.log(`🚪 Released coach: ${userTeam.coach.name}`);
-                userTeam.coach.teamId = null;
-            }
-            
-            // Assign new coach
-            newCoach.teamId = userTeam.id;
-            newCoach.tier = userTeam.tier;
-            userTeam.coach = newCoach;
-            
-            console.log(`✅ Hired coach: ${newCoach.name} (${newCoach.overall} OVR) for ${userTeam.name}`);
-            
-            eventBus.emit(GameEvents.TEAM_COACH_HIRED, {
-                teamId: userTeam.id,
-                teamName: userTeam.name,
-                coachName: newCoach.name,
-                coachOverall: newCoach.overall,
-                archetype: newCoach.archetype,
-                isPoach: isPoach
-            });
-            
-            saveGameState();
-            updateUI();
-            openCoachManagement(); // Refresh the modal
-        }
-        
-        function fireCoach() {
-            const userTeam = getUserTeam();
-            if (!userTeam || !userTeam.coach) return;
-            
-            const coach = userTeam.coach;
-            const severance = Math.round(coach.salary * Math.max(1, coach.contractYears) * 0.5);
-            
-            if (!confirm(`Fire ${coach.name}?\n\nSeverance cost: ${SalaryCapEngine.formatCurrency(severance)}\nRemaining contract: ${coach.contractYears} year(s)\n\nYour team will operate without a head coach until you hire a replacement, which will negatively affect performance.`)) return;
-            
-            console.log(`🚪 Fired coach: ${coach.name}`);
-            
-            eventBus.emit(GameEvents.TEAM_COACH_FIRED, {
-                teamId: userTeam.id,
-                teamName: userTeam.name,
-                coachName: coach.name,
-                coachOverall: coach.overall,
-                severance: severance
-            });
-            
-            coach.teamId = null;
-            userTeam.coach = null;
-            
-            saveGameState();
-            updateUI();
-            openCoachManagement();
-        }
-        
-        function closeCoachModal() {
-            document.getElementById('coachModal').classList.add('hidden');
-        }
+        // ===== COACH MANAGEMENT → Extracted to CoachManagementController.js =====
         
         // ===== PLAYER ATTRIBUTE DISPLAY =====
         
@@ -4202,7 +3211,7 @@ let gmMode = null;
                 if (hasExistingGame) {
                     document.getElementById('gameContainer').style.display = 'block';
                     document.getElementById('teamSelectionModal').classList.add('hidden');
-                    updateUI();
+                    getDashboardController().refresh();
                 } else {
                     // Generate free agent pool for new games
                     gameState.freeAgents = generateFreeAgentPool();
@@ -4214,7 +3223,9 @@ let gmMode = null;
                 // Initialize GM Mode (Phase 3)
                 console.log('Initializing GMMode...');
                 gmMode = new GMMode(gameState, simulationController, {
-                    updateUI, updateStandings, updateNextGames,
+                    updateUI: () => getDashboardController().refresh(),
+                    updateStandings: () => getDashboardController().refreshStandings(),
+                    updateNextGames: () => getDashboardController().refreshSchedule(),
                     showSeasonEnd: () => getGameSimController().showSeasonEnd(),
                     openRosterManagement, openTradeScreen: () => getTradeController().openTradeScreen(), saveGameState,
                     checkForAiTradeProposals: () => getTradeController().checkForAiTradeProposals(),
@@ -4304,21 +3315,21 @@ let gmMode = null;
 
         // ─── Local functions called from HTML ───
         window.closeAllStarModal = closeAllStarModal;
-        window.closeCoachModal = closeCoachModal;
+        window.closeCoachModal = () => getCoachManagementController().close();
         window.closeRosterManagementDynamic = closeRosterManagementDynamic;
-        window.continueFreeAgency = continueFreeAgency;
+        window.continueFreeAgency = (...args) => getFreeAgencyController().continue(...args);
         window.filterFreeAgents = filterFreeAgents;
-        window.filterFreeAgentsByPosition = filterFreeAgentsByPosition;
-        window.fireCoach = fireCoach;
-        window.hireCoach = hireCoach;
+        window.filterFreeAgentsByPosition = (...args) => getFreeAgencyController().filterByPosition(...args);
+        window.fireCoach = () => getCoachManagementController().fire();
+        window.hireCoach = (id, isPoach) => getCoachManagementController().hire(id, isPoach);
         window.isOnWatchList = (playerId) => getRosterController()._isOnWatchList(playerId);
         window.openCalendarView = openCalendarView;
-        window.openCoachManagement = openCoachManagement;
+        window.openCoachManagement = () => getCoachManagementController().open();
         window.formatCurrency = formatCurrency;
         window.calculateTeamSalary = calculateTeamSalary;
         window.determineContractLength = determineContractLength;
         window.generateSalary = generateSalary;
-        window.openFranchiseHistory = openFranchiseHistory;
+        window.openFranchiseHistory = () => getDashboardController().openFranchiseHistory();
         window.openRosterManagement = openRosterManagement;
         window.openRosterManagementFromCompliance = openRosterManagementFromCompliance;
         window.openRosterManagementHub = openRosterManagementHub;
@@ -4330,15 +3341,15 @@ let gmMode = null;
         window.selectTier = selectTier;
         window.showBoxScore = showBoxScore;
         window.showCalendarDayDetail = showCalendarDayDetail;
-        window.showCoachMarket = showCoachMarket;
-        window.showCoachTab = showCoachTab;
-        window.skipFreeAgency = skipFreeAgency;
+        window.showCoachMarket = () => getCoachManagementController().showMarket();
+        window.showCoachTab = (tab) => getCoachManagementController().showTab(tab);
+        window.skipFreeAgency = (...args) => getFreeAgencyController().skip(...args);
         window.sortFreeAgents = sortFreeAgents;
-        window.submitFreeAgencyOffers = submitFreeAgencyOffers;
-        window.toggleFreeAgentSelection = toggleFreeAgentSelection;
+        window.submitFreeAgencyOffers = (...args) => getFreeAgencyController().submitOffers(...args);
+        window.toggleFreeAgentSelection = (...args) => getFreeAgencyController().toggleSelection(...args);
         window.togglePlayerAttributes = togglePlayerAttributes;
-        window.toggleStandingsView = toggleStandingsView;
-        window.viewTierStandings = viewTierStandings;
+        window.toggleStandingsView = (view) => getDashboardController().toggleView(view);
+        window.viewTierStandings = (tier) => getDashboardController().viewTier(tier);
 
         // ─── Engine/class exports for cross-module access ───
         window.SimBenchmark = SimBenchmark;

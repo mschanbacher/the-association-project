@@ -51,11 +51,11 @@ export class OffseasonController {
 
     /**
      * Set the current offseason phase and advance the calendar date.
-     * This is the KEY function that prevents getting stuck — every
-     * offseason step sets its phase, so we can always resume.
+     * Automatically saves after every phase transition so that a reload
+     * always resumes from the correct phase.
      */
     setPhase(phase) {
-        const { gameState, engines } = this.ctx;
+        const { gameState, engines, helpers } = this.ctx;
         const P = OffseasonController.PHASES;
         gameState.offseasonPhase = phase;
 
@@ -80,6 +80,11 @@ export class OffseasonController {
         }
 
         console.log(`📅 Offseason phase: ${phase}${date ? ' (date: ' + gameState.currentDate + ')' : ''}`);
+
+        // Auto-save at every phase transition so reload resumes correctly
+        if (phase !== P.NONE) {
+            helpers.saveGameState();
+        }
     }
 
     /**

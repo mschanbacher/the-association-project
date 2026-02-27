@@ -15,6 +15,14 @@
  */
 
 import { CoachEngine } from './CoachEngine.js';
+import {
+    POSITION_ARCHETYPES,
+    getFatiguePenalty,
+    buildRotation,
+    calculateUsageShares,
+    getChemistryModifier,
+    emptyStatLine
+} from './BasketballMath.js';
 
 // ═══════════════════════════════════════════════════════════════
 // GAME STATE — Clock-based
@@ -214,19 +222,16 @@ export class GamePipeline {
     // ═══════════════════════════════════════════════════════════════
 
     static _setupTeams(game) {
-        const StatEngine = window.StatEngine;
-        const getFatiguePenalty = window.getFatiguePenalty || (() => 0);
-
-        const homeRotation = StatEngine._buildRotation(game.homeTeam, getFatiguePenalty, game.isPlayoffs)
+        const homeRotation = buildRotation(game.homeTeam, getFatiguePenalty, game.isPlayoffs, CoachEngine)
             .map(e => ({ ...e, onCourt: e.isStarter, fatigue: 0, fouls: 0 }));
-        const awayRotation = StatEngine._buildRotation(game.awayTeam, getFatiguePenalty, game.isPlayoffs)
+        const awayRotation = buildRotation(game.awayTeam, getFatiguePenalty, game.isPlayoffs, CoachEngine)
             .map(e => ({ ...e, onCourt: e.isStarter, fatigue: 0, fouls: 0 }));
 
-        StatEngine._calculateUsageShares(homeRotation);
-        StatEngine._calculateUsageShares(awayRotation);
+        calculateUsageShares(homeRotation);
+        calculateUsageShares(awayRotation);
 
-        const homeChemistry = StatEngine._getChemistryModifier(game.homeTeam, game.isPlayoffs);
-        const awayChemistry = StatEngine._getChemistryModifier(game.awayTeam, game.isPlayoffs);
+        const homeChemistry = getChemistryModifier(game.homeTeam, game.isPlayoffs);
+        const awayChemistry = getChemistryModifier(game.awayTeam, game.isPlayoffs);
 
         const homeCoachMods = CoachEngine.getGameModifiers(game.homeTeam);
         const awayCoachMods = CoachEngine.getGameModifiers(game.awayTeam);
@@ -339,7 +344,7 @@ export class GamePipeline {
 
         const shooter = GamePipeline._pickShooter(onCourt);
         const shooterStats = stats[shooter.player.id];
-        const archetype = (window.StatEngine.POSITION_ARCHETYPES || {})[shooter.player.position] || window.StatEngine.POSITION_ARCHETYPES['SF'];
+        const archetype = POSITION_ARCHETYPES[shooter.player.position] || POSITION_ARCHETYPES['SF'];
 
         // Rating-based modifiers — 3PT is less affected by raw talent than 2PT
         const ratingDelta = shooter.effectiveRating - 75 + homeBonus + momentumBoost;
@@ -790,19 +795,6 @@ export class GamePipeline {
     }
 
     static _emptyStatLine(player, isStarter) {
-        return {
-            playerId: player.id,
-            playerName: player.name,
-            position: player.position || 'SF',
-            team: null,
-            gamesPlayed: 0,
-            gamesStarted: 0,
-            minutesPlayed: 0,
-            points: 0, rebounds: 0, assists: 0, steals: 0, blocks: 0,
-            turnovers: 0, fouls: 0,
-            fieldGoalsMade: 0, fieldGoalsAttempted: 0,
-            threePointersMade: 0, threePointersAttempted: 0,
-            freeThrowsMade: 0, freeThrowsAttempted: 0
-        };
+        return emptyStatLine(player, isStarter);
     }
 }

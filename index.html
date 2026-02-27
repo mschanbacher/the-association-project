@@ -987,7 +987,7 @@
             <button onclick="openFinanceDashboard()" id="financeBtn" style="background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);">💰 Finances</button>
             <button onclick="openScoutingModal()" id="scoutingBtn" style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">🔍 Scouting</button>
             <button onclick="openFranchiseHistory()" id="historyBtn" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);">📜 History</button>
-            <button onclick="resetGame()" class="danger">🔄 Reset Game</button>
+            <button onclick="openGameMenu()" style="background: linear-gradient(135deg, #546e7a 0%, #37474f 100%);">⚙️ Game Menu</button>
         </div>
 
         <div class="legend">
@@ -1183,6 +1183,31 @@
             <div style="text-align: center; padding-top: 15px; border-top: 2px solid rgba(255,255,255,0.1);">
                 <button id="contractDecisionsConfirmBtn" class="success" style="font-size: 1.2em; padding: 15px 40px;">
                     Confirm Decisions
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Menu Modal -->
+    <div id="gameMenuModal" class="modal hidden" onclick="if(event.target===this)closeGameMenu()">
+        <div class="modal-content" style="max-width: 420px; padding: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 style="margin: 0;">⚙️ Game Menu</h2>
+                <button onclick="closeGameMenu()" style="background: rgba(255,255,255,0.1); padding: 6px 12px; font-size: 0.9em; box-shadow: none;">✕</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button onclick="downloadSave(); closeGameMenu()" style="width: 100%; text-align: left; padding: 16px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <span style="font-size: 1.1em;">💾 Download Save</span><br>
+                    <span style="font-size: 0.8em; opacity: 0.7; font-weight: normal;">Export your game to a file</span>
+                </button>
+                <button onclick="uploadSave()" style="width: 100%; text-align: left; padding: 16px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <span style="font-size: 1.1em;">📂 Load Save</span><br>
+                    <span style="font-size: 0.8em; opacity: 0.7; font-weight: normal;">Import a save file (replaces current)</span>
+                </button>
+                <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 8px 0;"></div>
+                <button onclick="resetGame()" style="width: 100%; text-align: left; padding: 16px 20px; background: linear-gradient(135deg, #ea4335 0%, #c62828 100%);">
+                    <span style="font-size: 1.1em;">🔄 Reset Game</span><br>
+                    <span style="font-size: 0.8em; opacity: 0.7; font-weight: normal;">Start over — all progress will be lost</span>
                 </button>
             </div>
         </div>
@@ -2688,6 +2713,13 @@
                 console.log('The Association Project loaded successfully!');
                 console.log('Rosters: All teams have 12-15 players');
                 console.log('Free Agents: ' + gameState.freeAgents.length + ' available');
+                
+                // Auto-resume offseason if we loaded mid-offseason
+                if (hasExistingGame && gameState.offseasonPhase && gameState.offseasonPhase !== 'none') {
+                    console.log(`📋 Resuming offseason from saved phase: ${gameState.offseasonPhase}`);
+                    // Small delay to let the UI finish rendering before showing offseason modals
+                    setTimeout(() => getOffseasonController().resumeOffseason(), 100);
+                }
             } catch(error) {
                 alert('Error loading game: ' + error.message);
                 console.error('Load error:', error);
@@ -2779,6 +2811,10 @@
         window.openTradeScreenFromRoster = openTradeScreenFromRoster;
         window.recheckRosterCompliance = recheckRosterCompliance;
         window.resetGame = () => getSaveLoadController().reset();
+        window.downloadSave = () => getSaveLoadController().downloadSave();
+        window.uploadSave = () => getSaveLoadController().uploadSave();
+        window.openGameMenu = () => document.getElementById('gameMenuModal').classList.remove('hidden');
+        window.closeGameMenu = () => document.getElementById('gameMenuModal').classList.add('hidden');
         window.selectInjuryOption = selectInjuryOption;
         window.selectTeam = selectTeam;
         window.selectTier = selectTier;

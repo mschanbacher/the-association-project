@@ -2,6 +2,8 @@
 // GameEngine — Pure basketball simulation functions (no side effects)
 // ═══════════════════════════════════════════════════════════════════
 
+import { getFatiguePenalty } from './BasketballMath.js';
+
 export const GameEngine = {
     /**
      * Calculate the strength of a team based on roster
@@ -30,7 +32,7 @@ export const GameEngine = {
                 }
                 
                 // Apply fatigue penalty
-                const fatiguePenalty = window.getFatiguePenalty(p.fatigue || 0);
+                const fatiguePenalty = getFatiguePenalty(p.fatigue || 0);
                 adjustedRating += fatiguePenalty; // Penalty is negative
                 
                 return {
@@ -168,7 +170,7 @@ export const GameEngine = {
             isPlayoffs: isPlayoffs,
             tier: tier,
             homeCourtBonus: this.getHomeCourtAdvantage(tier),
-            getFatiguePenalty: window.getFatiguePenalty,
+            getFatiguePenalty: getFatiguePenalty,
         });
     },
 

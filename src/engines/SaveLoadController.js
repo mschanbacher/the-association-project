@@ -33,6 +33,73 @@ export class SaveLoadController {
         });
     }
 
+    /** Download current save as a .json file */
+    async downloadSave() {
+        try {
+            const data = await this.StorageEngine.load();
+            if (!data) {
+                alert('No save data found to download.');
+                return;
+            }
+
+            const parsed = JSON.parse(data);
+            const season = parsed.currentSeason || 'unknown';
+            const filename = `association-save-${season}.json`;
+
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log(`📥 Save downloaded: ${filename} (${Math.round(data.length / 1024)}KB)`);
+        } catch (err) {
+            console.error('❌ Download save failed:', err);
+            alert('Error downloading save: ' + err.message);
+        }
+    }
+
+    /** Upload a .json save file to replace current save */
+    uploadSave() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const parsed = JSON.parse(text);
+
+                // Validate it's a real save
+                if (!parsed.gameVersion || !parsed.currentSeason || !parsed.tier1Teams) {
+                    alert('This doesn\'t appear to be a valid Association Project save file.');
+                    return;
+                }
+
+                if (!confirm(`Import save from Season ${parsed.currentSeason}?\n\nThis will replace your current save. This cannot be undone.`)) {
+                    return;
+                }
+
+                // Write to storage and reload
+                await this.StorageEngine.save({ serialize: () => text }, 'autosave');
+                console.log(`📤 Save imported: Season ${parsed.currentSeason} (${Math.round(text.length / 1024)}KB)`);
+                location.reload();
+            } catch (err) {
+                console.error('❌ Import save failed:', err);
+                alert('Error importing save: ' + err.message);
+            }
+        };
+
+        input.click();
+    }
+
     /** Reset game — clears all storage and reloads */
     reset() {
         if (confirm('Are you sure you want to reset? All progress will be lost.')) {

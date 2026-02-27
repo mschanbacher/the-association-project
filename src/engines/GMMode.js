@@ -800,6 +800,7 @@ export class GMMode {
      */
     updateControls() {
         const seasonComplete = this.gameState.isSeasonComplete();
+        const inOffseason = this.gameState.offseasonPhase && this.gameState.offseasonPhase !== 'none';
         
         const simNextBtn = document.getElementById('simNextBtn');
         const simDayBtn = document.getElementById('simDayBtn');
@@ -809,7 +810,11 @@ export class GMMode {
         if (simNextBtn) simNextBtn.disabled = seasonComplete;
         if (simDayBtn) simDayBtn.disabled = seasonComplete;
         if (simWeekBtn) simWeekBtn.disabled = seasonComplete;
-        if (finishBtn) finishBtn.disabled = seasonComplete;
+        // Finish Season stays enabled during offseason — routes to resumeOffseason()
+        if (finishBtn) {
+            finishBtn.disabled = seasonComplete && !inOffseason;
+            finishBtn.textContent = inOffseason ? '📋 Continue Offseason' : '⏭️ Finish Season';
+        }
         const watchBtn = document.getElementById('watchNextBtn');
         if (watchBtn) watchBtn.disabled = seasonComplete;
     }

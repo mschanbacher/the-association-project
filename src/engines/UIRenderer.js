@@ -478,13 +478,13 @@ export class UIRenderer {
     static injuryUserOptions({ player, injury }) {
         return `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                <div id="restOption" onclick="selectInjuryOption('rest')" style="background: rgba(52,168,83,0.2); padding: 20px; border-radius: 8px; cursor: pointer; border: 3px solid transparent; transition: all 0.2s;">
+                <div class="injury-option-btn" data-option="rest" onclick="selectInjuryOption('rest')" style="background: rgba(52,168,83,0.2); padding: 20px; border-radius: 8px; cursor: pointer; border: 3px solid transparent; transition: all 0.2s;">
                     <h4 style="margin: 0 0 10px 0; color: #34a853;">✅ Rest (Recommended)</h4>
                     <div style="margin-bottom: 8px;"><strong>Out:</strong> ${injury.gamesRemaining} games</div>
                     <div style="opacity: 0.9;">Returns at 100% health</div>
                 </div>
                 
-                <div id="playThroughOption" onclick="selectInjuryOption('playThrough')" style="background: rgba(255,152,0,0.2); padding: 20px; border-radius: 8px; cursor: pointer; border: 3px solid transparent; transition: all 0.2s;">
+                <div class="injury-option-btn" data-option="playThrough" onclick="selectInjuryOption('playThrough')" style="background: rgba(255,152,0,0.2); padding: 20px; border-radius: 8px; cursor: pointer; border: 3px solid transparent; transition: all 0.2s;">
                     <h4 style="margin: 0 0 10px 0; color: #ff9800;">⚠️ Play Through</h4>
                     <div style="margin-bottom: 8px;"><strong>Available for games</strong></div>
                     <div style="margin-bottom: 8px;">Rating: ${player.rating} → ${player.rating + injury.ratingPenalty}</div>

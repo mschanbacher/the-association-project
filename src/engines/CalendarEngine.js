@@ -2,6 +2,8 @@
 // CalendarEngine — Season schedule, calendar dates, event tracking
 // ═══════════════════════════════════════════════════════════════════
 
+import { DivisionManager } from './DivisionManager.js';
+
 export class CalendarEngine {
     
     /**
@@ -142,11 +144,13 @@ export class CalendarEngine {
      * @param {Object} seasonDates - Season dates object (for All-Star break)
      * @returns {Array} Schedule array with date-assigned games
      */
-    static generateCalendarSchedule(teams, numGames, startDateStr, endDateStr, seasonDates) {
-        console.log(`📅 Generating calendar schedule: ${teams.length} teams, ${numGames} games each, ${startDateStr} to ${endDateStr}`);
+    static generateCalendarSchedule(teams, numGames, startDateStr, endDateStr, seasonDates, tier = 1) {
+        console.log(`📅 Generating calendar schedule: ${teams.length} teams, ${numGames} games each, ${startDateStr} to ${endDateStr}, Tier ${tier}`);
         
-        // Step 1: Generate all matchups (same logic as before, but we collect them)
-        const matchups = CalendarEngine._generateMatchups(teams, numGames);
+        // Step 1: Generate all matchups — division-aware for T2/T3
+        const matchups = (tier >= 2)
+            ? CalendarEngine._generateDivisionMatchups(teams, numGames, tier)
+            : CalendarEngine._generateMatchups(teams, numGames);
         console.log(`  Generated ${matchups.length} total matchups`);
         
         // Step 2: Generate the list of available game dates
@@ -161,9 +165,16 @@ export class CalendarEngine {
     }
     
     /**
-     * Generate all matchups for a tier (unordered)
+     * Generate all matchups for a tier (unordered) — random pairing
+     * Used for Tier 1 only as a fallback; structured NBA scheduling below.
      */
     static _generateMatchups(teams, numGames) {
+        // For T1, use the structured NBA approach
+        if (teams.length === 30 && numGames === 82) {
+            return CalendarEngine._generateNBAMatchups(teams);
+        }
+
+        // Fallback: random pairing (kept for any non-standard configuration)
         const matchups = [];
         const teamGameCounts = {};
         
@@ -207,7 +218,485 @@ export class CalendarEngine {
         
         return matchups;
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    // NBA-STRUCTURED MATCHUP GENERATOR (Tier 1)
+    // ─────────────────────────────────────────────────────────────────
+    //
+    // Models the real NBA schedule structure (82 games):
+    //   • 4 division opponents × 4 games (2H + 2A) = 16
+    //   • 10 conference non-division opponents:
+    //       6 get 4 games (2H + 2A), 4 get 3 games (mixed) = 36
+    //   • 15 cross-conference opponents × 2 games (1H + 1A) = 30
+    //   Total: 16 + 36 + 30 = 82
+    //
+    // Which 6 conference opponents get 4 vs 3 is randomized per team
+    // but balanced so the total matchup count across all pairs stays
+    // consistent (each pair agrees on their game count).
+    // ─────────────────────────────────────────────────────────────────
+
+    static _generateNBAMatchups(teams) {
+        const matchups = [];
+
+        // Conference mapping
+        const eastDivisions = ['Atlantic', 'Central', 'Southeast'];
+        const westDivisions = ['Northwest', 'Pacific', 'Southwest'];
+
+        const getConference = (team) => eastDivisions.includes(team.division) ? 'East' : 'West';
+
+        // Group teams
+        const divisionTeams = {};
+        const conferenceTeams = { East: [], West: [] };
+        teams.forEach(t => {
+            if (!divisionTeams[t.division]) divisionTeams[t.division] = [];
+            divisionTeams[t.division].push(t);
+            conferenceTeams[getConference(t)].push(t);
+        });
+
+        // Helper: add N games between two teams with balanced H/A
+        const addGames = (team1, team2, count) => {
+            const homeFor1 = Math.ceil(count / 2);
+            const homeFor2 = Math.floor(count / 2);
+            // Randomize who gets the extra home game for odd counts
+            let t1Home, t2Home;
+            if (count % 2 === 0) {
+                t1Home = count / 2;
+                t2Home = count / 2;
+            } else {
+                if (Math.random() < 0.5) {
+                    t1Home = homeFor1;
+                    t2Home = homeFor2;
+                } else {
+                    t1Home = homeFor2;
+                    t2Home = homeFor1;
+                }
+            }
+            for (let i = 0; i < t1Home; i++) {
+                matchups.push({ homeTeamId: team1.id, awayTeamId: team2.id, played: false });
+            }
+            for (let i = 0; i < t2Home; i++) {
+                matchups.push({ homeTeamId: team2.id, awayTeamId: team1.id, played: false });
+            }
+        };
+
+        // ═══════════════════════════════════════════════════════════
+        // Determine game counts for conference non-division matchups
+        // ═══════════════════════════════════════════════════════════
+        // Each team plays 10 conference non-division opponents: 6 get 4 games, 4 get 3.
+        // We need both teams in a pair to agree on the count.
+        // Approach: for each conference, build the pair-game-count map globally.
+
+        const pairGameCount = {}; // "id1-id2" -> 3 or 4
+        const pairKey = (a, b) => a < b ? `${a}-${b}` : `${b}-${a}`;
+
+        for (const conf of ['East', 'West']) {
+            const confDivisions = conf === 'East' ? eastDivisions : westDivisions;
+
+            // For each pair of divisions in this conference, assign 4-game vs 3-game
+            // matchups. Each team needs exactly 3 four-game opponents from each of
+            // the other 2 divisions (totaling 6 fours, 4 threes across 10 opponents).
+            //
+            // Between two divisions of 5 teams each (25 pairs), we need each team
+            // to have exactly 3 fours. That means 15 four-game pairs and 10 three-game
+            // pairs per division pair. This is solved by random permutation matrices.
+
+            for (let d1 = 0; d1 < confDivisions.length; d1++) {
+                for (let d2 = d1 + 1; d2 < confDivisions.length; d2++) {
+                    const div1Teams = divisionTeams[confDivisions[d1]];
+                    const div2Teams = divisionTeams[confDivisions[d2]];
+                    const n1 = div1Teams.length; // 5
+                    const n2 = div2Teams.length; // 5
+
+                    // Build a matrix: fourGame[i][j] = true if div1Teams[i] vs div2Teams[j] is 4 games
+                    // Constraint: each row sums to 3, each column sums to 3
+                    // With 5×5 and sum=3, that's 15 fours out of 25 pairs.
+                    //
+                    // Simple construction: start with all-4, then randomly pick 2 per row to downgrade
+                    // while maintaining column constraints.
+                    
+                    // Start: all matchups = 4 games
+                    const fourGame = Array.from({ length: n1 }, () => Array(n2).fill(true));
+                    
+                    // Need to set exactly 2 per row to false (3-game), such that each column
+                    // also has exactly 2 falses. This is equivalent to placing 2 "threes" per row
+                    // with 2 per column — a problem of two non-overlapping permutation matrices.
+                    
+                    // Generate two random permutations of [0..n2-1]
+                    const perm1 = [...Array(n2).keys()];
+                    const perm2 = [...Array(n2).keys()];
+                    
+                    // Fisher-Yates shuffle
+                    for (let i = perm1.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [perm1[i], perm1[j]] = [perm1[j], perm1[i]];
+                    }
+                    
+                    // perm2 must not collide with perm1 in any position
+                    let valid = false;
+                    for (let attempt = 0; attempt < 100; attempt++) {
+                        for (let i = perm2.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [perm2[i], perm2[j]] = [perm2[j], perm2[i]];
+                        }
+                        if (perm1.every((v, i) => v !== perm2[i])) {
+                            valid = true;
+                            break;
+                        }
+                    }
+                    if (!valid) {
+                        // Fallback: just offset perm2
+                        for (let i = 0; i < n2; i++) perm2[i] = (perm1[i] + 1) % n2;
+                        if (perm1.some((v, i) => v === perm2[i])) {
+                            for (let i = 0; i < n2; i++) perm2[i] = (perm1[i] + 2) % n2;
+                        }
+                    }
+                    
+                    // Mark the two permutations as 3-game matchups
+                    for (let i = 0; i < n1; i++) {
+                        fourGame[i][perm1[i]] = false;
+                        fourGame[i][perm2[i]] = false;
+                    }
+                    
+                    // Write to pairGameCount
+                    for (let i = 0; i < n1; i++) {
+                        for (let j = 0; j < n2; j++) {
+                            const key = pairKey(div1Teams[i].id, div2Teams[j].id);
+                            pairGameCount[key] = fourGame[i][j] ? 4 : 3;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // Generate all matchups
+        // ═══════════════════════════════════════════════════════════
+
+        let divGames = 0, confGames = 0, crossGames = 0;
+
+        for (let i = 0; i < teams.length; i++) {
+            for (let j = i + 1; j < teams.length; j++) {
+                const t1 = teams[i], t2 = teams[j];
+                const sameDiv = t1.division === t2.division;
+                const sameConf = getConference(t1) === getConference(t2);
+
+                let games;
+                if (sameDiv) {
+                    games = 4; // Division: 4 games (2H + 2A)
+                    divGames += 4;
+                } else if (sameConf) {
+                    const key = pairKey(t1.id, t2.id);
+                    games = pairGameCount[key] || 3;
+                    confGames += games;
+                } else {
+                    games = 2; // Cross-conference: 2 games (1H + 1A)
+                    crossGames += 2;
+                }
+
+                addGames(t1, t2, games);
+            }
+        }
+
+        console.log(`    T1 NBA structure: ${divGames / 2} div pair-games, ${confGames / 2} conf pair-games, ${crossGames / 2} cross pair-games`);
+        console.log(`    Total matchups: ${matchups.length}`);
+
+        // Verify per-team game counts
+        const teamCounts = {};
+        teams.forEach(t => { teamCounts[t.id] = 0; });
+        matchups.forEach(m => { teamCounts[m.homeTeamId]++; teamCounts[m.awayTeamId]++; });
+        const counts = Object.values(teamCounts);
+        const min = Math.min(...counts), max = Math.max(...counts);
+        if (min !== 82 || max !== 82) {
+            console.warn(`    ⚠️ T1 game count issue: min=${min} max=${max} (expected 82)`);
+        }
+
+        // Shuffle before calendar distribution
+        for (let i = matchups.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [matchups[i], matchups[j]] = [matchups[j], matchups[i]];
+        }
+
+        return matchups;
+    }
     
+    // ─────────────────────────────────────────────────────────────────
+    // DIVISION-AWARE MATCHUP GENERATOR (Tiers 2 & 3)
+    // ─────────────────────────────────────────────────────────────────
+    //
+    // Priority:
+    //   1. Intra-division: target 6 games per opponent (3H + 3A).
+    //      If that would exceed numGames, reduce evenly, alternating
+    //      3H/2A and 2H/3A across opponents for fairness.
+    //   2. Neighbor divisions: fill remaining games.
+    //      T3 stops here — never goes beyond neighbors.
+    //   3. T2 only: neighbor-of-neighbor if still short.
+    //
+    // Produces the same { homeTeamId, awayTeamId, played } format.
+    // ─────────────────────────────────────────────────────────────────
+
+    static _generateDivisionMatchups(teams, numGames, tier) {
+        const matchups = [];
+        const teamGameCounts = {};
+        // Track matchup counts between specific pairs: "id1-id2" -> { total, homeFor1, homeFor2 }
+        const pairCounts = {};
+        
+        teams.forEach(t => { teamGameCounts[t.id] = 0; });
+
+        const neighbors = tier === 2 ? DivisionManager.T2_NEIGHBORS : DivisionManager.T3_NEIGHBORS;
+
+        // Group teams by division
+        const divisionTeams = {};
+        teams.forEach(t => {
+            if (!divisionTeams[t.division]) divisionTeams[t.division] = [];
+            divisionTeams[t.division].push(t);
+        });
+
+        // Helper: get a stable pair key
+        const pairKey = (a, b) => a < b ? `${a}-${b}` : `${b}-${a}`;
+
+        // Helper: add a matchup between two teams, respecting home/away balance
+        const addMatchup = (team1, team2) => {
+            const key = pairKey(team1.id, team2.id);
+            if (!pairCounts[key]) pairCounts[key] = { total: 0, homeFor: {} };
+            const pc = pairCounts[key];
+            if (!pc.homeFor[team1.id]) pc.homeFor[team1.id] = 0;
+            if (!pc.homeFor[team2.id]) pc.homeFor[team2.id] = 0;
+
+            // Give home to whichever team has fewer home games in this matchup
+            let home, away;
+            if (pc.homeFor[team1.id] <= pc.homeFor[team2.id]) {
+                home = team1; away = team2;
+            } else {
+                home = team2; away = team1;
+            }
+
+            matchups.push({ homeTeamId: home.id, awayTeamId: away.id, played: false });
+            pc.homeFor[home.id]++;
+            pc.total++;
+            teamGameCounts[home.id]++;
+            teamGameCounts[away.id]++;
+        };
+
+        // ═══════════════════════════════════════════════════════════
+        // PHASE 1: Intra-division games
+        // ═══════════════════════════════════════════════════════════
+        // Target 6 games per opponent (3H + 3A).
+        // If (divSize - 1) * 6 > numGames, reduce to fit.
+
+        for (const [divName, divTeams] of Object.entries(divisionTeams)) {
+            const opponents = divTeams.length - 1;
+            const maxIntraDivision = numGames; // can't exceed total season games
+            let gamesPerOpponent = Math.min(6, Math.floor(maxIntraDivision / Math.max(1, opponents)));
+            // Ensure even number for balanced H/A, or at least 2
+            if (gamesPerOpponent < 2) gamesPerOpponent = 2;
+
+            for (let i = 0; i < divTeams.length; i++) {
+                for (let j = i + 1; j < divTeams.length; j++) {
+                    for (let g = 0; g < gamesPerOpponent; g++) {
+                        // Only add if both teams still need games
+                        if (teamGameCounts[divTeams[i].id] < numGames &&
+                            teamGameCounts[divTeams[j].id] < numGames) {
+                            addMatchup(divTeams[i], divTeams[j]);
+                        }
+                    }
+                }
+            }
+        }
+
+        const intraDivCount = matchups.length;
+        console.log(`    Phase 1 (intra-division): ${intraDivCount} games`);
+
+        // ═══════════════════════════════════════════════════════════
+        // PHASE 2: Neighbor division games
+        // ═══════════════════════════════════════════════════════════
+        // Fill remaining games from neighbor divisions.
+        // Distribute evenly across neighbor teams.
+
+        // Build neighbor team pool for each division
+        const neighborPools = {};
+        for (const [divName, neighborDivs] of Object.entries(neighbors)) {
+            neighborPools[divName] = [];
+            for (const nDiv of neighborDivs) {
+                if (divisionTeams[nDiv]) {
+                    neighborPools[divName].push(...divisionTeams[nDiv]);
+                }
+            }
+        }
+
+        // For each team that still needs games, schedule against neighbor teams
+        // Do multiple passes to spread games evenly
+        let neighborAdded = 0;
+        const maxNeighborPasses = numGames; // enough passes to fill any schedule
+        for (let pass = 0; pass < maxNeighborPasses; pass++) {
+            let addedThisPass = 0;
+            
+            // Shuffle division order each pass for fairness
+            const divNames = Object.keys(divisionTeams);
+            for (let i = divNames.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [divNames[i], divNames[j]] = [divNames[j], divNames[i]];
+            }
+            
+            for (const divName of divNames) {
+                const divTeams = divisionTeams[divName];
+                const pool = neighborPools[divName] || [];
+                if (pool.length === 0) continue;
+
+                for (const team of divTeams) {
+                    if (teamGameCounts[team.id] >= numGames) continue;
+
+                    // Find the neighbor opponent this team has played least
+                    const candidates = pool
+                        .filter(opp => teamGameCounts[opp.id] < numGames)
+                        .sort((a, b) => {
+                            const pcA = pairCounts[pairKey(team.id, a.id)];
+                            const pcB = pairCounts[pairKey(team.id, b.id)];
+                            return (pcA ? pcA.total : 0) - (pcB ? pcB.total : 0);
+                        });
+
+                    if (candidates.length > 0) {
+                        addMatchup(team, candidates[0]);
+                        addedThisPass++;
+                    }
+                }
+            }
+
+            neighborAdded += addedThisPass;
+            if (addedThisPass === 0) break; // No more to add
+
+            // Check if all teams are full
+            if (teams.every(t => teamGameCounts[t.id] >= numGames)) break;
+        }
+
+        console.log(`    Phase 2 (neighbor): ${neighborAdded} games`);
+
+        // ═══════════════════════════════════════════════════════════
+        // PHASE 3: Neighbor-of-neighbor (Tier 2 only)
+        // ═══════════════════════════════════════════════════════════
+        // T3 stops at neighbors. T2 can extend one more hop if needed.
+
+        if (tier === 2) {
+            // Build extended pools: neighbors of neighbors (excluding own division)
+            const extendedPools = {};
+            for (const [divName, neighborDivs] of Object.entries(neighbors)) {
+                const extended = new Set();
+                // Add neighbor-of-neighbor divisions
+                for (const nDiv of neighborDivs) {
+                    if (neighbors[nDiv]) {
+                        for (const nnDiv of neighbors[nDiv]) {
+                            if (nnDiv !== divName && !neighborDivs.includes(nnDiv)) {
+                                extended.add(nnDiv);
+                            }
+                        }
+                    }
+                }
+                extendedPools[divName] = [];
+                for (const nnDiv of extended) {
+                    if (divisionTeams[nnDiv]) {
+                        extendedPools[divName].push(...divisionTeams[nnDiv]);
+                    }
+                }
+            }
+
+            let extendedAdded = 0;
+            for (let pass = 0; pass < numGames; pass++) {
+                let addedThisPass = 0;
+
+                for (const [divName, divTeams] of Object.entries(divisionTeams)) {
+                    const pool = extendedPools[divName] || [];
+                    if (pool.length === 0) continue;
+
+                    for (const team of divTeams) {
+                        if (teamGameCounts[team.id] >= numGames) continue;
+
+                        const candidates = pool
+                            .filter(opp => teamGameCounts[opp.id] < numGames)
+                            .sort((a, b) => {
+                                const pcA = pairCounts[pairKey(team.id, a.id)];
+                                const pcB = pairCounts[pairKey(team.id, b.id)];
+                                return (pcA ? pcA.total : 0) - (pcB ? pcB.total : 0);
+                            });
+
+                        if (candidates.length > 0) {
+                            addMatchup(team, candidates[0]);
+                            addedThisPass++;
+                        }
+                    }
+                }
+
+                extendedAdded += addedThisPass;
+                if (addedThisPass === 0) break;
+                if (teams.every(t => teamGameCounts[t.id] >= numGames)) break;
+            }
+
+            console.log(`    Phase 3 (extended neighbor): ${extendedAdded} games`);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // FALLBACK: If any team is still short, add random regional
+        // ═══════════════════════════════════════════════════════════
+        // FALLBACK: If any team is still short, add games
+        // ═══════════════════════════════════════════════════════════
+        let fallbackAdded = 0;
+        for (let pass = 0; pass < numGames; pass++) {
+            const shortTeams = teams.filter(t => teamGameCounts[t.id] < numGames);
+            if (shortTeams.length === 0) break;
+
+            let addedThisPass = 0;
+            for (const team of shortTeams) {
+                if (teamGameCounts[team.id] >= numGames) continue;
+
+                // Prefer opponents who also need games, fall back to anyone
+                const underTarget = teams
+                    .filter(t => t.id !== team.id && teamGameCounts[t.id] < numGames);
+                const atTarget = teams
+                    .filter(t => t.id !== team.id && teamGameCounts[t.id] === numGames);
+                const candidates = underTarget.length > 0 ? underTarget : atTarget;
+
+                if (candidates.length > 0) {
+                    // Pick the least-played opponent
+                    candidates.sort((a, b) => {
+                        const pcA = pairCounts[pairKey(team.id, a.id)];
+                        const pcB = pairCounts[pairKey(team.id, b.id)];
+                        return (pcA ? pcA.total : 0) - (pcB ? pcB.total : 0);
+                    });
+                    addMatchup(team, candidates[0]);
+                    addedThisPass++;
+                    fallbackAdded++;
+                }
+            }
+            if (addedThisPass === 0) break;
+        }
+        if (fallbackAdded > 0) {
+            console.log(`    ⚠️ Fallback: ${fallbackAdded} games added to fill schedules`);
+        }
+
+        // Log distribution summary
+        const totalGames = matchups.length;
+        const intraPct = ((intraDivCount / totalGames) * 100).toFixed(1);
+        console.log(`    Summary: ${totalGames} total games (${intraPct}% intra-division)`);
+
+        // Verify game counts
+        const shortAfter = teams.filter(t => teamGameCounts[t.id] < numGames);
+        const overAfter = teams.filter(t => teamGameCounts[t.id] > numGames);
+        if (shortAfter.length > 0) {
+            console.warn(`    ⚠️ ${shortAfter.length} teams under ${numGames} games:`,
+                shortAfter.map(t => `${t.name}(${teamGameCounts[t.id]})`).join(', '));
+        }
+        if (overAfter.length > 0) {
+            console.warn(`    ⚠️ ${overAfter.length} teams over ${numGames} games:`,
+                overAfter.map(t => `${t.name}(${teamGameCounts[t.id]})`).join(', '));
+        }
+
+        // Shuffle before calendar distribution
+        for (let i = matchups.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [matchups[i], matchups[j]] = [matchups[j], matchups[i]];
+        }
+
+        return matchups;
+    }
+
     /**
      * Generate available game dates between start and end, excluding All-Star break
      * Weight days of week: Tue/Wed/Fri/Sat are primary, Mon/Thu/Sun are secondary

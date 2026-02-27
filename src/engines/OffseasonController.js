@@ -193,6 +193,14 @@ export class OffseasonController {
             return;
         }
 
+        // If user is in T2 division playoffs, enter interactive T2 playoff flow
+        if (action === 't2-championship') {
+            console.log('🏆 User qualifies for T2 Division Playoffs — entering interactive playoff flow...');
+            const gameSim = helpers.getGameSimController();
+            gameSim.runTier2DivisionPlayoffs();
+            return;
+        }
+
         // Otherwise show static postseason results summary
         const html = engines.PlayoffEngine.generatePostseasonHTML(postseasonResults, gameState.userTeamId);
         document.getElementById('championshipPlayoffContent').innerHTML = UIRenderer.postseasonContinue({ resultsHTML: html });
@@ -1078,9 +1086,9 @@ export class OffseasonController {
         const seasonEnd = engines.CalendarEngine.toDateString(calSeasonDates.seasonEnd);
 
         console.log('📅 Generating calendar schedules for new season...');
-        gameState.tier1Schedule = engines.CalendarEngine.generateCalendarSchedule(gameState.tier1Teams, 82, t1Start, seasonEnd, calSeasonDates);
-        gameState.tier2Schedule = engines.CalendarEngine.generateCalendarSchedule(gameState.tier2Teams, 60, t2Start, seasonEnd, calSeasonDates);
-        gameState.tier3Schedule = engines.CalendarEngine.generateCalendarSchedule(gameState.tier3Teams, 40, t3Start, seasonEnd, calSeasonDates);
+        gameState.tier1Schedule = engines.CalendarEngine.generateCalendarSchedule(gameState.tier1Teams, 82, t1Start, seasonEnd, calSeasonDates, 1);
+        gameState.tier2Schedule = engines.CalendarEngine.generateCalendarSchedule(gameState.tier2Teams, 60, t2Start, seasonEnd, calSeasonDates, 2);
+        gameState.tier3Schedule = engines.CalendarEngine.generateCalendarSchedule(gameState.tier3Teams, 40, t3Start, seasonEnd, calSeasonDates, 3);
 
         if (gameState.currentTier === 1) gameState.schedule = gameState.tier1Schedule;
         else if (gameState.currentTier === 2) gameState.schedule = gameState.tier2Schedule;

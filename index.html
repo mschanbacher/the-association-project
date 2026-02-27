@@ -1848,13 +1848,13 @@
             console.log(`  T3: ${t3Start} to ${seasonEnd} (40 games)`);
             
             gameState.tier1Schedule = CalendarEngine.generateCalendarSchedule(
-                gameState.tier1Teams, 82, t1Start, seasonEnd, seasonDates
+                gameState.tier1Teams, 82, t1Start, seasonEnd, seasonDates, 1
             );
             gameState.tier2Schedule = CalendarEngine.generateCalendarSchedule(
-                gameState.tier2Teams, 60, t2Start, seasonEnd, seasonDates
+                gameState.tier2Teams, 60, t2Start, seasonEnd, seasonDates, 2
             );
             gameState.tier3Schedule = CalendarEngine.generateCalendarSchedule(
-                gameState.tier3Teams, 40, t3Start, seasonEnd, seasonDates
+                gameState.tier3Teams, 40, t3Start, seasonEnd, seasonDates, 3
             );
             
             // Set the user's schedule reference
@@ -2744,6 +2744,9 @@
         window.closeTradeScreen = (...args) => getTradeController().closeTradeScreen(...args);
         window.confirmOffseasonDecisions = (...args) => getOffseasonController().confirmOffseasonDecisions(...args);
         window.continueAfterChampionshipRound = (...args) => getGameSimController().continueAfterChampionshipRound(...args);
+        window.continueT2AfterDivisionFinal = (...args) => getGameSimController().continueT2AfterDivisionFinal(...args);
+        window.continueT2AfterDivisionSemis = (...args) => getGameSimController().continueT2AfterDivisionSemis(...args);
+        window.continueT2AfterNationalRound = (...args) => getGameSimController().continueT2AfterNationalRound(...args);
         window.continueAfterPostseason = (...args) => getOffseasonController().continueAfterPostseason(...args);
         window.dismissTransitionBriefing = (...args) => getFinanceController().dismissTransitionBriefing(...args);
         window.dropPlayer = (...args) => getRosterController().dropPlayer(...args);
@@ -2771,7 +2774,9 @@
         window.signPlayer = (...args) => getRosterController().signPlayer(...args);
         window.signFreeAgent = (...args) => getRosterController().signPlayer(...args);
         window.simAllChampionshipRounds = (...args) => getGameSimController().simAllChampionshipRounds(...args);
+        window.simAllT2Rounds = (...args) => getGameSimController().simAllT2Rounds(...args);
         window.skipChampionshipPlayoffs = (...args) => getGameSimController().skipChampionshipPlayoffs(...args);
+        window.skipT2Playoffs = (...args) => getGameSimController().skipT2Playoffs(...args);
         window.skipCollegeGradFA = (...args) => getDraftController().skipCollegeGradFA(...args);
         window.submitCollegeGradOffers = (...args) => getDraftController().submitCollegeGradOffers(...args);
         window.switchScoutTab = (...args) => getRosterController().switchScoutTab(...args);

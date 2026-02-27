@@ -3577,6 +3577,109 @@ export class UIRenderer {
         </div>`;
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // T2 PLAYOFF TEMPLATES
+    // ═══════════════════════════════════════════════════════════════════
+
+    static t2DivisionSemisPage({ division, semi1, semi2, userTeam, formatSeriesResult }) {
+        let html = `<div style="padding: 20px;">
+            <h1 style="text-align: center; margin-bottom: 10px; font-size: 2.2em;">🏀 Division Playoffs</h1>
+            <h2 style="text-align: center; margin-bottom: 30px; color: #c0c0c0; font-size: 1.3em;">${division} — Semifinals (Best of 3)</h2>
+            ${formatSeriesResult(semi1, userTeam)}
+            ${formatSeriesResult(semi2, userTeam)}
+            <div style="text-align: center; margin-top: 30px;">
+                <button onclick="simAllT2Rounds()" class="btn" style="font-size: 1em; padding: 10px 25px; margin-right: 10px; opacity: 0.7;">Sim All</button>
+                <button onclick="continueT2AfterDivisionSemis()" class="success" style="font-size: 1.2em; padding: 15px 40px;">Continue to Division Final</button>
+            </div>
+        </div>`;
+        return html;
+    }
+
+    static t2DivisionFinalPage({ division, divFinal, userTeam, formatSeriesResult }) {
+        const isChampion = divFinal.winner.id === userTeam.id;
+        let html = `<div style="padding: 20px;">
+            <h1 style="text-align: center; margin-bottom: 10px; font-size: 2.2em;">🏀 Division Final</h1>
+            <h2 style="text-align: center; margin-bottom: 30px; color: #c0c0c0; font-size: 1.3em;">${division} — Championship (Best of 3)</h2>
+            ${formatSeriesResult(divFinal, userTeam)}`;
+
+        if (isChampion) {
+            html += `<div style="margin: 20px 0; padding: 20px; background: linear-gradient(135deg, rgba(255,215,0,0.3), rgba(255,237,78,0.15)); border-radius: 12px; text-align: center; border: 1px solid rgba(255,215,0,0.5);">
+                <h2 style="color: #ffd700; margin-bottom: 5px;">🏆 Division Champions!</h2>
+                <p style="opacity: 0.9;">Advancing to the NARBL National Tournament</p>
+            </div>`;
+        } else {
+            html += `<div style="margin: 20px 0; padding: 15px; background: rgba(192,192,192,0.1); border-radius: 10px; text-align: center;">
+                <p style="opacity: 0.9;">Division Runner-Up — may qualify for National Tournament based on record</p>
+            </div>`;
+        }
+
+        html += `<div style="text-align: center; margin-top: 30px;">
+                <button onclick="simAllT2Rounds()" class="btn" style="font-size: 1em; padding: 10px 25px; margin-right: 10px; opacity: 0.7;">Sim All</button>
+                <button onclick="continueT2AfterDivisionFinal()" class="success" style="font-size: 1.2em; padding: 15px 40px;">Continue</button>
+            </div>
+        </div>`;
+        return html;
+    }
+
+    static t2NationalRoundPage({ roundName, roundNumber, roundResults, userTeam, isChampionshipRound, champion, formatSeriesResult }) {
+        let html = `<div style="padding: 20px;">
+            <h1 style="text-align: center; margin-bottom: 30px; font-size: 2.2em;">${isChampionshipRound ? '🏆 ' : ''}${roundName}</h1>`;
+
+        roundResults.forEach(s => {
+            html += formatSeriesResult(s.result, userTeam, isChampionshipRound);
+        });
+
+        if (isChampionshipRound && champion) {
+            const isUserChampion = champion.id === userTeam.id;
+            html += `<div style="margin-top: 30px; padding: 30px; background: linear-gradient(135deg, rgba(192,192,192,0.3), rgba(192,192,192,0.1)); border-radius: 15px; text-align: center; border: 1px solid rgba(192,192,192,0.5);">
+                <h1 style="font-size: 3em; margin-bottom: 10px;">🏆</h1>
+                <h2 style="font-size: 2.2em; margin-bottom: 10px;">${champion.name}</h2>
+                <p style="font-size: 1.5em; font-weight: bold;">${isUserChampion ? 'YOU ARE THE NARBL CHAMPION!' : 'NARBL CHAMPIONS'}</p>
+            </div>`;
+        }
+
+        html += `<div style="text-align: center; margin-top: 30px;">
+                <button onclick="simAllT2Rounds()" class="btn" style="font-size: 1em; padding: 10px 25px; margin-right: 10px; opacity: 0.7;">Sim All</button>
+                <button onclick="continueT2AfterNationalRound()" class="success" style="font-size: 1.2em; padding: 15px 40px;">
+                    ${isChampionshipRound ? 'Continue to Off-Season' : 'Continue to Next Round'}
+                </button>
+            </div>
+        </div>`;
+        return html;
+    }
+
+    static t2EliminationPage({ userTeam, eliminatedIn, champion }) {
+        return `<div style="padding: 20px; text-align: center;">
+            <h1 style="margin-bottom: 20px; font-size: 2.2em;">Season Over</h1>
+            <div style="margin: 20px 0; padding: 20px; background: rgba(102,126,234,0.15); border-radius: 12px; border: 1px solid rgba(102,126,234,0.3);">
+                <h2 style="margin-bottom: 10px;">${userTeam.name}</h2>
+                <p style="opacity: 0.9;">Eliminated in ${eliminatedIn}</p>
+                <p style="margin-top: 10px; opacity: 0.7;">Final Record: ${userTeam.wins}-${userTeam.losses}</p>
+            </div>
+            ${champion ? `<div style="margin: 20px 0; padding: 20px; background: rgba(192,192,192,0.1); border-radius: 12px; border: 1px solid rgba(192,192,192,0.3);">
+                <h3 style="color: #c0c0c0; margin-bottom: 5px;">NARBL Champion</h3>
+                <h2 style="font-size: 1.5em;">🏆 ${champion.name}</h2>
+            </div>` : ''}
+            <div style="text-align: center; margin-top: 30px;">
+                <button onclick="skipT2Playoffs()" class="success" style="font-size: 1.2em; padding: 15px 40px;">Continue to Off-Season</button>
+            </div>
+        </div>`;
+    }
+
+    static t2PlayoffCompleteQuick({ champion }) {
+        return `<div style="padding: 20px; text-align: center;">
+            <h1 style="margin-bottom: 30px; font-size: 2.5em;">🏆 NARBL Playoffs Complete</h1>
+            <div style="margin-top: 20px; padding: 30px; background: linear-gradient(135deg, rgba(192,192,192,0.3), rgba(192,192,192,0.1)); border-radius: 15px; border: 1px solid rgba(192,192,192,0.5);">
+                <h1 style="font-size: 3em; margin-bottom: 10px;">🏆</h1>
+                <h2 style="font-size: 2.2em; margin-bottom: 10px;">${champion ? champion.name : 'TBD'}</h2>
+                <p style="font-size: 1.5em; font-weight: bold;">NARBL CHAMPIONS</p>
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+                <button onclick="skipT2Playoffs()" class="success" style="font-size: 1.2em; padding: 15px 40px;">Continue to Off-Season</button>
+            </div>
+        </div>`;
+    }
+
     static expiredContractDecisionResult({ playerName, decision, contractYears, salary, formatCurrency }) {
         if (decision === 'resign') {
             return `<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px;">

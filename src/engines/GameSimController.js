@@ -450,9 +450,18 @@ export class GameSimController {
                 }
             }
         } else if (gameState.currentTier === 2) {
-            if (rank === 1) { status = '🎉 AUTO-PROMOTED TO TIER 1!'; statusColor = '#34a853'; nextAction = 'promote'; }
-            else if (rank >= 2 && rank <= 4) { status = '⚡ PROMOTION PLAYOFF BERTH'; statusColor = '#ffa500'; nextAction = 'promotion-playoff'; }
-            else { status = 'Staying in Tier 2'; statusColor = '#667eea'; nextAction = 'stay'; }
+            // Check if user is in top 4 of their division (division playoff eligible)
+            const divTeams = teams.filter(t => t.division === userTeam.division);
+            const divSorted = helpers.sortTeamsByStandings(divTeams, gameState.schedule);
+            const divRank = divSorted.findIndex(t => t.id === userTeam.id) + 1;
+
+            if (rank === totalTeams) { status = '⚠️ AUTO-RELEGATED TO TIER 3'; statusColor = '#ea4335'; nextAction = 'relegate'; }
+            else if (rank >= totalTeams - 2 && rank <= totalTeams - 1) { status = '⚠️ RELEGATION PLAYOFF'; statusColor = '#ffa500'; nextAction = 'relegation-playoff'; }
+            else if (divRank <= 4) {
+                status = `🏆 #${divRank} SEED — ${userTeam.division} Division Playoffs!`;
+                statusColor = '#ffd700'; nextAction = 't2-championship';
+            }
+            else { status = 'Season Over — Staying in Tier 2'; statusColor = '#667eea'; nextAction = 'stay'; }
         } else {
             const divisionTeams = teams.filter(t => t.division === userTeam.division);
             const divisionSorted = helpers.sortTeamsByStandings(divisionTeams, gameState.schedule);
@@ -852,6 +861,271 @@ export class GameSimController {
                 helpers.proceedToDraftOrDevelopment();
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Tier 2 Division Playoffs + National Tournament
+    // ═══════════════════════════════════════════════════════════════════
+
+    runTier2DivisionPlayoffs() {
+        const { gameState, helpers } = this.ctx;
+        console.log('🏆 Starting Tier 2 Division Playoffs...');
+
+        const userTeam = helpers.getUserTeam();
+        const postseason = gameState.postseasonResults;
+        const t2Bracket = postseason.t2;
+
+        // Find user's division bracket
+        const userDivBracket = t2Bracket.divisionBrackets.find(db =>
+            db.teams.some(t => t.id === userTeam.id)
+        );
+
+        if (!userDivBracket) {
+            console.warn('User team not found in any division bracket');
+            this._showT2PostseasonSummary();
+            return;
+        }
+
+        // Store T2 playoff state
+        gameState.t2PlayoffData = {
+            userDivBracket,
+            userDivision: userDivBracket.division,
+            stage: 'division-semis', // division-semis → division-final → national
+            userTeamId: userTeam.id,
+            interactiveResults: {
+                divSemi1: null,
+                divSemi2: null,
+                divFinal: null,
+                // National tournament results will be re-simulated interactively
+                nationalRounds: []
+            }
+        };
+
+        // Show division semifinals
+        this._showT2DivisionSemis();
+    }
+
+    _showT2DivisionSemis() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const db = pd.userDivBracket;
+
+        // Simulate the two semifinals using the full engine
+        const semi1 = helpers.simulatePlayoffSeries(db.seed1, db.seed4, 3);
+        const semi2 = helpers.simulatePlayoffSeries(db.seed2, db.seed3, 3);
+        pd.interactiveResults.divSemi1 = semi1;
+        pd.interactiveResults.divSemi2 = semi2;
+
+        const userTeam = helpers.getUserTeam();
+        const html = UIRenderer.t2DivisionSemisPage({
+            division: db.division,
+            semi1, semi2, userTeam,
+            formatSeriesResult: (sr, ut) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id, isFinals: false })
+        });
+
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
+    }
+
+    continueT2AfterDivisionSemis() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const semi1 = pd.interactiveResults.divSemi1;
+        const semi2 = pd.interactiveResults.divSemi2;
+
+        // Check if user was eliminated
+        const userTeam = helpers.getUserTeam();
+        const userEliminated = (semi1.loser.id === userTeam.id || semi2.loser.id === userTeam.id);
+
+        if (userEliminated) {
+            // Show elimination + remaining T2 playoff summary
+            this._showT2EliminationAndSummary('division semifinals');
+            return;
+        }
+
+        // Simulate division final
+        pd.stage = 'division-final';
+        const divFinal = helpers.simulatePlayoffSeries(semi1.winner, semi2.winner, 3);
+        pd.interactiveResults.divFinal = divFinal;
+
+        const html = UIRenderer.t2DivisionFinalPage({
+            division: pd.userDivision,
+            divFinal, userTeam,
+            formatSeriesResult: (sr, ut) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id, isFinals: true })
+        });
+
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+    }
+
+    continueT2AfterDivisionFinal() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const userTeam = helpers.getUserTeam();
+        const divFinal = pd.interactiveResults.divFinal;
+
+        // User is either division champion or runner-up
+        const isChampion = divFinal.winner.id === userTeam.id;
+
+        // Check if user qualifies for national tournament
+        // Champions always qualify. Runner-ups qualify if they're in top 5 runners-up by record.
+        const postseason = gameState.postseasonResults;
+        const t2Bracket = postseason.t2;
+
+        // Get all runners-up sorted by record
+        const allRunnersUp = t2Bracket.divisionBrackets
+            .filter(db => db.runnerUp)
+            .map(db => db.runnerUp)
+            .sort((a, b) => (b.wins !== a.wins) ? b.wins - a.wins : b.pointDiff - a.pointDiff);
+        const qualifyingRunnersUp = allRunnersUp.slice(0, 5);
+        const userQualifiesAsRunnerUp = qualifyingRunnersUp.some(t => t.id === userTeam.id);
+
+        if (!isChampion && !userQualifiesAsRunnerUp) {
+            this._showT2EliminationAndSummary('division final (did not qualify for National Tournament)');
+            return;
+        }
+
+        // User qualifies for national tournament — show the field and start rounds
+        pd.stage = 'national';
+        this._showT2NationalRound(1);
+    }
+
+    _showT2NationalRound(roundNumber) {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const postseason = gameState.postseasonResults;
+        const nat = postseason.t2.nationalBracket;
+        const userTeam = helpers.getUserTeam();
+
+        // The national bracket was already simulated by PlayoffEngine in the background.
+        // For the interactive flow, we re-simulate each round using the full game engine.
+        // We use the same seedings but generate fresh series results.
+
+        const sortByRecord = (a, b) => (b.wins !== a.wins) ? b.wins - a.wins : b.pointDiff - a.pointDiff;
+
+        let seriesMatchups = [];
+        let roundName = '';
+        let bestOf = 5;
+
+        if (roundNumber === 1) {
+            roundName = 'National Tournament — Round of 16';
+            const teams16 = nat.teams;
+            for (let i = 0; i < 8; i++) {
+                seriesMatchups.push({ higher: teams16[i], lower: teams16[15 - i] });
+            }
+        } else if (roundNumber === 2) {
+            roundName = 'National Tournament — Quarterfinals';
+            const prevWinners = pd.interactiveResults.nationalRounds[0].map(s => s.result.winner);
+            prevWinners.sort(sortByRecord);
+            for (let i = 0; i < 4; i++) {
+                seriesMatchups.push({ higher: prevWinners[i], lower: prevWinners[7 - i] });
+            }
+        } else if (roundNumber === 3) {
+            roundName = 'National Tournament — Semifinals';
+            const prevWinners = pd.interactiveResults.nationalRounds[1].map(s => s.result.winner);
+            prevWinners.sort(sortByRecord);
+            seriesMatchups.push({ higher: prevWinners[0], lower: prevWinners[3] });
+            seriesMatchups.push({ higher: prevWinners[1], lower: prevWinners[2] });
+        } else if (roundNumber === 4) {
+            roundName = '🏆 NARBL Championship';
+            bestOf = 5;
+            const prevResults = pd.interactiveResults.nationalRounds[2];
+            seriesMatchups.push({ higher: prevResults[0].result.winner, lower: prevResults[1].result.winner });
+        }
+
+        // Simulate all series for this round
+        const roundResults = seriesMatchups.map(m => ({
+            result: helpers.simulatePlayoffSeries(m.higher, m.lower, bestOf)
+        }));
+        pd.interactiveResults.nationalRounds.push(roundResults);
+
+        // Check if user was eliminated this round
+        const userEliminated = roundResults.some(s =>
+            s.result.loser.id === userTeam.id
+        );
+
+        // For the finals, also handle 3rd place + championship bonus
+        if (roundNumber === 4) {
+            const champion = roundResults[0].result.winner;
+            helpers.applyChampionshipBonus(champion);
+            // Update the postseason T2 champion from interactive results
+            postseason.t2.champion = champion;
+            postseason.t2.runnerUp = roundResults[0].result.loser;
+        }
+
+        const html = UIRenderer.t2NationalRoundPage({
+            roundName, roundNumber, roundResults, userTeam,
+            isChampionshipRound: roundNumber === 4,
+            champion: roundNumber === 4 ? roundResults[0].result.winner : null,
+            formatSeriesResult: (sr, ut, isF) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id, isFinals: isF })
+        });
+
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+    }
+
+    continueT2AfterNationalRound() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const currentRound = pd.interactiveResults.nationalRounds.length;
+        const userTeam = helpers.getUserTeam();
+
+        // Check if user was eliminated in the last round
+        const lastRound = pd.interactiveResults.nationalRounds[currentRound - 1];
+        const userEliminated = lastRound.some(s => s.result.loser.id === userTeam.id);
+
+        if (userEliminated && currentRound < 4) {
+            this._showT2EliminationAndSummary(`National Tournament Round ${currentRound}`);
+            return;
+        }
+
+        if (currentRound >= 4) {
+            // Championship is done — continue to postseason wrap-up
+            this._finishT2Playoffs();
+            return;
+        }
+
+        // Advance to next national round
+        this._showT2NationalRound(currentRound + 1);
+    }
+
+    simAllT2Rounds() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const postseason = gameState.postseasonResults;
+
+        // The background simulation already has all results — just use those
+        document.getElementById('championshipPlayoffContent').innerHTML =
+            UIRenderer.t2PlayoffCompleteQuick({ champion: postseason.t2.champion });
+    }
+
+    _showT2EliminationAndSummary(eliminatedIn) {
+        const { gameState, helpers } = this.ctx;
+        const postseason = gameState.postseasonResults;
+        const userTeam = helpers.getUserTeam();
+
+        const html = UIRenderer.t2EliminationPage({
+            userTeam,
+            eliminatedIn,
+            champion: postseason.t2.champion
+        });
+
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+    }
+
+    _finishT2Playoffs() {
+        const { gameState, helpers } = this.ctx;
+        document.getElementById('championshipPlayoffModal').classList.add('hidden');
+
+        const offseasonCtrl = helpers.getOffseasonController ? helpers.getOffseasonController() : null;
+        if (offseasonCtrl) {
+            offseasonCtrl.continueAfterPostseason();
+        } else {
+            helpers.executePromotionRelegationFromResults();
+            helpers.proceedToDraftOrDevelopment();
+        }
+    }
+
+    skipT2Playoffs() {
+        this._finishT2Playoffs();
     }
 
     // ═══════════════════════════════════════════════════════════════════

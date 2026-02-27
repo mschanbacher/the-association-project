@@ -102,48 +102,64 @@ export class PlayoffEngine {
     }
     
     // ============================================
-    // T2 PLAYOFFS — 16 teams, conference-based, Bo5
     // ============================================
+    // T2 PLAYOFFS — Division Playoffs + National Tournament
+    // ============================================
+    //
+    // Stage 1: Division Playoffs (11 divisions)
+    //   Top 4 in each division play Bo3 brackets:
+    //     Semi 1: #1 vs #4, Semi 2: #2 vs #3
+    //     Division Final: winners meet (Bo3)
+    //   → 11 division champions + 5 best runners-up = 16 teams
+    //
+    // Stage 2: National Tournament (16 teams, Bo5)
+    //   Seeded by regular season record
+    //   Round 1: 1v16, 2v15, ... 8v9
+    //   Round 2: Re-seed, 1v4, 2v3 per half
+    //   Semifinals → Championship (Bo5)
+    //   3rd place game between semifinal losers (Bo3)
     
     /**
-     * Generate T2 playoff bracket
-     * T2 has geographic divisions — we split them into East/West conferences
+     * Generate T2 playoff bracket — division playoffs stage
      */
     static generateT2Bracket(teams) {
-        // T2 divisions and their conference assignments
-        const westDivisions = ['Pacific Northwest', 'California', 'Mountain West', 'Texas', 'Great Plains'];
-        const eastDivisions = ['Great Lakes', 'Mid-Atlantic', 'Southeast', 'New England', 'Florida', 'Gulf Coast'];
-        
         const sortByRecord = (a, b) => {
             if (b.wins !== a.wins) return b.wins - a.wins;
             return b.pointDiff - a.pointDiff;
         };
-        
-        // Split and sort
-        const westTeams = teams.filter(t => westDivisions.includes(t.division)).sort(sortByRecord);
-        const eastTeams = teams.filter(t => eastDivisions.includes(t.division)).sort(sortByRecord);
-        
-        // If conferences are uneven, just take top 8 per conference
-        // If one conference has fewer than 8 teams, take all from that and more from the other
-        let west8, east8;
-        if (westTeams.length >= 8 && eastTeams.length >= 8) {
-            west8 = westTeams.slice(0, 8);
-            east8 = eastTeams.slice(0, 8);
-        } else {
-            // Fallback: just take top 16 overall
-            const allSorted = [...teams].sort(sortByRecord);
-            const top16 = allSorted.slice(0, 16);
-            west8 = top16.slice(0, 8);
-            east8 = top16.slice(8, 16);
+
+        // Group by division
+        const divisionMap = {};
+        teams.forEach(t => {
+            if (!divisionMap[t.division]) divisionMap[t.division] = [];
+            divisionMap[t.division].push(t);
+        });
+
+        // Build division playoff brackets
+        const divisionBrackets = [];
+        for (const [divName, divTeams] of Object.entries(divisionMap)) {
+            const sorted = [...divTeams].sort(sortByRecord);
+            const top4 = sorted.slice(0, Math.min(4, sorted.length));
+            divisionBrackets.push({
+                division: divName,
+                teams: top4,
+                seed1: top4[0] || null,
+                seed2: top4[1] || null,
+                seed3: top4[2] || null,
+                seed4: top4[3] || null,
+                semi1Result: null,  // #1 vs #4
+                semi2Result: null,  // #2 vs #3
+                finalResult: null,
+                champion: null,
+                runnerUp: null
+            });
         }
-        
+
         return {
             type: 't2',
-            bestOf: 5,
-            east: east8,
-            west: west8,
-            rounds: [],
-            currentRound: 0,
+            stage: 'division',
+            divisionBrackets,
+            nationalBracket: null,
             champion: null,
             runnerUp: null,
             thirdPlaceWinner: null,
@@ -443,71 +459,115 @@ export class PlayoffEngine {
      * Run T2 playoffs: 16 teams, conference-based, Bo5, plus 3rd place game
      */
     static _runT2Playoffs(gameState) {
-        const bracket = PlayoffEngine.generateT2Bracket(
-            [...gameState.tier2Teams].sort((a, b) => (b.wins - a.wins) || (b.pointDiff - a.pointDiff))
-        );
-        
-        // Round 1
+        const bracket = PlayoffEngine.generateT2Bracket(gameState.tier2Teams);
+
+        // ═══ STAGE 1: Division Playoffs (Bo3) ═══
+        console.log('  T2 Stage 1: Division Playoffs...');
+        for (const db of bracket.divisionBrackets) {
+            if (db.teams.length < 2) {
+                // Division too small — top team auto-wins
+                db.champion = db.seed1;
+                db.runnerUp = db.seed2;
+                continue;
+            }
+            if (db.teams.length < 4) {
+                // 2 or 3 teams — just play a final
+                if (db.teams.length === 3) {
+                    db.semi2Result = PlayoffEngine.simulateSeries(db.seed2, db.seed3, 3);
+                    db.finalResult = PlayoffEngine.simulateSeries(db.seed1, db.semi2Result.winner, 3);
+                } else {
+                    db.finalResult = PlayoffEngine.simulateSeries(db.seed1, db.seed2, 3);
+                }
+                db.champion = db.finalResult.winner;
+                db.runnerUp = db.finalResult.loser;
+                continue;
+            }
+
+            // Full 4-team bracket
+            db.semi1Result = PlayoffEngine.simulateSeries(db.seed1, db.seed4, 3);
+            db.semi2Result = PlayoffEngine.simulateSeries(db.seed2, db.seed3, 3);
+            db.finalResult = PlayoffEngine.simulateSeries(db.semi1Result.winner, db.semi2Result.winner, 3);
+            db.champion = db.finalResult.winner;
+            db.runnerUp = db.finalResult.loser;
+        }
+
+        // ═══ STAGE 2: National Tournament (Bo5) ═══
+        console.log('  T2 Stage 2: National Tournament...');
+
+        // Collect 11 division champions + 5 best runners-up
+        const sortByRecord = (a, b) => {
+            if (b.wins !== a.wins) return b.wins - a.wins;
+            return b.pointDiff - a.pointDiff;
+        };
+
+        const champions = bracket.divisionBrackets
+            .filter(db => db.champion)
+            .map(db => db.champion);
+        const runnersUp = bracket.divisionBrackets
+            .filter(db => db.runnerUp)
+            .map(db => db.runnerUp)
+            .sort(sortByRecord)
+            .slice(0, 5);
+
+        const national16 = [...champions, ...runnersUp].sort(sortByRecord);
+        // Pad to 16 if we somehow have fewer (shouldn't happen with 11 divisions)
+        if (national16.length < 16) {
+            const allT2 = [...gameState.tier2Teams].sort(sortByRecord);
+            for (const t of allT2) {
+                if (national16.length >= 16) break;
+                if (!national16.find(n => n.id === t.id)) national16.push(t);
+            }
+        }
+
+        bracket.nationalBracket = {
+            teams: national16.slice(0, 16),
+            rounds: [],
+            champions: champions.map(c => c.id), // track which are division champs
+            runnersUp: runnersUp.map(r => r.id)
+        };
+
+        const nat = bracket.nationalBracket;
+
+        // Round 1 (Bo5): 1v16, 2v15, ... 8v9
         const r1 = [];
-        for (const conf of [{ name: 'East', teams: bracket.east }, { name: 'West', teams: bracket.west }]) {
-            r1.push({ conf: conf.name, result: PlayoffEngine.simulateSeries(conf.teams[0], conf.teams[7], 5) });
-            r1.push({ conf: conf.name, result: PlayoffEngine.simulateSeries(conf.teams[1], conf.teams[6], 5) });
-            r1.push({ conf: conf.name, result: PlayoffEngine.simulateSeries(conf.teams[2], conf.teams[5], 5) });
-            r1.push({ conf: conf.name, result: PlayoffEngine.simulateSeries(conf.teams[3], conf.teams[4], 5) });
+        for (let i = 0; i < 8; i++) {
+            const result = PlayoffEngine.simulateSeries(nat.teams[i], nat.teams[15 - i], 5);
+            r1.push({ result });
         }
-        bracket.rounds.push(r1);
-        
-        // Round 2: Re-seed
+        nat.rounds.push(r1);
+
+        // Round 2 (Bo5): Re-seed winners 1v8, 2v7, 3v6, 4v5
+        const r1Winners = r1.map(s => s.result.winner);
+        r1Winners.sort(sortByRecord);
         const r2 = [];
-        for (const confName of ['East', 'West']) {
-            const confTeams = confName === 'East' ? bracket.east : bracket.west;
-            const winners = r1.filter(s => s.conf === confName).map(s => s.result.winner);
-            winners.sort((a, b) => {
-                const aIdx = confTeams.findIndex(t => t.id === a.id);
-                const bIdx = confTeams.findIndex(t => t.id === b.id);
-                return aIdx - bIdx;
-            });
-            r2.push({ conf: confName, result: PlayoffEngine.simulateSeries(winners[0], winners[3], 5) });
-            r2.push({ conf: confName, result: PlayoffEngine.simulateSeries(winners[1], winners[2], 5) });
+        for (let i = 0; i < 4; i++) {
+            const result = PlayoffEngine.simulateSeries(r1Winners[i], r1Winners[7 - i], 5);
+            r2.push({ result });
         }
-        bracket.rounds.push(r2);
-        
-        // Conference Finals
-        const r3 = [];
-        for (const confName of ['East', 'West']) {
-            const confTeams = confName === 'East' ? bracket.east : bracket.west;
-            const winners = r2.filter(s => s.conf === confName).map(s => s.result.winner);
-            winners.sort((a, b) => {
-                const aIdx = confTeams.findIndex(t => t.id === a.id);
-                const bIdx = confTeams.findIndex(t => t.id === b.id);
-                return aIdx - bIdx;
-            });
-            r3.push({ conf: confName, result: PlayoffEngine.simulateSeries(winners[0], winners[1], 5) });
-        }
-        bracket.rounds.push(r3);
-        
-        // Finals
-        const eastChamp = r3.find(s => s.conf === 'East').result.winner;
-        const westChamp = r3.find(s => s.conf === 'West').result.winner;
-        const eastOrigSeed = bracket.east.findIndex(t => t.id === eastChamp.id);
-        const westOrigSeed = bracket.west.findIndex(t => t.id === westChamp.id);
-        const higher = eastOrigSeed <= westOrigSeed ? eastChamp : westChamp;
-        const lower = higher.id === eastChamp.id ? westChamp : eastChamp;
-        const finals = PlayoffEngine.simulateSeries(higher, lower, 5);
-        bracket.rounds.push([{ conf: 'Finals', result: finals }]);
-        
-        bracket.champion = finals.winner;
-        bracket.runnerUp = finals.loser;
-        
-        // 3rd place game: Conference finals losers play Bo3
-        const eastLoser = r3.find(s => s.conf === 'East').result.loser;
-        const westLoser = r3.find(s => s.conf === 'West').result.loser;
-        const thirdPlace = PlayoffEngine.simulateSeries(eastLoser, westLoser, 3);
+        nat.rounds.push(r2);
+
+        // Semifinals (Bo5): Re-seed 1v4, 2v3
+        const r2Winners = r2.map(s => s.result.winner);
+        r2Winners.sort(sortByRecord);
+        const sf1 = PlayoffEngine.simulateSeries(r2Winners[0], r2Winners[3], 5);
+        const sf2 = PlayoffEngine.simulateSeries(r2Winners[1], r2Winners[2], 5);
+        nat.rounds.push([{ result: sf1 }, { result: sf2 }]);
+
+        // 3rd place game (Bo3)
+        const thirdPlace = PlayoffEngine.simulateSeries(sf1.loser, sf2.loser, 3);
         bracket.thirdPlaceResult = thirdPlace;
         bracket.thirdPlaceWinner = thirdPlace.winner;
         bracket.thirdPlaceLoser = thirdPlace.loser;
+
+        // Championship (Bo5)
+        const finals = PlayoffEngine.simulateSeries(sf1.winner, sf2.winner, 5);
+        nat.rounds.push([{ result: finals }]);
+
+        bracket.champion = finals.winner;
+        bracket.runnerUp = finals.loser;
         bracket.completed = true;
-        
+
+        console.log(`  T2 Champion: ${bracket.champion.name}`);
         return bracket;
     }
     
@@ -714,8 +774,10 @@ export class PlayoffEngine {
      * Generate a summary HTML of the full postseason results
      */
     static generatePostseasonHTML(results, userTeamId) {
-        const userInT1Playoffs = results.t1 && [...results.t1.east, ...results.t1.west].some(t => t.id === userTeamId);
-        const userInT2Playoffs = results.t2 && [...results.t2.east, ...results.t2.west].some(t => t.id === userTeamId);
+        const userInT1Playoffs = results.t1 && results.t1.east && results.t1.west &&
+            [...results.t1.east, ...results.t1.west].some(t => t.id === userTeamId);
+        const userInT2Playoffs = results.t2 && results.t2.nationalBracket &&
+            results.t2.nationalBracket.teams.some(t => t.id === userTeamId);
         
         let html = `<div style="text-align: center; max-height: 75vh; overflow-y: auto; padding: 20px;">`;
         

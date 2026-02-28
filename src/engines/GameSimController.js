@@ -631,34 +631,24 @@ export class GameSimController {
             pw.lowerWins++;
         }
 
-        // Build box score data from watch game result
+        // Build box score data matching regular season format
+        const mapStats = (stats) => (stats || [])
+            .filter(p => p.minutesPlayed > 0)
+            .sort((a, b) => b.minutesPlayed - a.minutesPlayed)
+            .map(p => ({
+                name: p.playerName || p.name || 'Unknown', pos: p.position || '',
+                min: p.minutesPlayed || 0, pts: p.points || 0,
+                reb: p.rebounds || 0, ast: p.assists || 0,
+                stl: p.steals || 0, blk: p.blocks || 0, to: p.turnovers || 0,
+                pf: p.fouls || 0, starter: p.gamesStarted > 0,
+                fgm: p.fieldGoalsMade || 0, fga: p.fieldGoalsAttempted || 0,
+                tpm: p.threePointersMade || 0, tpa: p.threePointersAttempted || 0,
+                ftm: p.freeThrowsMade || 0, fta: p.freeThrowsAttempted || 0
+            }));
+
         const boxScore = {
-            home: {
-                city: homeTeam.city || '', name: homeTeam.name, score: result.homeScore,
-                players: (result.homePlayerStats || []).map(p => ({
-                    name: p.playerName || p.name || 'Unknown', starter: p.gamesStarted > 0,
-                    minutesPlayed: p.minutesPlayed || 0, points: p.points || 0,
-                    rebounds: p.rebounds || 0, assists: p.assists || 0,
-                    steals: p.steals || 0, blocks: p.blocks || 0,
-                    turnovers: p.turnovers || 0,
-                    fgMade: p.fgMade || 0, fgAttempted: p.fgAttempted || 0,
-                    threePtMade: p.threePtMade || 0, threePtAttempted: p.threePtAttempted || 0,
-                    ftMade: p.ftMade || 0, ftAttempted: p.ftAttempted || 0
-                }))
-            },
-            away: {
-                city: awayTeam.city || '', name: awayTeam.name, score: result.awayScore,
-                players: (result.awayPlayerStats || []).map(p => ({
-                    name: p.playerName || p.name || 'Unknown', starter: p.gamesStarted > 0,
-                    minutesPlayed: p.minutesPlayed || 0, points: p.points || 0,
-                    rebounds: p.rebounds || 0, assists: p.assists || 0,
-                    steals: p.steals || 0, blocks: p.blocks || 0,
-                    turnovers: p.turnovers || 0,
-                    fgMade: p.fgMade || 0, fgAttempted: p.fgAttempted || 0,
-                    threePtMade: p.threePtMade || 0, threePtAttempted: p.threePtAttempted || 0,
-                    ftMade: p.ftMade || 0, ftAttempted: p.ftAttempted || 0
-                }))
-            },
+            home: { city: homeTeam.city || '', name: homeTeam.name, score: result.homeScore, players: mapStats(result.homePlayerStats) },
+            away: { city: awayTeam.city || '', name: awayTeam.name, score: result.awayScore, players: mapStats(result.awayPlayerStats) },
             quarterScores: result.quarterScores || null
         };
 
@@ -712,22 +702,22 @@ export class GameSimController {
 
             // Store box score for user's series
             if (userInSeries && gameResult.homePlayerStats && gameResult.awayPlayerStats) {
-                const buildTeamBox = (team, stats, score) => ({
-                    city: team.city || '', name: team.name, score,
-                    players: (stats || []).map(p => ({
-                        name: p.playerName || p.name || 'Unknown', starter: p.gamesStarted > 0,
-                        minutesPlayed: p.minutesPlayed || 0, points: p.points || 0,
-                        rebounds: p.rebounds || 0, assists: p.assists || 0,
-                        steals: p.steals || 0, blocks: p.blocks || 0,
-                        turnovers: p.turnovers || 0,
-                        fgMade: p.fgMade || 0, fgAttempted: p.fgAttempted || 0,
-                        threePtMade: p.threePtMade || 0, threePtAttempted: p.threePtAttempted || 0,
-                        ftMade: p.ftMade || 0, ftAttempted: p.ftAttempted || 0
-                    }))
-                });
+                const mapStats = (stats) => (stats || [])
+                    .filter(p => p.minutesPlayed > 0)
+                    .sort((a, b) => b.minutesPlayed - a.minutesPlayed)
+                    .map(p => ({
+                        name: p.playerName || p.name || 'Unknown', pos: p.position || '',
+                        min: p.minutesPlayed || 0, pts: p.points || 0,
+                        reb: p.rebounds || 0, ast: p.assists || 0,
+                        stl: p.steals || 0, blk: p.blocks || 0, to: p.turnovers || 0,
+                        pf: p.fouls || 0, starter: p.gamesStarted > 0,
+                        fgm: p.fieldGoalsMade || 0, fga: p.fieldGoalsAttempted || 0,
+                        tpm: p.threePointersMade || 0, tpa: p.threePointersAttempted || 0,
+                        ftm: p.freeThrowsMade || 0, fta: p.freeThrowsAttempted || 0
+                    }));
                 gameEntry.boxScore = {
-                    home: buildTeamBox(homeTeam, gameResult.homePlayerStats, gameResult.homeScore),
-                    away: buildTeamBox(awayTeam, gameResult.awayPlayerStats, gameResult.awayScore),
+                    home: { city: homeTeam.city || '', name: homeTeam.name, score: gameResult.homeScore, players: mapStats(gameResult.homePlayerStats) },
+                    away: { city: awayTeam.city || '', name: awayTeam.name, score: gameResult.awayScore, players: mapStats(gameResult.awayPlayerStats) },
                     quarterScores: gameResult.quarterScores || null
                 };
             }

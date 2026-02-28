@@ -201,6 +201,14 @@ export class OffseasonController {
             return;
         }
 
+        // If user is in T3 metro playoffs, enter interactive T3 playoff flow
+        if (action === 't3-championship') {
+            console.log('🏆 User qualifies for T3 Metro Playoffs — entering interactive playoff flow...');
+            const gameSim = helpers.getGameSimController();
+            gameSim.runTier3MetroPlayoffs();
+            return;
+        }
+
         // Otherwise show static postseason results summary
         const html = engines.PlayoffEngine.generatePostseasonHTML(postseasonResults, gameState.userTeamId);
         document.getElementById('championshipPlayoffContent').innerHTML = UIRenderer.postseasonContinue({ resultsHTML: html });

@@ -2239,9 +2239,13 @@ export class UIRenderer {
     // WATCH GAME — Live game view layout
     // ═══════════════════════════════════════════════════════════════
 
-    static watchGameLayout({ homeName, awayName }) {
+    static watchGameLayout({ homeName, awayName, playoffContext }) {
+        const contextBanner = playoffContext
+            ? `<div style="text-align: center; padding: 6px; background: rgba(255,215,0,0.15); color: #ffd700; font-size: 0.85em; font-weight: bold; border-bottom: 1px solid rgba(255,215,0,0.2);">🏆 ${playoffContext}</div>`
+            : '';
         return `
         <div style="display: flex; flex-direction: column; height: 90vh; background: #0a0a1a; color: #fff; font-family: system-ui, sans-serif;">
+            ${contextBanner}
             <!-- Scoreboard -->
             <div id="wg-scoreboard" style="background: linear-gradient(135deg, #1a1a3e 0%, #0d0d2b 100%); padding: 15px 20px; border-bottom: 2px solid rgba(255,255,255,0.1); flex-shrink: 0;">
                 <div style="display: flex; justify-content: center; align-items: center; gap: 30px;">
@@ -3227,6 +3231,8 @@ export class UIRenderer {
 
         html += `
                 <div style="text-align: center; margin-top: 30px;">
+                    <button onclick="openBracketViewer()" class="btn" style="font-size: 0.9em; padding: 8px 20px; margin-right: 10px; opacity: 0.6;">📊 View Bracket</button>
+                    <button onclick="simAllChampionshipRounds()" class="btn" style="font-size: 1em; padding: 10px 25px; margin-right: 10px; opacity: 0.7;">Sim All</button>
                     <button onclick="continueAfterChampionshipRound()" class="success" style="font-size: 1.2em; padding: 15px 40px;">
                         ${roundNumber < 4 ? 'Continue to Next Round' : 'Continue to Draft'}
                     </button>
@@ -3572,6 +3578,7 @@ export class UIRenderer {
                 <p style="font-size: 1.5em; font-weight: bold;">NBA CHAMPIONS</p>
             </div>
             <div style="text-align: center; margin-top: 30px;">
+                <button onclick="openBracketViewer()" class="btn" style="font-size: 0.9em; padding: 8px 20px; margin-right: 10px; opacity: 0.6;">📊 View Bracket</button>
                 <button onclick="skipChampionshipPlayoffs()" class="success" style="font-size: 1.2em; padding: 15px 40px;">Continue to Off-Season</button>
             </div>
         </div>`;
@@ -3678,6 +3685,174 @@ export class UIRenderer {
                 <button onclick="skipT2Playoffs()" class="success" style="font-size: 1.2em; padding: 15px 40px;">Continue to Off-Season</button>
             </div>
         </div>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // T3 PLAYOFF TEMPLATES
+    // ═══════════════════════════════════════════════════════════════════
+
+    static t3MetroFinalResultPage({ result, userTeam, userSeed, hasBye, totalMetroChamps, formatSeriesResult }) {
+        const isChampion = result.winner.id === userTeam.id;
+        let html = `<div style="padding: 20px;">
+            <h1 style="text-align: center; margin-bottom: 10px; font-size: 2.2em;">🏀 Metro Finals</h1>
+            <h2 style="text-align: center; margin-bottom: 25px; color: #c0c0c0; font-size: 1.1em;">Best of 3</h2>
+            ${formatSeriesResult(result)}`;
+
+        html += `<div style="margin: 20px 0; padding: 20px; background: linear-gradient(135deg, rgba(205,127,50,0.3), rgba(205,127,50,0.1)); border-radius: 12px; text-align: center; border: 1px solid rgba(205,127,50,0.5);">
+            <h2 style="color: #cd7f32; margin-bottom: 8px;">🏆 Metro Champion!</h2>
+            <p style="font-size: 1.1em;">Seeded <strong>#${userSeed}</strong> of ${totalMetroChamps} metro champions</p>
+            <p style="margin-top: 8px; opacity: 0.8;">${hasBye
+                ? '✨ You earned a BYE to the Sweet 16!'
+                : '⚡ You will play in the Regional Round to reach the Sweet 16'}</p>
+        </div>`;
+
+        html += `<div style="text-align: center; margin-top: 25px;">
+            <button onclick="simAllT3Rounds()" class="btn" style="font-size: 1em; padding: 10px 25px; margin-right: 10px; opacity: 0.7;">Sim All</button>
+            <button onclick="continueT3AfterMetroFinal()" class="success" style="font-size: 1.2em; padding: 15px 40px;">
+                ${hasBye ? 'Continue to Sweet 16' : 'Continue to Regional Round'}
+            </button>
+        </div></div>`;
+        return html;
+    }
+
+    static t3RegionalRoundResultPage({ userTeam, userSeed16, userResult, formatSeriesResult }) {
+        let html = `<div style="padding: 20px;">
+            <h1 style="text-align: center; margin-bottom: 10px; font-size: 2.2em;">🏀 Regional Round</h1>
+            <h2 style="text-align: center; margin-bottom: 25px; color: #c0c0c0; font-size: 1.1em;">Play-In (Best of 3)</h2>`;
+
+        if (userResult) {
+            html += formatSeriesResult(userResult);
+        }
+
+        html += `<div style="margin: 20px 0; padding: 15px; background: rgba(205,127,50,0.1); border-radius: 10px; text-align: center; border: 1px solid rgba(205,127,50,0.3);">
+            <p style="font-size: 1.1em;">Advanced to Sweet 16 as <strong>#${userSeed16} seed</strong></p>
+        </div>
+
+        <div style="text-align: center; margin-top: 25px;">
+            <button onclick="simAllT3Rounds()" class="btn" style="font-size: 1em; padding: 10px 25px; margin-right: 10px; opacity: 0.7;">Sim All</button>
+            <button onclick="continueT3AfterRegionalRound()" class="success" style="font-size: 1.2em; padding: 15px 40px;">Continue to Sweet 16</button>
+        </div></div>`;
+        return html;
+    }
+
+    static t3NationalRoundPage({ roundName, stage, roundResults, userTeam, isChampionship, champion, formatSeriesResult }) {
+        let html = `<div style="padding: 20px;">
+            <h1 style="text-align: center; margin-bottom: 30px; font-size: 2.2em;">${isChampionship ? '🏆 ' : ''}${roundName}</h1>`;
+
+        roundResults.forEach(s => {
+            if (s) html += formatSeriesResult(s.result, userTeam, isChampionship);
+        });
+
+        if (isChampionship && champion) {
+            const isUserChampion = champion.id === userTeam.id;
+            html += `<div style="margin-top: 30px; padding: 30px; background: linear-gradient(135deg, rgba(205,127,50,0.4), rgba(205,127,50,0.15)); border-radius: 15px; text-align: center; border: 1px solid rgba(205,127,50,0.6);">
+                <h1 style="font-size: 3em; margin-bottom: 10px;">🏆</h1>
+                <h2 style="font-size: 2.2em; margin-bottom: 10px;">${champion.name}</h2>
+                <p style="font-size: 1.5em; font-weight: bold;">${isUserChampion ? 'YOU ARE THE METRO LEAGUE CHAMPION!' : 'METRO LEAGUE CHAMPIONS'}</p>
+                ${isUserChampion ? '<p style="margin-top: 10px; color: #cd7f32;">🎉 Promoted to Tier 2!</p>' : ''}
+            </div>`;
+        }
+
+        html += `<div style="text-align: center; margin-top: 30px;">
+            <button onclick="simAllT3Rounds()" class="btn" style="font-size: 1em; padding: 10px 25px; margin-right: 10px; opacity: 0.7;">Sim All</button>
+            <button onclick="continueT3AfterNationalRound()" class="success" style="font-size: 1.2em; padding: 15px 40px;">
+                ${isChampionship ? 'Continue to Off-Season' : 'Continue to Next Round'}
+            </button>
+        </div></div>`;
+        return html;
+    }
+
+    static t3EliminationPage({ userTeam, eliminatedIn, champion }) {
+        return `<div style="padding: 20px; text-align: center;">
+            <h1 style="margin-bottom: 20px; font-size: 2.2em;">Season Over</h1>
+            <div style="margin: 20px 0; padding: 20px; background: rgba(205,127,50,0.1); border-radius: 12px; border: 1px solid rgba(205,127,50,0.3);">
+                <h2 style="margin-bottom: 10px;">${userTeam.name}</h2>
+                <p style="opacity: 0.9;">Eliminated in ${eliminatedIn}</p>
+                <p style="margin-top: 10px; opacity: 0.7;">Final Record: ${userTeam.wins}-${userTeam.losses}</p>
+            </div>
+            ${champion ? `<div style="margin: 20px 0; padding: 20px; background: rgba(205,127,50,0.08); border-radius: 12px; border: 1px solid rgba(205,127,50,0.2);">
+                <h3 style="color: #cd7f32; margin-bottom: 5px;">Metro League Champion</h3>
+                <h2 style="font-size: 1.5em;">🏆 ${champion.name}</h2>
+            </div>` : ''}
+            <div style="text-align: center; margin-top: 30px;">
+                <button onclick="skipT3Playoffs()" class="success" style="font-size: 1.2em; padding: 15px 40px;">Continue to Off-Season</button>
+            </div>
+        </div>`;
+    }
+
+    static t3PlayoffCompleteQuick({ champion }) {
+        return `<div style="padding: 20px; text-align: center;">
+            <h1 style="margin-bottom: 30px; font-size: 2.5em;">🏆 Metro League Playoffs Complete</h1>
+            <div style="margin-top: 20px; padding: 30px; background: linear-gradient(135deg, rgba(205,127,50,0.3), rgba(205,127,50,0.1)); border-radius: 15px; border: 1px solid rgba(205,127,50,0.5);">
+                <h1 style="font-size: 3em; margin-bottom: 10px;">🏆</h1>
+                <h2 style="font-size: 2.2em; margin-bottom: 10px;">${champion ? champion.name : 'TBD'}</h2>
+                <p style="font-size: 1.5em; font-weight: bold;">METRO LEAGUE CHAMPIONS</p>
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+                <button onclick="skipT3Playoffs()" class="success" style="font-size: 1.2em; padding: 15px 40px;">Continue to Off-Season</button>
+            </div>
+        </div>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // PLAYOFF SERIES WATCH TEMPLATES
+    // ═══════════════════════════════════════════════════════════════════
+
+    static playoffSeriesWatchPage({ higherSeed, lowerSeed, higherWins, lowerWins, bestOf, nextGameNum, games, userTeam, isHigherHome }) {
+        const userIsHigher = userTeam.id === higherSeed.id;
+        const userWins = userIsHigher ? higherWins : lowerWins;
+        const oppWins = userIsHigher ? lowerWins : higherWins;
+        const opponent = userIsHigher ? lowerSeed : higherSeed;
+        const gamesToWin = Math.ceil(bestOf / 2);
+        const userHome = (userIsHigher && isHigherHome) || (!userIsHigher && !isHigherHome);
+
+        let html = `<div style="padding: 20px;">
+            <h1 style="text-align: center; margin-bottom: 5px; font-size: 2em;">🏀 Playoff Series</h1>
+            <h2 style="text-align: center; margin-bottom: 25px; color: #c0c0c0; font-size: 1.1em;">Best of ${bestOf}</h2>
+
+            <div style="display: flex; justify-content: center; align-items: center; gap: 30px; margin-bottom: 30px;">
+                <div style="text-align: center; flex: 1; max-width: 200px;">
+                    <div style="font-size: 3em; font-weight: bold; color: ${userIsHigher ? '#4ecdc4' : '#ff6b6b'};">${higherWins}</div>
+                    <div style="font-size: 1.1em; margin-top: 5px; ${userIsHigher ? 'font-weight: bold;' : 'opacity: 0.8;'}">${higherSeed.name}</div>
+                    ${userIsHigher ? '<div style="font-size: 0.8em; color: #4ecdc4;">YOUR TEAM</div>' : ''}
+                </div>
+                <div style="font-size: 1.5em; opacity: 0.5;">vs</div>
+                <div style="text-align: center; flex: 1; max-width: 200px;">
+                    <div style="font-size: 3em; font-weight: bold; color: ${!userIsHigher ? '#4ecdc4' : '#ff6b6b'};">${lowerWins}</div>
+                    <div style="font-size: 1.1em; margin-top: 5px; ${!userIsHigher ? 'font-weight: bold;' : 'opacity: 0.8;'}">${lowerSeed.name}</div>
+                    ${!userIsHigher ? '<div style="font-size: 0.8em; color: #4ecdc4;">YOUR TEAM</div>' : ''}
+                </div>
+            </div>`;
+
+        // Show completed game results
+        if (games.length > 0) {
+            html += `<div style="max-width: 500px; margin: 0 auto 25px; background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px;">`;
+            for (const game of games) {
+                const gameWon = game.winner.id === userTeam.id;
+                html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <span>Game ${game.gameNumber}</span>
+                    <span style="color: ${gameWon ? '#4ecdc4' : '#ff6b6b'}; font-weight: bold;">
+                        ${game.homeTeam.name} ${game.homeScore} - ${game.awayScore} ${game.awayTeam.name}
+                    </span>
+                </div>`;
+            }
+            html += `</div>`;
+        }
+
+        // Next game info and buttons
+        html += `<div style="text-align: center; padding: 20px; background: rgba(102,126,234,0.1); border-radius: 10px; margin-bottom: 20px;">
+            <div style="font-size: 1.2em; margin-bottom: 10px;">Game ${nextGameNum} — ${userHome ? '🏠 Home' : '✈️ Away'}</div>
+            <div style="opacity: 0.7;">${userTeam.name} ${userHome ? 'vs' : '@'} ${opponent.name}</div>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <button onclick="openBracketViewer()" class="btn" style="font-size: 0.9em; padding: 8px 20px; margin-right: 10px; opacity: 0.6;">📊 View Bracket</button>
+            <button onclick="simRestOfPlayoffSeries()" class="btn" style="font-size: 1em; padding: 10px 25px; margin-right: 10px; opacity: 0.7;">Sim Rest of Series</button>
+            <button onclick="watchPlayoffGame()" class="success" style="font-size: 1.2em; padding: 15px 40px;">🏀 Watch Game ${nextGameNum}</button>
+        </div>
+        </div>`;
+
+        return html;
     }
 
     static expiredContractDecisionResult({ playerName, decision, contractYears, salary, formatCurrency }) {
@@ -3789,6 +3964,243 @@ export class UIRenderer {
         }
 
         html += '</div>';
+        return html;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // BRACKET VIEWER TEMPLATES
+    // ═══════════════════════════════════════════════════════════════════
+
+    static t1BracketViewer({ playoffData, userTeam, playoffWatch }) {
+        const { eastTeams, westTeams, roundResults, currentRound } = playoffData;
+
+        // Helper to get series result for a given round, filtering by conference
+        const getSeriesResult = (round, conf, idx) => {
+            if (!roundResults[round]) return null;
+            const confSeries = roundResults[round].filter(s => s.conf === conf);
+            return confSeries[idx] || null;
+        };
+
+        // Build the matchup tree for each conference
+        // Round 1 pairing order: 1v8, 2v7, 3v6, 4v5
+        const buildConfBracket = (confName, seeds) => {
+            const r1Pairings = [
+                { higher: seeds[0], lower: seeds[7] },
+                { higher: seeds[1], lower: seeds[6] },
+                { higher: seeds[2], lower: seeds[5] },
+                { higher: seeds[3], lower: seeds[4] }
+            ];
+
+            // Round 1 results
+            const r1Results = [];
+            const r1ConfSeries = roundResults[0] ? roundResults[0].filter(s => s.conf === confName) : [];
+            for (let i = 0; i < 4; i++) {
+                r1Results.push(r1ConfSeries[i] || null);
+            }
+
+            // Round 2: re-seeded winners — need to figure out ordering
+            let r2Pairings = [null, null];
+            let r2Results = [null, null];
+            if (roundResults[1]) {
+                const r2ConfSeries = roundResults[1].filter(s => s.conf === confName);
+                r2Results = [r2ConfSeries[0] || null, r2ConfSeries[1] || null];
+            }
+
+            // Conf Finals
+            let cfResult = null;
+            if (roundResults[2]) {
+                const cfConfSeries = roundResults[2].filter(s => s.conf === confName);
+                cfResult = cfConfSeries[0] || null;
+            }
+
+            return { r1Pairings, r1Results, r2Results, cfResult, seeds };
+        };
+
+        const eastBracket = buildConfBracket('East', eastTeams);
+        const westBracket = buildConfBracket('West', westTeams);
+
+        // Finals
+        let finalsResult = null;
+        if (roundResults[3]) {
+            finalsResult = roundResults[3][0] || null;
+        }
+
+        // In-progress series from playoff watch
+        let activeSeriesInfo = null;
+        if (playoffWatch) {
+            activeSeriesInfo = {
+                higherId: playoffWatch.higherSeed.id,
+                lowerId: playoffWatch.lowerSeed.id,
+                higherWins: playoffWatch.higherWins,
+                lowerWins: playoffWatch.lowerWins
+            };
+        }
+
+        // Render helpers
+        const teamCell = (team, seed, isWinner, isLoser, isUser) => {
+            if (!team) return `<div class="bv-team bv-tbd">TBD</div>`;
+            const classes = ['bv-team'];
+            if (isWinner) classes.push('bv-winner');
+            if (isLoser) classes.push('bv-loser');
+            if (isUser) classes.push('bv-user');
+            return `<div class="${classes.join(' ')}">
+                <span class="bv-seed">${seed}</span>
+                <span class="bv-name">${team.name}</span>
+                <span class="bv-record">${team.wins}-${team.losses}</span>
+            </div>`;
+        };
+
+        const matchupCell = (higher, lower, hSeed, lSeed, seriesResult, userId, activeInfo) => {
+            let isHigherWinner = false, isLowerWinner = false;
+            let scoreText = '';
+
+            if (seriesResult) {
+                isHigherWinner = seriesResult.result.winner.id === higher.id;
+                isLowerWinner = !isHigherWinner;
+                scoreText = seriesResult.result.seriesScore;
+            } else if (activeInfo && higher && lower &&
+                ((activeInfo.higherId === higher.id && activeInfo.lowerId === lower.id) ||
+                 (activeInfo.higherId === lower.id && activeInfo.lowerId === higher.id))) {
+                // This is the in-progress series
+                if (activeInfo.higherId === higher.id) {
+                    scoreText = `${activeInfo.higherWins}-${activeInfo.lowerWins}`;
+                } else {
+                    scoreText = `${activeInfo.lowerWins}-${activeInfo.higherWins}`;
+                }
+                scoreText = `🔴 ${scoreText}`;
+            }
+
+            return `<div class="bv-matchup">
+                ${teamCell(higher, hSeed, isHigherWinner, isLowerWinner, higher && higher.id === userId)}
+                ${teamCell(lower, lSeed, isLowerWinner, isHigherWinner, lower && lower.id === userId)}
+                ${scoreText ? `<div class="bv-score">${scoreText}</div>` : ''}
+            </div>`;
+        };
+
+        // Render one conference bracket
+        const renderConf = (conf, bracket, confColor, confName) => {
+            let html = `<div class="bv-conf">
+                <div class="bv-conf-header" style="color: ${confColor};">${confName} Conference</div>
+                <div class="bv-rounds">`;
+
+            // Round 1 (4 matchups)
+            html += `<div class="bv-round bv-r1">
+                <div class="bv-round-label">First Round</div>`;
+            for (let i = 0; i < 4; i++) {
+                const p = bracket.r1Pairings[i];
+                const r = bracket.r1Results[i];
+                html += matchupCell(p.higher, p.lower, i + 1, 8 - i, r, userTeam.id, activeSeriesInfo);
+            }
+            html += `</div>`;
+
+            // Round 2 (2 matchups)
+            html += `<div class="bv-round bv-r2">
+                <div class="bv-round-label">Conf Semis</div>`;
+            for (let i = 0; i < 2; i++) {
+                const r = bracket.r2Results[i];
+                if (r) {
+                    const hSeed = bracket.seeds.findIndex(t => t.id === r.result.higherSeed.id) + 1;
+                    const lSeed = bracket.seeds.findIndex(t => t.id === r.result.lowerSeed.id) + 1;
+                    html += matchupCell(r.result.higherSeed, r.result.lowerSeed, hSeed, lSeed, r, userTeam.id, activeSeriesInfo);
+                } else {
+                    // Future matchup — try to determine from R1 winners
+                    const r1Done = bracket.r1Results.filter(Boolean).length === 4;
+                    if (r1Done) {
+                        const winners = bracket.r1Results.map(s => s.result.winner);
+                        winners.sort((a, b) => bracket.seeds.findIndex(t => t.id === a.id) - bracket.seeds.findIndex(t => t.id === b.id));
+                        const pairs = [[winners[0], winners[3]], [winners[1], winners[2]]];
+                        const h = pairs[i][0], l = pairs[i][1];
+                        const hS = bracket.seeds.findIndex(t => t.id === h.id) + 1;
+                        const lS = bracket.seeds.findIndex(t => t.id === l.id) + 1;
+                        html += matchupCell(h, l, hS, lS, null, userTeam.id, activeSeriesInfo);
+                    } else {
+                        html += matchupCell(null, null, '?', '?', null, userTeam.id, null);
+                    }
+                }
+            }
+            html += `</div>`;
+
+            // Conf Finals (1 matchup)
+            html += `<div class="bv-round bv-r3">
+                <div class="bv-round-label">Conf Finals</div>`;
+            if (bracket.cfResult) {
+                const hSeed = bracket.seeds.findIndex(t => t.id === bracket.cfResult.result.higherSeed.id) + 1;
+                const lSeed = bracket.seeds.findIndex(t => t.id === bracket.cfResult.result.lowerSeed.id) + 1;
+                html += matchupCell(bracket.cfResult.result.higherSeed, bracket.cfResult.result.lowerSeed, hSeed, lSeed, bracket.cfResult, userTeam.id, activeSeriesInfo);
+            } else {
+                // Future — check R2
+                const r2Done = bracket.r2Results.filter(Boolean).length === 2;
+                if (r2Done) {
+                    const winners = bracket.r2Results.map(s => s.result.winner);
+                    winners.sort((a, b) => bracket.seeds.findIndex(t => t.id === a.id) - bracket.seeds.findIndex(t => t.id === b.id));
+                    const hS = bracket.seeds.findIndex(t => t.id === winners[0].id) + 1;
+                    const lS = bracket.seeds.findIndex(t => t.id === winners[1].id) + 1;
+                    html += matchupCell(winners[0], winners[1], hS, lS, null, userTeam.id, activeSeriesInfo);
+                } else {
+                    html += matchupCell(null, null, '?', '?', null, userTeam.id, null);
+                }
+            }
+            html += `</div>`;
+
+            html += `</div></div>`;
+            return html;
+        };
+
+        // Finals section
+        let finalsHTML = `<div class="bv-finals">
+            <div class="bv-round-label" style="color: #ffd700;">NBA Finals</div>`;
+        if (finalsResult) {
+            const html = matchupCell(
+                finalsResult.result.higherSeed, finalsResult.result.lowerSeed,
+                '', '', finalsResult, userTeam.id, activeSeriesInfo
+            );
+            finalsHTML += html;
+            finalsHTML += `<div class="bv-champion">🏆 ${finalsResult.result.winner.name}</div>`;
+        } else {
+            // Try to determine finalists
+            const eastCF = eastBracket.cfResult;
+            const westCF = westBracket.cfResult;
+            if (eastCF && westCF) {
+                finalsHTML += matchupCell(eastCF.result.winner, westCF.result.winner, 'E', 'W', null, userTeam.id, activeSeriesInfo);
+            } else {
+                finalsHTML += matchupCell(null, null, '?', '?', null, userTeam.id, null);
+            }
+        }
+        finalsHTML += `</div>`;
+
+        // Assemble full bracket
+        let html = `<div class="bv-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h1 style="font-size: 1.8em;">🏆 NAPL Championship Bracket</h1>
+                <button onclick="closeBracketViewer()" style="padding: 8px 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; font-size: 1em;">✕ Close</button>
+            </div>
+            <style>
+                .bv-container { padding: 10px; }
+                .bv-conf { margin-bottom: 25px; }
+                .bv-conf-header { font-size: 1.3em; font-weight: bold; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid rgba(255,255,255,0.1); }
+                .bv-rounds { display: flex; gap: 15px; align-items: flex-start; }
+                .bv-round { flex: 1; min-width: 0; }
+                .bv-round-label { font-size: 0.75em; text-transform: uppercase; opacity: 0.5; margin-bottom: 8px; text-align: center; letter-spacing: 0.5px; }
+                .bv-matchup { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 6px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.08); position: relative; }
+                .bv-team { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 4px; font-size: 0.85em; }
+                .bv-team + .bv-team { border-top: 1px solid rgba(255,255,255,0.06); }
+                .bv-seed { font-size: 0.75em; opacity: 0.5; min-width: 18px; text-align: center; }
+                .bv-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .bv-record { font-size: 0.75em; opacity: 0.5; }
+                .bv-winner { font-weight: bold; }
+                .bv-loser { opacity: 0.35; }
+                .bv-user .bv-name { color: #4ecdc4; }
+                .bv-tbd { opacity: 0.3; font-style: italic; justify-content: center; }
+                .bv-score { text-align: center; font-size: 0.75em; font-weight: bold; margin-top: 3px; opacity: 0.7; }
+                .bv-finals { margin: 10px 0 0 0; padding: 15px; background: rgba(255,215,0,0.06); border-radius: 10px; border: 1px solid rgba(255,215,0,0.15); max-width: 350px; margin-left: auto; margin-right: auto; }
+                .bv-finals .bv-round-label { font-size: 0.9em; margin-bottom: 10px; }
+                .bv-champion { text-align: center; margin-top: 10px; font-size: 1.1em; font-weight: bold; color: #ffd700; }
+            </style>
+            ${renderConf('East', eastBracket, '#fbbc04', 'Eastern')}
+            ${finalsHTML}
+            ${renderConf('West', westBracket, '#667eea', 'Western')}
+        </div>`;
+
         return html;
     }
 

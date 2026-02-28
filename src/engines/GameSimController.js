@@ -284,6 +284,12 @@ export class GameSimController {
     }
 
     watchGameClose() {
+        // If we're in a playoff series watch, route to the playoff handler
+        if (this._isPlayoffWatch) {
+            this.watchPlayoffGameClose();
+            return;
+        }
+
         const { gameState, helpers, engines } = this.ctx;
         if (this._watchTimer) clearInterval(this._watchTimer);
         this._watchTimer = null;
@@ -378,6 +384,238 @@ export class GameSimController {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // Bracket Viewer
+    // ═══════════════════════════════════════════════════════════════════
+
+    openBracketViewer() {
+        const { gameState, helpers } = this.ctx;
+        const userTeam = helpers.getUserTeam();
+        let html = '';
+
+        if (gameState.currentTier === 1 && gameState.championshipPlayoffData) {
+            html = UIRenderer.t1BracketViewer({
+                playoffData: gameState.championshipPlayoffData,
+                userTeam,
+                playoffWatch: this._playoffWatch
+            });
+        } else if (gameState.currentTier === 2 && gameState.t2PlayoffData) {
+            // T2 bracket viewer — future
+            html = '<div style="padding:40px;text-align:center;opacity:0.7;">T2 bracket viewer coming soon</div>';
+        } else if (gameState.currentTier === 3 && gameState.t3PlayoffData) {
+            // T3 bracket viewer — future
+            html = '<div style="padding:40px;text-align:center;opacity:0.7;">T3 bracket viewer coming soon</div>';
+        } else {
+            html = '<div style="padding:40px;text-align:center;opacity:0.7;">No active playoff bracket</div>';
+        }
+
+        document.getElementById('bracketViewerContent').innerHTML = html;
+        document.getElementById('bracketViewerModal').classList.remove('hidden');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Playoff Series Watch System
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // Allows the user to watch individual games in a playoff series.
+    // Flow: Series Intro → Watch Game 1 → Series Update → Watch Game 2 → ... → Series Complete
+    // The user can "Sim Rest" at any point to auto-finish the series.
+    //
+    // State stored in this._playoffWatch:
+    //   { higherSeed, lowerSeed, bestOf, gamesToWin, homePattern,
+    //     higherWins, lowerWins, games[], gameNum, onComplete(result) }
+
+    /**
+     * Start watching a playoff series game-by-game.
+     * @param {Object} higherSeed - Higher seeded team
+     * @param {Object} lowerSeed - Lower seeded team
+     * @param {number} bestOf - 3, 5, or 7
+     * @param {Function} onComplete - Called with the series result when finished
+     */
+    startPlayoffSeriesWatch(higherSeed, lowerSeed, bestOf, onComplete) {
+        const homePattern = bestOf === 7
+            ? [true, true, false, false, true, false, true]
+            : bestOf === 3
+                ? [true, false, true]
+                : [true, true, false, false, true];
+
+        this._playoffWatch = {
+            higherSeed, lowerSeed, bestOf,
+            gamesToWin: Math.ceil(bestOf / 2),
+            homePattern,
+            higherWins: 0, lowerWins: 0,
+            games: [],
+            gameNum: 0,
+            onComplete
+        };
+
+        this._showPlayoffSeriesStatus();
+    }
+
+    _showPlayoffSeriesStatus() {
+        const pw = this._playoffWatch;
+        if (!pw) return;
+
+        const { helpers } = this.ctx;
+        const userTeam = helpers.getUserTeam();
+        const seriesOver = pw.higherWins >= pw.gamesToWin || pw.lowerWins >= pw.gamesToWin;
+
+        if (seriesOver) {
+            this._completePlayoffSeries();
+            return;
+        }
+
+        const html = UIRenderer.playoffSeriesWatchPage({
+            higherSeed: pw.higherSeed,
+            lowerSeed: pw.lowerSeed,
+            higherWins: pw.higherWins,
+            lowerWins: pw.lowerWins,
+            bestOf: pw.bestOf,
+            nextGameNum: pw.gameNum + 1,
+            games: pw.games,
+            userTeam,
+            isHigherHome: pw.homePattern[pw.gameNum]
+        });
+
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
+    }
+
+    watchPlayoffGame() {
+        const { gameState, helpers, engines } = this.ctx;
+        const pw = this._playoffWatch;
+        if (!pw) return;
+
+        const { GamePipeline } = engines;
+        const isHigherHome = pw.homePattern[pw.gameNum];
+        const homeTeam = isHigherHome ? pw.higherSeed : pw.lowerSeed;
+        const awayTeam = isHigherHome ? pw.lowerSeed : pw.higherSeed;
+
+        // Hide the playoff modal while watching
+        document.getElementById('championshipPlayoffModal').classList.add('hidden');
+
+        this._watchHomeTeam = homeTeam;
+        this._watchAwayTeam = awayTeam;
+        this._watchHomeName = homeTeam.name;
+        this._watchAwayName = awayTeam.name;
+        this._watchDate = null; // No calendar date for playoffs
+        this._isPlayoffWatch = true;
+
+        this._watchGame = GamePipeline.create(homeTeam, awayTeam, {
+            isPlayoffs: true,
+            tier: gameState.currentTier
+        });
+
+        document.getElementById('watchGameContent').innerHTML = UIRenderer.watchGameLayout({
+            homeName: this._watchHomeName, awayName: this._watchAwayName,
+            playoffContext: `Game ${pw.gameNum + 1} — Series ${pw.higherWins}-${pw.lowerWins}`
+        });
+        document.getElementById('watchGameModal').classList.remove('hidden');
+
+        this._watchPaused = false;
+        this._watchSpeed = 1;
+        this.watchGameSetSpeed(1);
+        this._startWatchTimer();
+    }
+
+    /**
+     * Close the watch game modal after a playoff game.
+     * Instead of updating calendar/standings, records the game result
+     * and returns to the series flow.
+     */
+    watchPlayoffGameClose() {
+        const { helpers } = this.ctx;
+        if (this._watchTimer) clearInterval(this._watchTimer);
+        this._watchTimer = null;
+        if (!this._watchGame || !this._playoffWatch) return;
+
+        const result = this._watchGame.getResult();
+        const pw = this._playoffWatch;
+
+        const isHigherHome = pw.homePattern[pw.gameNum];
+        const homeTeam = isHigherHome ? pw.higherSeed : pw.lowerSeed;
+        const awayTeam = isHigherHome ? pw.lowerSeed : pw.higherSeed;
+
+        // Determine winner
+        const higherSeedWon = (result.homeWon && isHigherHome) || (!result.homeWon && !isHigherHome);
+        if (higherSeedWon) {
+            pw.higherWins++;
+        } else {
+            pw.lowerWins++;
+        }
+
+        pw.games.push({
+            gameNumber: pw.gameNum + 1,
+            homeTeam, awayTeam,
+            homeScore: result.homeScore,
+            awayScore: result.awayScore,
+            winner: higherSeedWon ? pw.higherSeed : pw.lowerSeed
+        });
+        pw.gameNum++;
+
+        document.getElementById('watchGameModal').classList.add('hidden');
+        this._watchGame = null;
+        this._isPlayoffWatch = false;
+
+        // Return to series status
+        this._showPlayoffSeriesStatus();
+    }
+
+    /**
+     * Auto-sim remaining games in the current playoff series.
+     */
+    simRestOfPlayoffSeries() {
+        const { helpers } = this.ctx;
+        const pw = this._playoffWatch;
+        if (!pw) return;
+
+        while (pw.higherWins < pw.gamesToWin && pw.lowerWins < pw.gamesToWin) {
+            const isHigherHome = pw.homePattern[pw.gameNum];
+            const homeTeam = isHigherHome ? pw.higherSeed : pw.lowerSeed;
+            const awayTeam = isHigherHome ? pw.lowerSeed : pw.higherSeed;
+
+            const gameResult = helpers.getSimulationController().simulatePlayoffGame(homeTeam, awayTeam);
+            const higherSeedWon = (gameResult.winner.id === pw.higherSeed.id);
+
+            if (higherSeedWon) pw.higherWins++;
+            else pw.lowerWins++;
+
+            pw.games.push({
+                gameNumber: pw.gameNum + 1,
+                homeTeam, awayTeam,
+                homeScore: gameResult.homeScore,
+                awayScore: gameResult.awayScore,
+                winner: higherSeedWon ? pw.higherSeed : pw.lowerSeed
+            });
+            pw.gameNum++;
+        }
+
+        this._completePlayoffSeries();
+    }
+
+    _completePlayoffSeries() {
+        const pw = this._playoffWatch;
+        if (!pw) return;
+
+        const result = {
+            higherSeed: pw.higherSeed,
+            lowerSeed: pw.lowerSeed,
+            winner: pw.higherWins >= pw.gamesToWin ? pw.higherSeed : pw.lowerSeed,
+            loser: pw.higherWins >= pw.gamesToWin ? pw.lowerSeed : pw.higherSeed,
+            higherWins: pw.higherWins,
+            lowerWins: pw.lowerWins,
+            higherSeedWins: pw.higherWins,
+            lowerSeedWins: pw.lowerWins,
+            games: pw.games,
+            seriesScore: `${pw.higherWins}-${pw.lowerWins}`
+        };
+
+        const callback = pw.onComplete;
+        this._playoffWatch = null;
+
+        if (callback) callback(result);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // Season End
     // ═══════════════════════════════════════════════════════════════════
 
@@ -467,10 +705,10 @@ export class GameSimController {
             const divisionSorted = helpers.sortTeamsByStandings(divisionTeams, gameState.schedule);
             const divisionRank = divisionSorted.findIndex(t => t.id === userTeam.id) + 1;
 
-            if (divisionRank >= 1 && divisionRank <= 4) {
-                status = divisionRank === 1 ? '🏆 #1 SEED - Division Playoffs!' : `⚡ #${divisionRank} SEED - Division Playoffs!`;
-                statusColor = '#ffa500'; nextAction = 'division-playoff';
-            } else { status = 'Staying in Tier 3'; statusColor = '#667eea'; nextAction = 'stay'; }
+            if (divisionRank <= 2) {
+                status = divisionRank === 1 ? '🏆 #1 SEED — Metro League Playoffs!' : '⚡ #2 SEED — Metro League Playoffs!';
+                statusColor = '#cd7f32'; nextAction = 't3-championship';
+            } else { status = 'Season Over — Staying in Tier 3'; statusColor = '#667eea'; nextAction = 'stay'; }
         }
 
         const tier1Sorted = helpers.sortTeamsByStandings(gameState.tier1Teams, gameState.tier1Schedule);
@@ -795,17 +1033,61 @@ export class GameSimController {
             series = [{ higher, lower, conf: 'Finals' }];
         }
 
-        const roundResults = series.map(matchup => {
+        // In silent mode (simAllChampionshipRounds), auto-sim everything
+        if (silent) {
+            const roundResults = series.map(matchup => {
+                const result = helpers.simulatePlayoffSeries(matchup.higher, matchup.lower, bestOf);
+                return { conf: matchup.conf, result };
+            });
+            playoffData.roundResults.push(roundResults);
+            playoffData.currentRound = roundNumber;
+            return;
+        }
+
+        // Interactive mode: find user's series, watch it, auto-sim the rest
+        const userTeam = helpers.getUserTeam();
+        const userMatchupIdx = series.findIndex(m =>
+            m.higher.id === userTeam.id || m.lower.id === userTeam.id
+        );
+
+        // Store round context for callback
+        playoffData._pendingRound = roundNumber;
+        playoffData._pendingRoundName = roundName;
+        playoffData._pendingBestOf = bestOf;
+
+        // Auto-sim non-user series
+        const roundResults = series.map((matchup, i) => {
+            if (i === userMatchupIdx) return null; // placeholder
             const result = helpers.simulatePlayoffSeries(matchup.higher, matchup.lower, bestOf);
             return { conf: matchup.conf, result };
         });
+        playoffData._pendingRoundResults = roundResults;
+
+        if (userMatchupIdx >= 0) {
+            const m = series[userMatchupIdx];
+            this.startPlayoffSeriesWatch(m.higher, m.lower, bestOf, (result) => {
+                playoffData._pendingRoundResults[userMatchupIdx] = { conf: series[userMatchupIdx].conf, result };
+                this._showChampionshipRoundAfterWatch();
+            });
+        } else {
+            // User was eliminated in a prior round — show all results
+            playoffData.roundResults.push(roundResults);
+            playoffData.currentRound = roundNumber;
+            this.showChampionshipRoundResults(roundNumber, roundName, roundResults);
+        }
+    }
+
+    _showChampionshipRoundAfterWatch() {
+        const { gameState, helpers } = this.ctx;
+        const playoffData = gameState.championshipPlayoffData;
+        const roundNumber = playoffData._pendingRound;
+        const roundName = playoffData._pendingRoundName;
+        const roundResults = playoffData._pendingRoundResults;
 
         playoffData.roundResults.push(roundResults);
         playoffData.currentRound = roundNumber;
 
-        if (!silent) {
-            this.showChampionshipRoundResults(roundNumber, roundName, roundResults);
-        }
+        this.showChampionshipRoundResults(roundNumber, roundName, roundResults);
     }
 
     showChampionshipRoundResults(roundNumber, roundName, roundResults) {
@@ -909,17 +1191,44 @@ export class GameSimController {
         const { gameState, helpers } = this.ctx;
         const pd = gameState.t2PlayoffData;
         const db = pd.userDivBracket;
-
-        // Simulate the two semifinals using the full engine
-        const semi1 = helpers.simulatePlayoffSeries(db.seed1, db.seed4, 3);
-        const semi2 = helpers.simulatePlayoffSeries(db.seed2, db.seed3, 3);
-        pd.interactiveResults.divSemi1 = semi1;
-        pd.interactiveResults.divSemi2 = semi2;
-
         const userTeam = helpers.getUserTeam();
+
+        // Determine which semi the user is in
+        const userInSemi1 = (db.seed1.id === userTeam.id || db.seed4.id === userTeam.id);
+        const userInSemi2 = (db.seed2.id === userTeam.id || db.seed3.id === userTeam.id);
+
+        // Auto-sim the non-user semi immediately
+        if (userInSemi1) {
+            pd.interactiveResults.divSemi2 = helpers.simulatePlayoffSeries(db.seed2, db.seed3, 3);
+            // Launch watch for user's semi
+            this.startPlayoffSeriesWatch(db.seed1, db.seed4, 3, (result) => {
+                pd.interactiveResults.divSemi1 = result;
+                this._showT2DivisionSemisResults();
+            });
+        } else if (userInSemi2) {
+            pd.interactiveResults.divSemi1 = helpers.simulatePlayoffSeries(db.seed1, db.seed4, 3);
+            this.startPlayoffSeriesWatch(db.seed2, db.seed3, 3, (result) => {
+                pd.interactiveResults.divSemi2 = result;
+                this._showT2DivisionSemisResults();
+            });
+        } else {
+            // User not in either semi (shouldn't happen but handle gracefully)
+            pd.interactiveResults.divSemi1 = helpers.simulatePlayoffSeries(db.seed1, db.seed4, 3);
+            pd.interactiveResults.divSemi2 = helpers.simulatePlayoffSeries(db.seed2, db.seed3, 3);
+            this._showT2DivisionSemisResults();
+        }
+    }
+
+    _showT2DivisionSemisResults() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const userTeam = helpers.getUserTeam();
+
         const html = UIRenderer.t2DivisionSemisPage({
-            division: db.division,
-            semi1, semi2, userTeam,
+            division: pd.userDivBracket.division,
+            semi1: pd.interactiveResults.divSemi1,
+            semi2: pd.interactiveResults.divSemi2,
+            userTeam,
             formatSeriesResult: (sr, ut) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id, isFinals: false })
         });
 
@@ -938,15 +1247,32 @@ export class GameSimController {
         const userEliminated = (semi1.loser.id === userTeam.id || semi2.loser.id === userTeam.id);
 
         if (userEliminated) {
-            // Show elimination + remaining T2 playoff summary
             this._showT2EliminationAndSummary('division semifinals');
             return;
         }
 
-        // Simulate division final
+        // Division final — check if user is in it
         pd.stage = 'division-final';
-        const divFinal = helpers.simulatePlayoffSeries(semi1.winner, semi2.winner, 3);
-        pd.interactiveResults.divFinal = divFinal;
+        const higher = semi1.winner;
+        const lower = semi2.winner;
+        const userInFinal = (higher.id === userTeam.id || lower.id === userTeam.id);
+
+        if (userInFinal) {
+            this.startPlayoffSeriesWatch(higher, lower, 3, (result) => {
+                pd.interactiveResults.divFinal = result;
+                this._showT2DivisionFinalResults();
+            });
+        } else {
+            pd.interactiveResults.divFinal = helpers.simulatePlayoffSeries(higher, lower, 3);
+            this._showT2DivisionFinalResults();
+        }
+    }
+
+    _showT2DivisionFinalResults() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const userTeam = helpers.getUserTeam();
+        const divFinal = pd.interactiveResults.divFinal;
 
         const html = UIRenderer.t2DivisionFinalPage({
             division: pd.userDivision,
@@ -955,6 +1281,7 @@ export class GameSimController {
         });
 
         document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
     }
 
     continueT2AfterDivisionFinal() {
@@ -996,10 +1323,6 @@ export class GameSimController {
         const nat = postseason.t2.nationalBracket;
         const userTeam = helpers.getUserTeam();
 
-        // The national bracket was already simulated by PlayoffEngine in the background.
-        // For the interactive flow, we re-simulate each round using the full game engine.
-        // We use the same seedings but generate fresh series results.
-
         const sortByRecord = (a, b) => (b.wins !== a.wins) ? b.wins - a.wins : b.pointDiff - a.pointDiff;
 
         let seriesMatchups = [];
@@ -1032,22 +1355,62 @@ export class GameSimController {
             seriesMatchups.push({ higher: prevResults[0].result.winner, lower: prevResults[1].result.winner });
         }
 
-        // Simulate all series for this round
-        const roundResults = seriesMatchups.map(m => ({
-            result: helpers.simulatePlayoffSeries(m.higher, m.lower, bestOf)
-        }));
-        pd.interactiveResults.nationalRounds.push(roundResults);
+        // Store current round context for callback
+        pd._currentNationalRound = roundNumber;
+        pd._currentNationalRoundName = roundName;
+        pd._currentNationalBestOf = bestOf;
 
-        // Check if user was eliminated this round
-        const userEliminated = roundResults.some(s =>
-            s.result.loser.id === userTeam.id
+        // Find the user's series (if any)
+        const userMatchupIdx = seriesMatchups.findIndex(m =>
+            m.higher.id === userTeam.id || m.lower.id === userTeam.id
         );
 
-        // For the finals, also handle 3rd place + championship bonus
+        // Auto-sim all non-user series
+        const roundResults = [];
+        for (let i = 0; i < seriesMatchups.length; i++) {
+            if (i === userMatchupIdx) {
+                roundResults.push(null); // placeholder for user's series
+            } else {
+                roundResults.push({
+                    result: helpers.simulatePlayoffSeries(seriesMatchups[i].higher, seriesMatchups[i].lower, bestOf)
+                });
+            }
+        }
+        pd._pendingNationalRoundResults = roundResults;
+
+        if (userMatchupIdx >= 0) {
+            // Launch watch for user's series
+            const m = seriesMatchups[userMatchupIdx];
+            this.startPlayoffSeriesWatch(m.higher, m.lower, bestOf, (result) => {
+                pd._pendingNationalRoundResults[userMatchupIdx] = { result };
+                this._showT2NationalRoundResults();
+            });
+        } else {
+            // User not in this round (already eliminated) — show all results
+            pd.interactiveResults.nationalRounds.push(roundResults);
+            this._showT2NationalRoundResults();
+        }
+    }
+
+    _showT2NationalRoundResults() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const postseason = gameState.postseasonResults;
+        const userTeam = helpers.getUserTeam();
+
+        const roundNumber = pd._currentNationalRound;
+        const roundName = pd._currentNationalRoundName;
+        const roundResults = pd._pendingNationalRoundResults;
+
+        // Store completed round results if not already stored
+        if (pd.interactiveResults.nationalRounds.length < roundNumber) {
+            pd.interactiveResults.nationalRounds.push(roundResults);
+        }
+
+        // For the finals, handle championship bonus
         if (roundNumber === 4) {
             const champion = roundResults[0].result.winner;
             helpers.applyChampionshipBonus(champion);
-            // Update the postseason T2 champion from interactive results
             postseason.t2.champion = champion;
             postseason.t2.runnerUp = roundResults[0].result.loser;
         }
@@ -1060,6 +1423,7 @@ export class GameSimController {
         });
 
         document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
     }
 
     continueT2AfterNationalRound() {
@@ -1126,6 +1490,437 @@ export class GameSimController {
 
     skipT2Playoffs() {
         this._finishT2Playoffs();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Tier 3 Metro Playoffs + National Tournament (6 stages)
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // Stage 1: Metro Finals (Bo3) — #1 vs #2 in each of 24 metros
+    // Stage 2: Regional Round (Bo3) — top 8 metro champs get byes, 9-24 play in
+    // Stage 3: Sweet 16 (Bo5)
+    // Stage 4: Quarterfinals (Bo5)
+    // Stage 5: Semifinals (Bo5)
+    // Stage 6: Championship (Bo5)
+
+    runTier3MetroPlayoffs() {
+        const { gameState, helpers } = this.ctx;
+        console.log('🏆 Starting Tier 3 Metro Playoffs...');
+
+        const userTeam = helpers.getUserTeam();
+        const postseason = gameState.postseasonResults;
+        const t3Bracket = postseason.t3;
+
+        // Find user's metro matchup
+        const userMetro = t3Bracket.metroMatchups.find(m =>
+            m.seed1.id === userTeam.id || m.seed2.id === userTeam.id
+        );
+
+        if (!userMetro) {
+            console.warn('User team not found in any metro matchup');
+            this._showT3PostseasonSummary();
+            return;
+        }
+
+        gameState.t3PlayoffData = {
+            userMetroDivision: userMetro.division,
+            stage: 'metro-final',
+            userTeamId: userTeam.id,
+            interactiveResults: {
+                metroFinal: null,
+                regionalRound: null,  // array of play-in results (or null if user had bye)
+                userHadBye: false,
+                sweet16: null,        // array of 8 series
+                quarterfinals: null,  // array of 4 series
+                semifinals: null,     // array of 2 series
+                championship: null    // single series
+            },
+            // Track all metro champions + seedings for later rounds
+            metroChampions: null,
+            sweet16Teams: null
+        };
+
+        // Stage 1: Metro Final — watch user's, auto-sim the rest
+        this._runT3MetroFinals();
+    }
+
+    _runT3MetroFinals() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t3PlayoffData;
+        const t3Bracket = gameState.postseasonResults.t3;
+        const userTeam = helpers.getUserTeam();
+
+        // Find user's metro matchup
+        const userMetro = t3Bracket.metroMatchups.find(m =>
+            m.seed1.id === userTeam.id || m.seed2.id === userTeam.id
+        );
+
+        // Launch watch for user's metro final
+        this.startPlayoffSeriesWatch(userMetro.seed1, userMetro.seed2, 3, (result) => {
+            pd.interactiveResults.metroFinal = result;
+            this._showT3MetroFinalResult();
+        });
+    }
+
+    _showT3MetroFinalResult() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t3PlayoffData;
+        const userTeam = helpers.getUserTeam();
+        const result = pd.interactiveResults.metroFinal;
+
+        const userWon = result.winner.id === userTeam.id;
+
+        if (!userWon) {
+            this._showT3EliminationAndSummary('Metro Finals');
+            return;
+        }
+
+        // User won metro final — determine seeding among all metro champs
+        // The background simulation already has all results, use those for seedings
+        const t3Bracket = gameState.postseasonResults.t3;
+        const sortByRecord = (a, b) => (b.wins !== a.wins) ? b.wins - a.wins : b.pointDiff - a.pointDiff;
+
+        // Build metro champions list: use background results for all others, user's interactive result for theirs
+        const metroChampions = t3Bracket.metroMatchups.map(m => {
+            if (m.seed1.id === userTeam.id || m.seed2.id === userTeam.id) {
+                return { division: m.division, team: result.winner };
+            }
+            // Use background result
+            const bgChamp = t3Bracket.metroChampions.find(mc => mc.division === m.division);
+            return bgChamp ? { division: bgChamp.division, team: bgChamp.team } : null;
+        }).filter(Boolean);
+
+        const champsSorted = [...metroChampions].sort((a, b) => sortByRecord(a.team, b.team));
+        pd.metroChampions = champsSorted;
+
+        const userSeed = champsSorted.findIndex(c => c.team.id === userTeam.id) + 1;
+        pd.interactiveResults.userHadBye = userSeed <= 8;
+
+        const html = UIRenderer.t3MetroFinalResultPage({
+            result, userTeam, userSeed,
+            hasBye: userSeed <= 8,
+            totalMetroChamps: champsSorted.length,
+            formatSeriesResult: (sr) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: true, isFinals: true })
+        });
+
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
+    }
+
+    continueT3AfterMetroFinal() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t3PlayoffData;
+
+        if (pd.interactiveResults.userHadBye) {
+            // Skip regional round, go straight to Sweet 16
+            this._runT3RegionalRoundSimOnly();
+            this._runT3NationalRound('sweet16');
+        } else {
+            // User plays in regional round
+            pd.stage = 'regional';
+            this._runT3RegionalRound();
+        }
+    }
+
+    _runT3RegionalRound() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t3PlayoffData;
+        const userTeam = helpers.getUserTeam();
+        const sortByRecord = (a, b) => (b.wins !== a.wins) ? b.wins - a.wins : b.pointDiff - a.pointDiff;
+
+        // Play-in teams are seeds 9-24
+        const playInChamps = pd.metroChampions.slice(8);
+        const playInMatchups = [];
+        for (let i = 0; i < playInChamps.length / 2; i++) {
+            playInMatchups.push({
+                higher: playInChamps[i].team,
+                lower: playInChamps[playInChamps.length - 1 - i].team
+            });
+        }
+
+        // Find user's matchup
+        const userIdx = playInMatchups.findIndex(m =>
+            m.higher.id === userTeam.id || m.lower.id === userTeam.id
+        );
+
+        // Auto-sim non-user play-in games
+        const playInResults = playInMatchups.map((m, i) => {
+            if (i === userIdx) return null;
+            return { result: helpers.simulatePlayoffSeries(m.higher, m.lower, 3) };
+        });
+        pd._pendingRegionalResults = playInResults;
+
+        if (userIdx >= 0) {
+            const m = playInMatchups[userIdx];
+            this.startPlayoffSeriesWatch(m.higher, m.lower, 3, (result) => {
+                pd._pendingRegionalResults[userIdx] = { result };
+                this._showT3RegionalRoundResult();
+            });
+        } else {
+            // Shouldn't happen if user is seed 9-24
+            this._showT3RegionalRoundResult();
+        }
+    }
+
+    _runT3RegionalRoundSimOnly() {
+        // Auto-sim the entire regional round (user had bye)
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t3PlayoffData;
+        const sortByRecord = (a, b) => (b.wins !== a.wins) ? b.wins - a.wins : b.pointDiff - a.pointDiff;
+
+        const playInChamps = pd.metroChampions.slice(8);
+        const playInResults = [];
+        for (let i = 0; i < playInChamps.length / 2; i++) {
+            const result = helpers.simulatePlayoffSeries(
+                playInChamps[i].team,
+                playInChamps[playInChamps.length - 1 - i].team,
+                3
+            );
+            playInResults.push({ result });
+        }
+        pd.interactiveResults.regionalRound = playInResults;
+
+        // Build Sweet 16 field
+        const byeTeams = pd.metroChampions.slice(0, 8).map(c => c.team);
+        const playInWinners = playInResults.map(r => r.result.winner);
+        pd.sweet16Teams = [...byeTeams, ...playInWinners].sort(sortByRecord);
+    }
+
+    _showT3RegionalRoundResult() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t3PlayoffData;
+        const userTeam = helpers.getUserTeam();
+        const sortByRecord = (a, b) => (b.wins !== a.wins) ? b.wins - a.wins : b.pointDiff - a.pointDiff;
+
+        pd.interactiveResults.regionalRound = pd._pendingRegionalResults;
+
+        // Check if user was eliminated
+        const userEliminated = pd._pendingRegionalResults.some(r =>
+            r && r.result.loser.id === userTeam.id
+        );
+
+        if (userEliminated) {
+            this._showT3EliminationAndSummary('Regional Round');
+            return;
+        }
+
+        // Build Sweet 16 field
+        const byeTeams = pd.metroChampions.slice(0, 8).map(c => c.team);
+        const playInWinners = pd._pendingRegionalResults.map(r => r.result.winner);
+        pd.sweet16Teams = [...byeTeams, ...playInWinners].sort(sortByRecord);
+
+        const userSeed16 = pd.sweet16Teams.findIndex(t => t.id === userTeam.id) + 1;
+
+        const html = UIRenderer.t3RegionalRoundResultPage({
+            userTeam, userSeed16,
+            userResult: pd._pendingRegionalResults.find(r =>
+                r && (r.result.winner.id === userTeam.id || r.result.loser.id === userTeam.id)
+            )?.result,
+            formatSeriesResult: (sr) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: true, isFinals: false })
+        });
+
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
+    }
+
+    continueT3AfterRegionalRound() {
+        this._runT3NationalRound('sweet16');
+    }
+
+    _runT3NationalRound(stage) {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t3PlayoffData;
+        const postseason = gameState.postseasonResults;
+        const userTeam = helpers.getUserTeam();
+        const sortByRecord = (a, b) => (b.wins !== a.wins) ? b.wins - a.wins : b.pointDiff - a.pointDiff;
+
+        let matchups = [];
+        let roundName = '';
+        let bestOf = 5;
+
+        if (stage === 'sweet16') {
+            roundName = 'Sweet 16';
+            pd.stage = 'sweet16';
+            const teams = pd.sweet16Teams;
+            for (let i = 0; i < 8; i++) {
+                matchups.push({ higher: teams[i], lower: teams[15 - i] });
+            }
+        } else if (stage === 'quarterfinals') {
+            roundName = 'Quarterfinals';
+            pd.stage = 'quarterfinals';
+            const prevWinners = pd.interactiveResults.sweet16.map(s => s.result.winner);
+            prevWinners.sort(sortByRecord);
+            for (let i = 0; i < 4; i++) {
+                matchups.push({ higher: prevWinners[i], lower: prevWinners[7 - i] });
+            }
+        } else if (stage === 'semifinals') {
+            roundName = 'Semifinals';
+            pd.stage = 'semifinals';
+            const prevWinners = pd.interactiveResults.quarterfinals.map(s => s.result.winner);
+            prevWinners.sort(sortByRecord);
+            matchups.push({ higher: prevWinners[0], lower: prevWinners[3] });
+            matchups.push({ higher: prevWinners[1], lower: prevWinners[2] });
+        } else if (stage === 'championship') {
+            roundName = '🏆 Metro League Championship';
+            pd.stage = 'championship';
+            const sfResults = pd.interactiveResults.semifinals;
+            matchups.push({ higher: sfResults[0].result.winner, lower: sfResults[1].result.winner });
+        }
+
+        // Find user's matchup
+        const userIdx = matchups.findIndex(m =>
+            m.higher.id === userTeam.id || m.lower.id === userTeam.id
+        );
+
+        // Auto-sim non-user series
+        const roundResults = matchups.map((m, i) => {
+            if (i === userIdx) return null;
+            return { result: helpers.simulatePlayoffSeries(m.higher, m.lower, bestOf) };
+        });
+
+        pd._pendingNationalStage = stage;
+        pd._pendingNationalRoundName = roundName;
+        pd._pendingNationalResults = roundResults;
+
+        if (userIdx >= 0) {
+            const m = matchups[userIdx];
+            this.startPlayoffSeriesWatch(m.higher, m.lower, bestOf, (result) => {
+                pd._pendingNationalResults[userIdx] = { result };
+                this._showT3NationalRoundResult();
+            });
+        } else {
+            // User already eliminated — just show results
+            this._storeT3NationalResults(roundResults, stage);
+            this._showT3NationalRoundResult();
+        }
+    }
+
+    _storeT3NationalResults(results, stage) {
+        const { gameState } = this.ctx;
+        const pd = gameState.t3PlayoffData;
+        if (stage === 'sweet16') pd.interactiveResults.sweet16 = results;
+        else if (stage === 'quarterfinals') pd.interactiveResults.quarterfinals = results;
+        else if (stage === 'semifinals') pd.interactiveResults.semifinals = results;
+        else if (stage === 'championship') pd.interactiveResults.championship = results[0];
+    }
+
+    _showT3NationalRoundResult() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t3PlayoffData;
+        const postseason = gameState.postseasonResults;
+        const userTeam = helpers.getUserTeam();
+        const stage = pd._pendingNationalStage;
+        const roundName = pd._pendingNationalRoundName;
+        const roundResults = pd._pendingNationalResults;
+
+        // Store results
+        this._storeT3NationalResults(roundResults, stage);
+
+        // Check user elimination
+        const userEliminated = roundResults.some(r =>
+            r && r.result.loser.id === userTeam.id
+        );
+
+        const isChampionship = stage === 'championship';
+
+        // Handle championship
+        if (isChampionship && roundResults[0]) {
+            const champion = roundResults[0].result.winner;
+            helpers.applyChampionshipBonus(champion);
+            postseason.t3.champion = champion;
+            postseason.t3.runnerUp = roundResults[0].result.loser;
+        }
+
+        const html = UIRenderer.t3NationalRoundPage({
+            roundName, stage, roundResults, userTeam,
+            isChampionship,
+            champion: isChampionship ? roundResults[0]?.result.winner : null,
+            formatSeriesResult: (sr, ut, isF) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id, isFinals: isF })
+        });
+
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
+    }
+
+    continueT3AfterNationalRound() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t3PlayoffData;
+        const userTeam = helpers.getUserTeam();
+        const stage = pd._pendingNationalStage;
+
+        // Check if user was eliminated
+        const lastResults = pd._pendingNationalResults;
+        const userEliminated = lastResults.some(r =>
+            r && r.result.loser.id === userTeam.id
+        );
+
+        if (userEliminated && stage !== 'championship') {
+            this._showT3EliminationAndSummary(pd._pendingNationalRoundName);
+            return;
+        }
+
+        if (stage === 'championship') {
+            this._finishT3Playoffs();
+            return;
+        }
+
+        // Advance to next stage
+        const nextStage = {
+            'sweet16': 'quarterfinals',
+            'quarterfinals': 'semifinals',
+            'semifinals': 'championship'
+        }[stage];
+
+        if (nextStage) {
+            this._runT3NationalRound(nextStage);
+        }
+    }
+
+    simAllT3Rounds() {
+        const { gameState } = this.ctx;
+        const postseason = gameState.postseasonResults;
+        document.getElementById('championshipPlayoffContent').innerHTML =
+            UIRenderer.t3PlayoffCompleteQuick({ champion: postseason.t3.champion });
+    }
+
+    _showT3EliminationAndSummary(eliminatedIn) {
+        const { gameState, helpers } = this.ctx;
+        const postseason = gameState.postseasonResults;
+        const userTeam = helpers.getUserTeam();
+
+        const html = UIRenderer.t3EliminationPage({
+            userTeam,
+            eliminatedIn,
+            champion: postseason.t3.champion
+        });
+
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
+    }
+
+    _showT3PostseasonSummary() {
+        const { gameState } = this.ctx;
+        const postseason = gameState.postseasonResults;
+        document.getElementById('championshipPlayoffContent').innerHTML =
+            UIRenderer.t3PlayoffCompleteQuick({ champion: postseason.t3.champion });
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
+    }
+
+    _finishT3Playoffs() {
+        const { gameState, helpers } = this.ctx;
+        document.getElementById('championshipPlayoffModal').classList.add('hidden');
+
+        const offseasonCtrl = helpers.getOffseasonController ? helpers.getOffseasonController() : null;
+        if (offseasonCtrl) {
+            offseasonCtrl.continueAfterPostseason();
+        } else {
+            helpers.executePromotionRelegationFromResults();
+            helpers.proceedToDraftOrDevelopment();
+        }
+    }
+
+    skipT3Playoffs() {
+        this._finishT3Playoffs();
     }
 
     // ═══════════════════════════════════════════════════════════════════

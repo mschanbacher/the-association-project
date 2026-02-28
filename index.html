@@ -859,6 +859,15 @@
         </div>
     </div>
 
+    <!-- Bracket Viewer Modal (overlays playoff modal) -->
+    <div id="bracketViewerModal" class="modal hidden" style="z-index: 1015;">
+        <div class="modal-content" style="max-width: 1400px; max-height: 90vh; overflow-y: auto;">
+            <div id="bracketViewerContent">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
     <!-- Draft Lottery Modal -->
     <div id="lotteryModal" class="modal hidden">
         <div class="modal-content" style="max-width: 900px;">
@@ -2744,9 +2753,14 @@
         window.closeTradeScreen = (...args) => getTradeController().closeTradeScreen(...args);
         window.confirmOffseasonDecisions = (...args) => getOffseasonController().confirmOffseasonDecisions(...args);
         window.continueAfterChampionshipRound = (...args) => getGameSimController().continueAfterChampionshipRound(...args);
+        window.closeBracketViewer = () => document.getElementById('bracketViewerModal').classList.add('hidden');
+        window.openBracketViewer = () => getGameSimController().openBracketViewer();
         window.continueT2AfterDivisionFinal = (...args) => getGameSimController().continueT2AfterDivisionFinal(...args);
         window.continueT2AfterDivisionSemis = (...args) => getGameSimController().continueT2AfterDivisionSemis(...args);
         window.continueT2AfterNationalRound = (...args) => getGameSimController().continueT2AfterNationalRound(...args);
+        window.continueT3AfterMetroFinal = (...args) => getGameSimController().continueT3AfterMetroFinal(...args);
+        window.continueT3AfterNationalRound = (...args) => getGameSimController().continueT3AfterNationalRound(...args);
+        window.continueT3AfterRegionalRound = (...args) => getGameSimController().continueT3AfterRegionalRound(...args);
         window.continueAfterPostseason = (...args) => getOffseasonController().continueAfterPostseason(...args);
         window.dismissTransitionBriefing = (...args) => getFinanceController().dismissTransitionBriefing(...args);
         window.dropPlayer = (...args) => getRosterController().dropPlayer(...args);
@@ -2775,8 +2789,12 @@
         window.signFreeAgent = (...args) => getRosterController().signPlayer(...args);
         window.simAllChampionshipRounds = (...args) => getGameSimController().simAllChampionshipRounds(...args);
         window.simAllT2Rounds = (...args) => getGameSimController().simAllT2Rounds(...args);
+        window.simAllT3Rounds = (...args) => getGameSimController().simAllT3Rounds(...args);
+        window.simRestOfPlayoffSeries = (...args) => getGameSimController().simRestOfPlayoffSeries(...args);
         window.skipChampionshipPlayoffs = (...args) => getGameSimController().skipChampionshipPlayoffs(...args);
         window.skipT2Playoffs = (...args) => getGameSimController().skipT2Playoffs(...args);
+        window.skipT3Playoffs = (...args) => getGameSimController().skipT3Playoffs(...args);
+        window.watchPlayoffGame = (...args) => getGameSimController().watchPlayoffGame(...args);
         window.skipCollegeGradFA = (...args) => getDraftController().skipCollegeGradFA(...args);
         window.submitCollegeGradOffers = (...args) => getDraftController().submitCollegeGradOffers(...args);
         window.switchScoutTab = (...args) => getRosterController().switchScoutTab(...args);

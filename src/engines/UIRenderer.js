@@ -4534,34 +4534,50 @@ export class UIRenderer {
         // ─── User's Path (vertical flow) ─────────────────────────────
         let pathHTML = '';
 
-        // Metro Final
+        // Determine what stage we can show based on live watch or completed results
         const metro = pd.interactiveResults.metroFinal;
-        console.log('T3 bracket viewer - metro:', metro ? 'exists' : 'null', 'userHadBye:', pd.interactiveResults.userHadBye, 'regional:', pd.interactiveResults.regionalRound ? 'exists' : 'null');
+        const pw = playoffWatch; // live in-progress series
+
+        // Metro Final — show live series if in progress, completed result if done
         if (metro) {
             pathHTML += `<div class="t3bv-stage">
                 <div class="t3bv-stage-label">Metro Final <span style="opacity:0.5;font-size:0.85em;">(Bo3)</span></div>
                 ${matchupCard(metro.higherSeed, metro.lowerSeed, '#1', '#2', metro, 't3-metroFinal')}
             </div>`;
+        } else if (pw && pd.stage === 'metro-final') {
+            // Currently playing metro final — show live matchup
+            pathHTML += `<div class="t3bv-stage">
+                <div class="t3bv-stage-label">Metro Final <span style="opacity:0.5;font-size:0.85em;">(Bo3)</span></div>
+                ${matchupCard(pw.higherSeed, pw.lowerSeed, '#1', '#2', null, null)}
+            </div>`;
         }
 
-        // Regional Round (if user didn't have bye)
-        if (!pd.interactiveResults.userHadBye && pd.interactiveResults.regionalRound) {
-            const regResults = pd.interactiveResults.regionalRound;
-            const userReg = regResults.find(r =>
-                r && r.result && (r.result.winner.id === userId || r.result.loser.id === userId)
-            );
-            if (userReg) {
-                const idx = regResults.indexOf(userReg);
+        // Regional Round — only show if we're past metro final
+        if (metro) {
+            if (!pd.interactiveResults.userHadBye && pd.interactiveResults.regionalRound) {
+                const regResults = pd.interactiveResults.regionalRound;
+                const userReg = regResults.find(r =>
+                    r && r.result && (r.result.winner.id === userId || r.result.loser.id === userId)
+                );
+                if (userReg) {
+                    const idx = regResults.indexOf(userReg);
+                    pathHTML += `<div class="t3bv-stage">
+                        <div class="t3bv-stage-label">Regional Round <span style="opacity:0.5;font-size:0.85em;">(Play-In, Bo3)</span></div>
+                        ${matchupCard(userReg.result.higherSeed, userReg.result.lowerSeed, '', '', userReg.result, `t3-regional-${idx}`)}
+                    </div>`;
+                }
+            } else if (pd.interactiveResults.userHadBye) {
+                pathHTML += `<div class="t3bv-stage">
+                    <div class="t3bv-stage-label">Regional Round</div>
+                    <div style="padding:10px;text-align:center;opacity:0.5;font-style:italic;background:rgba(255,255,255,0.03);border-radius:8px;margin:0 10px;">BYE — Top 8 seed</div>
+                </div>`;
+            } else if (pw && pd.stage === 'regional') {
+                // Currently playing regional round — show live matchup
                 pathHTML += `<div class="t3bv-stage">
                     <div class="t3bv-stage-label">Regional Round <span style="opacity:0.5;font-size:0.85em;">(Play-In, Bo3)</span></div>
-                    ${matchupCard(userReg.result.higherSeed, userReg.result.lowerSeed, '', '', userReg.result, `t3-regional-${idx}`)}
+                    ${matchupCard(pw.higherSeed, pw.lowerSeed, '', '', null, null)}
                 </div>`;
             }
-        } else if (pd.interactiveResults.userHadBye) {
-            pathHTML += `<div class="t3bv-stage">
-                <div class="t3bv-stage-label">Regional Round</div>
-                <div style="padding:10px;text-align:center;opacity:0.5;font-style:italic;background:rgba(255,255,255,0.03);border-radius:8px;margin:0 10px;">BYE — Top 8 seed</div>
-            </div>`;
         }
 
         // ─── National Tournament (horizontal bracket) ──────────────

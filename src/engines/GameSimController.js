@@ -399,8 +399,11 @@ export class GameSimController {
                 playoffWatch: this._playoffWatch
             });
         } else if (gameState.currentTier === 2 && gameState.t2PlayoffData) {
-            // T2 bracket viewer — future
-            html = '<div style="padding:40px;text-align:center;opacity:0.7;">T2 bracket viewer coming soon</div>';
+            html = UIRenderer.t2BracketViewer({
+                playoffData: gameState.t2PlayoffData,
+                userTeam,
+                playoffWatch: this._playoffWatch
+            });
         } else if (gameState.currentTier === 3 && gameState.t3PlayoffData) {
             // T3 bracket viewer — future
             html = '<div style="padding:40px;text-align:center;opacity:0.7;">T3 bracket viewer coming soon</div>';

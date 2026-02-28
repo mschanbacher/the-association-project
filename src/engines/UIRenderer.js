@@ -4536,6 +4536,7 @@ export class UIRenderer {
 
         // Metro Final
         const metro = pd.interactiveResults.metroFinal;
+        console.log('T3 bracket viewer - metro:', metro ? 'exists' : 'null', 'userHadBye:', pd.interactiveResults.userHadBye, 'regional:', pd.interactiveResults.regionalRound ? 'exists' : 'null');
         if (metro) {
             pathHTML += `<div class="t3bv-stage">
                 <div class="t3bv-stage-label">Metro Final <span style="opacity:0.5;font-size:0.85em;">(Bo3)</span></div>

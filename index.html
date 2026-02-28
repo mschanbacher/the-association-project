@@ -2755,6 +2755,7 @@
         window.continueAfterChampionshipRound = (...args) => getGameSimController().continueAfterChampionshipRound(...args);
         window.closeBracketViewer = () => document.getElementById('bracketViewerModal').classList.add('hidden');
         window.openBracketViewer = () => getGameSimController().openBracketViewer();
+        window.showPlayoffBoxScore = (seriesKey, gameIdx) => getGameSimController().showPlayoffBoxScore(seriesKey, gameIdx);
         window.continueT2AfterDivisionFinal = (...args) => getGameSimController().continueT2AfterDivisionFinal(...args);
         window.continueT2AfterDivisionSemis = (...args) => getGameSimController().continueT2AfterDivisionSemis(...args);
         window.continueT2AfterNationalRound = (...args) => getGameSimController().continueT2AfterNationalRound(...args);

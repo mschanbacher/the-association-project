@@ -412,6 +412,94 @@ export class GameSimController {
         document.getElementById('bracketViewerModal').classList.remove('hidden');
     }
 
+    /**
+     * Show a box score for a playoff game.
+     * @param {string} seriesKey - Key to locate the series in playoff data
+     * @param {number} gameIdx - 0-based index into the series games array
+     */
+    showPlayoffBoxScore(seriesKey, gameIdx) {
+        const { gameState, helpers } = this.ctx;
+        const userTeam = helpers.getUserTeam();
+
+        // Find the series result by key
+        let seriesResult = null;
+        if (seriesKey.startsWith('t1-')) {
+            const pd = gameState.championshipPlayoffData;
+            if (pd && pd.roundResults) {
+                const [, roundStr, idxStr] = seriesKey.split('-');
+                const round = parseInt(roundStr);
+                const idx = parseInt(idxStr);
+                if (pd.roundResults[round] && pd.roundResults[round][idx]) {
+                    seriesResult = pd.roundResults[round][idx].result;
+                }
+            }
+        } else if (seriesKey.startsWith('t2-div-')) {
+            const pd = gameState.t2PlayoffData;
+            if (pd) {
+                const field = seriesKey.replace('t2-div-', '');
+                seriesResult = pd.interactiveResults[field];
+            }
+        } else if (seriesKey.startsWith('t2-nat-')) {
+            const pd = gameState.t2PlayoffData;
+            if (pd) {
+                const [, , roundStr, idxStr] = seriesKey.split('-');
+                const round = parseInt(roundStr);
+                const idx = parseInt(idxStr);
+                if (pd.interactiveResults.nationalRounds[round] && pd.interactiveResults.nationalRounds[round][idx]) {
+                    seriesResult = pd.interactiveResults.nationalRounds[round][idx].result;
+                }
+            }
+        } else if (seriesKey.startsWith('t3-')) {
+            const pd = gameState.t3PlayoffData;
+            if (pd) {
+                const field = seriesKey.replace('t3-', '');
+                if (field === 'metroFinal') {
+                    seriesResult = pd.interactiveResults.metroFinal;
+                } else if (field.startsWith('nat-')) {
+                    const [, stage, idxStr] = field.split('-');
+                    const idx = parseInt(idxStr);
+                    const stageData = pd.interactiveResults[stage];
+                    if (stage === 'championship' && stageData) {
+                        // Championship stored as single result, not array
+                        seriesResult = stageData.result;
+                    } else if (stageData && stageData[idx]) {
+                        seriesResult = stageData[idx].result;
+                    }
+                } else if (field.startsWith('regional-')) {
+                    const idx = parseInt(field.replace('regional-', ''));
+                    if (pd.interactiveResults.regionalRound && pd.interactiveResults.regionalRound[idx]) {
+                        seriesResult = pd.interactiveResults.regionalRound[idx].result;
+                    }
+                }
+            }
+        }
+
+        if (!seriesResult || !seriesResult.games || !seriesResult.games[gameIdx]) {
+            console.warn('Could not find playoff game:', seriesKey, gameIdx);
+            return;
+        }
+
+        const game = seriesResult.games[gameIdx];
+        if (!game.boxScore) {
+            // No box score — show score-only view
+            document.getElementById('boxScoreContent').innerHTML = UIRenderer.boxScore({
+                home: { city: game.homeTeam.city || '', name: game.homeTeam.name, score: game.homeScore, players: [] },
+                away: { city: game.awayTeam.city || '', name: game.awayTeam.name, score: game.awayScore, players: [] },
+                date: `Playoff Game ${game.gameNumber}`,
+                hasDetailedStats: false
+            });
+        } else {
+            document.getElementById('boxScoreContent').innerHTML = UIRenderer.boxScore({
+                home: game.boxScore.home,
+                away: game.boxScore.away,
+                date: `Playoff Game ${game.gameNumber}`,
+                hasDetailedStats: true,
+                quarterScores: game.boxScore.quarterScores
+            });
+        }
+        document.getElementById('boxScoreModal').classList.remove('hidden');
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // Playoff Series Watch System
     // ═══════════════════════════════════════════════════════════════════
@@ -543,12 +631,44 @@ export class GameSimController {
             pw.lowerWins++;
         }
 
+        // Build box score data from watch game result
+        const boxScore = {
+            home: {
+                city: homeTeam.city || '', name: homeTeam.name, score: result.homeScore,
+                players: (result.homePlayerStats || []).map(p => ({
+                    name: p.playerName || p.name || 'Unknown', starter: p.gamesStarted > 0,
+                    minutesPlayed: p.minutesPlayed || 0, points: p.points || 0,
+                    rebounds: p.rebounds || 0, assists: p.assists || 0,
+                    steals: p.steals || 0, blocks: p.blocks || 0,
+                    turnovers: p.turnovers || 0,
+                    fgMade: p.fgMade || 0, fgAttempted: p.fgAttempted || 0,
+                    threePtMade: p.threePtMade || 0, threePtAttempted: p.threePtAttempted || 0,
+                    ftMade: p.ftMade || 0, ftAttempted: p.ftAttempted || 0
+                }))
+            },
+            away: {
+                city: awayTeam.city || '', name: awayTeam.name, score: result.awayScore,
+                players: (result.awayPlayerStats || []).map(p => ({
+                    name: p.playerName || p.name || 'Unknown', starter: p.gamesStarted > 0,
+                    minutesPlayed: p.minutesPlayed || 0, points: p.points || 0,
+                    rebounds: p.rebounds || 0, assists: p.assists || 0,
+                    steals: p.steals || 0, blocks: p.blocks || 0,
+                    turnovers: p.turnovers || 0,
+                    fgMade: p.fgMade || 0, fgAttempted: p.fgAttempted || 0,
+                    threePtMade: p.threePtMade || 0, threePtAttempted: p.threePtAttempted || 0,
+                    ftMade: p.ftMade || 0, ftAttempted: p.ftAttempted || 0
+                }))
+            },
+            quarterScores: result.quarterScores || null
+        };
+
         pw.games.push({
             gameNumber: pw.gameNum + 1,
             homeTeam, awayTeam,
             homeScore: result.homeScore,
             awayScore: result.awayScore,
-            winner: higherSeedWon ? pw.higherSeed : pw.lowerSeed
+            winner: higherSeedWon ? pw.higherSeed : pw.lowerSeed,
+            boxScore
         });
         pw.gameNum++;
 
@@ -568,6 +688,9 @@ export class GameSimController {
         const pw = this._playoffWatch;
         if (!pw) return;
 
+        const userTeam = helpers.getUserTeam();
+        const userInSeries = (pw.higherSeed.id === userTeam.id || pw.lowerSeed.id === userTeam.id);
+
         while (pw.higherWins < pw.gamesToWin && pw.lowerWins < pw.gamesToWin) {
             const isHigherHome = pw.homePattern[pw.gameNum];
             const homeTeam = isHigherHome ? pw.higherSeed : pw.lowerSeed;
@@ -579,13 +702,37 @@ export class GameSimController {
             if (higherSeedWon) pw.higherWins++;
             else pw.lowerWins++;
 
-            pw.games.push({
+            const gameEntry = {
                 gameNumber: pw.gameNum + 1,
                 homeTeam, awayTeam,
                 homeScore: gameResult.homeScore,
                 awayScore: gameResult.awayScore,
                 winner: higherSeedWon ? pw.higherSeed : pw.lowerSeed
-            });
+            };
+
+            // Store box score for user's series
+            if (userInSeries && gameResult.homePlayerStats && gameResult.awayPlayerStats) {
+                const buildTeamBox = (team, stats, score) => ({
+                    city: team.city || '', name: team.name, score,
+                    players: (stats || []).map(p => ({
+                        name: p.playerName || p.name || 'Unknown', starter: p.gamesStarted > 0,
+                        minutesPlayed: p.minutesPlayed || 0, points: p.points || 0,
+                        rebounds: p.rebounds || 0, assists: p.assists || 0,
+                        steals: p.steals || 0, blocks: p.blocks || 0,
+                        turnovers: p.turnovers || 0,
+                        fgMade: p.fgMade || 0, fgAttempted: p.fgAttempted || 0,
+                        threePtMade: p.threePtMade || 0, threePtAttempted: p.threePtAttempted || 0,
+                        ftMade: p.ftMade || 0, ftAttempted: p.ftAttempted || 0
+                    }))
+                });
+                gameEntry.boxScore = {
+                    home: buildTeamBox(homeTeam, gameResult.homePlayerStats, gameResult.homeScore),
+                    away: buildTeamBox(awayTeam, gameResult.awayPlayerStats, gameResult.awayScore),
+                    quarterScores: gameResult.quarterScores || null
+                };
+            }
+
+            pw.games.push(gameEntry);
             pw.gameNum++;
         }
 
@@ -1105,8 +1252,7 @@ export class GameSimController {
 
         const html = UIRenderer.championshipRoundPage({
             roundName, roundNumber, eastSeries, westSeries, finalsSeries,
-            formatSeriesResult: (sr, ut, isF) => this.formatSeriesResult(sr, ut, isF),
-            userTeam
+            userTeam, roundResults
         });
         document.getElementById('championshipPlayoffContent').innerHTML = html;
         document.getElementById('championshipPlayoffModal').classList.remove('hidden');
@@ -1229,7 +1375,11 @@ export class GameSimController {
             semi1: pd.interactiveResults.divSemi1,
             semi2: pd.interactiveResults.divSemi2,
             userTeam,
-            formatSeriesResult: (sr, ut) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id, isFinals: false })
+            formatSeriesResult: (sr, ut) => {
+                const isUser = sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id;
+                const key = sr === pd.interactiveResults.divSemi1 ? 't2-div-divSemi1' : 't2-div-divSemi2';
+                return UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: isUser, isFinals: false, seriesKey: isUser ? key : undefined });
+            }
         });
 
         document.getElementById('championshipPlayoffContent').innerHTML = html;
@@ -1277,7 +1427,10 @@ export class GameSimController {
         const html = UIRenderer.t2DivisionFinalPage({
             division: pd.userDivision,
             divFinal, userTeam,
-            formatSeriesResult: (sr, ut) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id, isFinals: true })
+            formatSeriesResult: (sr, ut) => {
+                const isUser = sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id;
+                return UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: isUser, isFinals: true, seriesKey: isUser ? 't2-div-divFinal' : undefined });
+            }
         });
 
         document.getElementById('championshipPlayoffContent').innerHTML = html;
@@ -1415,11 +1568,17 @@ export class GameSimController {
             postseason.t2.runnerUp = roundResults[0].result.loser;
         }
 
+        const roundIdx = pd.interactiveResults.nationalRounds.length - 1;
         const html = UIRenderer.t2NationalRoundPage({
             roundName, roundNumber, roundResults, userTeam,
             isChampionshipRound: roundNumber === 4,
             champion: roundNumber === 4 ? roundResults[0].result.winner : null,
-            formatSeriesResult: (sr, ut, isF) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id, isFinals: isF })
+            formatSeriesResult: (sr, ut, isF) => {
+                const isUser = sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id;
+                const idx = roundResults.findIndex(r => r && r.result === sr);
+                const key = isUser && idx >= 0 ? `t2-nat-${roundIdx}-${idx}` : undefined;
+                return UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: isUser, isFinals: isF, seriesKey: key });
+            }
         });
 
         document.getElementById('championshipPlayoffContent').innerHTML = html;
@@ -1600,7 +1759,7 @@ export class GameSimController {
             result, userTeam, userSeed,
             hasBye: userSeed <= 8,
             totalMetroChamps: champsSorted.length,
-            formatSeriesResult: (sr) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: true, isFinals: true })
+            formatSeriesResult: (sr) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: true, isFinals: true, seriesKey: 't3-metroFinal' })
         });
 
         document.getElementById('championshipPlayoffContent').innerHTML = html;
@@ -1711,12 +1870,14 @@ export class GameSimController {
 
         const userSeed16 = pd.sweet16Teams.findIndex(t => t.id === userTeam.id) + 1;
 
+        const userRegIdx = pd._pendingRegionalResults.findIndex(r =>
+            r && (r.result.winner.id === userTeam.id || r.result.loser.id === userTeam.id)
+        );
+
         const html = UIRenderer.t3RegionalRoundResultPage({
             userTeam, userSeed16,
-            userResult: pd._pendingRegionalResults.find(r =>
-                r && (r.result.winner.id === userTeam.id || r.result.loser.id === userTeam.id)
-            )?.result,
-            formatSeriesResult: (sr) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: true, isFinals: false })
+            userResult: userRegIdx >= 0 ? pd._pendingRegionalResults[userRegIdx].result : null,
+            formatSeriesResult: (sr) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: true, isFinals: false, seriesKey: userRegIdx >= 0 ? `t3-regional-${userRegIdx}` : undefined })
         });
 
         document.getElementById('championshipPlayoffContent').innerHTML = html;
@@ -1835,7 +1996,12 @@ export class GameSimController {
             roundName, stage, roundResults, userTeam,
             isChampionship,
             champion: isChampionship ? roundResults[0]?.result.winner : null,
-            formatSeriesResult: (sr, ut, isF) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id, isFinals: isF })
+            formatSeriesResult: (sr, ut, isF) => {
+                const isUser = sr.higherSeed.id === ut.id || sr.lowerSeed.id === ut.id;
+                const idx = roundResults.findIndex(r => r && r.result === sr);
+                const key = isUser && idx >= 0 ? `t3-nat-${stage}-${idx}` : undefined;
+                return UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: isUser, isFinals: isF, seriesKey: key });
+            }
         });
 
         document.getElementById('championshipPlayoffContent').innerHTML = html;

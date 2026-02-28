@@ -3258,38 +3258,27 @@ export class UIRenderer {
     static seriesResultCard({ seriesResult, isUserInvolved, isFinals, seriesKey }) {
         const bgColor = isUserInvolved ? 'rgba(102,126,234,0.3)' : 'rgba(255,255,255,0.05)';
         const borderColor = isUserInvolved ? '#667eea' : 'rgba(255,255,255,0.1)';
-        const cardId = seriesKey ? `series-card-${seriesKey}` : `series-card-${Math.random().toString(36).substr(2,6)}`;
 
         let html = `
-            <div style="background: ${bgColor}; padding: 15px 20px; margin-bottom: 15px; border-radius: 10px; border: 2px solid ${borderColor}; cursor: pointer;"
-                 onclick="document.getElementById('${cardId}-games').classList.toggle('hidden')">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h3 style="font-size: 1.3em; margin-bottom: 3px;">
-                            ${seriesResult.winner.name} defeat ${seriesResult.loser.name}
-                        </h3>
-                        <span style="font-size: 1.05em; opacity: 0.8;">Series: ${seriesResult.seriesScore}</span>
-                    </div>
-                    <div style="opacity: 0.4; font-size: 0.85em;">▼ Games</div>
+            <div style="background: ${bgColor}; padding: 20px; margin-bottom: 20px; border-radius: 10px; border: 2px solid ${borderColor};">
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <h3 style="font-size: 1.5em; margin-bottom: 5px;">
+                        ${seriesResult.winner.name} defeat ${seriesResult.loser.name}
+                    </h3>
+                    <p style="font-size: 1.2em; opacity: 0.9;">Series: ${seriesResult.seriesScore}</p>
                 </div>
-            </div>
-            <div id="${cardId}-games" class="hidden" style="margin: -10px 0 15px 0; padding: 0 20px 15px 20px; background: ${bgColor}; border-radius: 0 0 10px 10px; border: 2px solid ${borderColor}; border-top: none;">
-                <div style="display: grid; gap: 6px; max-width: 600px; margin: 0 auto;">
+
+                <div style="display: grid; gap: 8px; max-width: 600px; margin: 0 auto;">
         `;
 
-        seriesResult.games.forEach((game, idx) => {
+        seriesResult.games.forEach(game => {
             const homeWon = game.winner.id === game.homeTeam.id;
-            const hasBox = isUserInvolved && game.boxScore;
-            const onclick = hasBox && seriesKey ? `onclick="event.stopPropagation(); showPlayoffBoxScore('${seriesKey}', ${idx})"` : '';
-            const cursorStyle = hasBox ? 'cursor: pointer;' : '';
-
             html += `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: rgba(255,255,255,0.05); border-radius: 5px; ${cursorStyle}" ${onclick}>
-                    <span style="min-width: 55px; font-size: 0.85em; opacity: 0.6;">Game ${game.gameNumber}</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px;">
+                    <span style="flex: 1;">Game ${game.gameNumber}</span>
                     <span style="flex: 2; text-align: right; ${homeWon ? 'font-weight: bold;' : 'opacity: 0.7;'}">${game.homeTeam.name} ${game.homeScore}</span>
-                    <span style="margin: 0 10px; opacity: 0.3;">-</span>
+                    <span style="margin: 0 15px;">-</span>
                     <span style="flex: 2; text-align: left; ${!homeWon ? 'font-weight: bold;' : 'opacity: 0.7;'}">${game.awayScore} ${game.awayTeam.name}</span>
-                    ${hasBox ? '<span style="margin-left: 8px; opacity: 0.4; font-size: 0.8em;">📊</span>' : ''}
                 </div>
             `;
         });
@@ -4071,18 +4060,19 @@ export class UIRenderer {
             </div>`;
         };
 
-        const matchupCell = (higher, lower, hSeed, lSeed, seriesResult, userId, activeInfo) => {
+        const matchupCell = (higher, lower, hSeed, lSeed, seriesResult, userId, activeInfo, seriesKey) => {
             let isHigherWinner = false, isLowerWinner = false;
             let scoreText = '';
+            let isUserSeries = false;
 
             if (seriesResult) {
                 isHigherWinner = seriesResult.result.winner.id === higher.id;
                 isLowerWinner = !isHigherWinner;
                 scoreText = seriesResult.result.seriesScore;
+                isUserSeries = (seriesResult.result.higherSeed.id === userId || seriesResult.result.lowerSeed.id === userId);
             } else if (activeInfo && higher && lower &&
                 ((activeInfo.higherId === higher.id && activeInfo.lowerId === lower.id) ||
                  (activeInfo.higherId === lower.id && activeInfo.lowerId === higher.id))) {
-                // This is the in-progress series
                 if (activeInfo.higherId === higher.id) {
                     scoreText = `${activeInfo.higherWins}-${activeInfo.lowerWins}`;
                 } else {
@@ -4091,11 +4081,42 @@ export class UIRenderer {
                 scoreText = `🔴 ${scoreText}`;
             }
 
-            return `<div class="bv-matchup">
+            const hasGames = seriesResult && seriesResult.result.games && seriesResult.result.games.length > 0;
+            const expandId = seriesKey ? `bv-expand-${seriesKey}` : null;
+            const clickAttr = expandId && hasGames ? `onclick="document.getElementById('${expandId}').classList.toggle('hidden')" style="cursor:pointer;"` : '';
+
+            let html = `<div class="bv-matchup" ${clickAttr}>
                 ${teamCell(higher, hSeed, isHigherWinner, isLowerWinner, higher && higher.id === userId)}
                 ${teamCell(lower, lSeed, isLowerWinner, isHigherWinner, lower && lower.id === userId)}
-                ${scoreText ? `<div class="bv-score">${scoreText}</div>` : ''}
+                ${scoreText ? `<div class="bv-score">${scoreText}${hasGames ? ' ▼' : ''}</div>` : ''}
             </div>`;
+
+            // Expandable game details
+            if (expandId && hasGames) {
+                html += `<div id="${expandId}" class="hidden" style="margin: -4px 0 6px 0; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 0 0 6px 6px; border: 1px solid rgba(255,255,255,0.06); border-top: none; font-size: 0.8em;">`;
+                seriesResult.result.games.forEach((game, idx) => {
+                    const homeWon = game.winner.id === game.homeTeam.id;
+                    const hasBox = isUserSeries && game.boxScore;
+                    const boxClick = hasBox && seriesKey ? `onclick="event.stopPropagation(); showPlayoffBoxScore('${seriesKey}', ${idx})" style="cursor:pointer;"` : '';
+                    html += `<div style="display: flex; align-items: center; padding: 3px 4px; gap: 4px; border-bottom: 1px solid rgba(255,255,255,0.04);" ${boxClick}>
+                        <span style="min-width: 30px; opacity: 0.5;">G${game.gameNumber}</span>
+                        <span style="flex:1; text-align:right; ${homeWon ? 'font-weight:bold;' : 'opacity:0.6;'}">${game.homeTeam.name} ${game.homeScore}</span>
+                        <span style="opacity:0.3; margin: 0 3px;">-</span>
+                        <span style="flex:1; ${!homeWon ? 'font-weight:bold;' : 'opacity:0.6;'}">${game.awayScore} ${game.awayTeam.name}</span>
+                        ${hasBox ? '<span style="opacity:0.4;">📊</span>' : ''}
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+
+            return html;
+        };
+
+        // Helper to find seriesKey from a series result object
+        const getSeriesKey = (seriesObj, roundIdx) => {
+            if (!seriesObj || !roundResults[roundIdx]) return null;
+            const idx = roundResults[roundIdx].indexOf(seriesObj);
+            return idx >= 0 ? `t1-${roundIdx}-${idx}` : null;
         };
 
         // Render one conference bracket
@@ -4111,7 +4132,7 @@ export class UIRenderer {
             for (let i = 0; i < 4; i++) {
                 const p = bracket.r1Pairings[i];
                 const r = bracket.r1Results[i];
-                html += matchupCell(p.higher, p.lower, i + 1, 8 - i, r, userTeam.id, activeSeriesInfo);
+                html += matchupCell(p.higher, p.lower, i + 1, 8 - i, r, userTeam.id, activeSeriesInfo, r ? getSeriesKey(r, 0) : null);
             }
             html += `</div></div>`;
 
@@ -4124,9 +4145,8 @@ export class UIRenderer {
                 if (r) {
                     const hSeed = bracket.seeds.findIndex(t => t.id === r.result.higherSeed.id) + 1;
                     const lSeed = bracket.seeds.findIndex(t => t.id === r.result.lowerSeed.id) + 1;
-                    html += matchupCell(r.result.higherSeed, r.result.lowerSeed, hSeed, lSeed, r, userTeam.id, activeSeriesInfo);
+                    html += matchupCell(r.result.higherSeed, r.result.lowerSeed, hSeed, lSeed, r, userTeam.id, activeSeriesInfo, getSeriesKey(r, 1));
                 } else {
-                    // Future matchup — try to determine from R1 winners
                     const r1Done = bracket.r1Results.filter(Boolean).length === 4;
                     if (r1Done) {
                         const winners = bracket.r1Results.map(s => s.result.winner);
@@ -4135,9 +4155,9 @@ export class UIRenderer {
                         const h = pairs[i][0], l = pairs[i][1];
                         const hS = bracket.seeds.findIndex(t => t.id === h.id) + 1;
                         const lS = bracket.seeds.findIndex(t => t.id === l.id) + 1;
-                        html += matchupCell(h, l, hS, lS, null, userTeam.id, activeSeriesInfo);
+                        html += matchupCell(h, l, hS, lS, null, userTeam.id, activeSeriesInfo, null);
                     } else {
-                        html += matchupCell(null, null, '?', '?', null, userTeam.id, null);
+                        html += matchupCell(null, null, '?', '?', null, userTeam.id, null, null);
                     }
                 }
             }
@@ -4150,18 +4170,17 @@ export class UIRenderer {
             if (bracket.cfResult) {
                 const hSeed = bracket.seeds.findIndex(t => t.id === bracket.cfResult.result.higherSeed.id) + 1;
                 const lSeed = bracket.seeds.findIndex(t => t.id === bracket.cfResult.result.lowerSeed.id) + 1;
-                html += matchupCell(bracket.cfResult.result.higherSeed, bracket.cfResult.result.lowerSeed, hSeed, lSeed, bracket.cfResult, userTeam.id, activeSeriesInfo);
+                html += matchupCell(bracket.cfResult.result.higherSeed, bracket.cfResult.result.lowerSeed, hSeed, lSeed, bracket.cfResult, userTeam.id, activeSeriesInfo, getSeriesKey(bracket.cfResult, 2));
             } else {
-                // Future — check R2
                 const r2Done = bracket.r2Results.filter(Boolean).length === 2;
                 if (r2Done) {
                     const winners = bracket.r2Results.map(s => s.result.winner);
                     winners.sort((a, b) => bracket.seeds.findIndex(t => t.id === a.id) - bracket.seeds.findIndex(t => t.id === b.id));
                     const hS = bracket.seeds.findIndex(t => t.id === winners[0].id) + 1;
                     const lS = bracket.seeds.findIndex(t => t.id === winners[1].id) + 1;
-                    html += matchupCell(winners[0], winners[1], hS, lS, null, userTeam.id, activeSeriesInfo);
+                    html += matchupCell(winners[0], winners[1], hS, lS, null, userTeam.id, activeSeriesInfo, null);
                 } else {
-                    html += matchupCell(null, null, '?', '?', null, userTeam.id, null);
+                    html += matchupCell(null, null, '?', '?', null, userTeam.id, null, null);
                 }
             }
             html += `</div></div>`;
@@ -4176,7 +4195,7 @@ export class UIRenderer {
         if (finalsResult) {
             const html = matchupCell(
                 finalsResult.result.higherSeed, finalsResult.result.lowerSeed,
-                '', '', finalsResult, userTeam.id, activeSeriesInfo
+                '', '', finalsResult, userTeam.id, activeSeriesInfo, getSeriesKey(finalsResult, 3)
             );
             finalsHTML += html;
             finalsHTML += `<div class="bv-champion">🏆 ${finalsResult.result.winner.name}</div>`;
@@ -4185,9 +4204,9 @@ export class UIRenderer {
             const eastCF = eastBracket.cfResult;
             const westCF = westBracket.cfResult;
             if (eastCF && westCF) {
-                finalsHTML += matchupCell(eastCF.result.winner, westCF.result.winner, 'E', 'W', null, userTeam.id, activeSeriesInfo);
+                finalsHTML += matchupCell(eastCF.result.winner, westCF.result.winner, 'E', 'W', null, userTeam.id, activeSeriesInfo, null);
             } else {
-                finalsHTML += matchupCell(null, null, '?', '?', null, userTeam.id, null);
+                finalsHTML += matchupCell(null, null, '?', '?', null, userTeam.id, null, null);
             }
         }
         finalsHTML += `</div>`;

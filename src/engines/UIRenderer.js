@@ -3191,30 +3191,40 @@ export class UIRenderer {
     /**
      * Championship round results page
      */
-    static championshipRoundPage({ roundName, roundNumber, eastSeries, westSeries, finalsSeries, formatSeriesResult, userTeam }) {
+    static championshipRoundPage({ roundName, roundNumber, eastSeries, westSeries, finalsSeries, userTeam, roundResults }) {
         let html = `
             <div style="padding: 20px;">
                 <h1 style="text-align: center; margin-bottom: 30px; font-size: 2.5em;">🏆 ${roundName}</h1>
         `;
 
+        // Build a lookup from series to its index in roundResults for seriesKey generation
+        const getSeriesKey = (series) => {
+            if (!roundResults) return undefined;
+            const idx = roundResults.indexOf(series);
+            return idx >= 0 ? `t1-${roundNumber - 1}-${idx}` : undefined;
+        };
+
         if (eastSeries.length > 0) {
             html += `<h2 style="margin: 30px 0 20px 0; color: #fbbc04;">Eastern Conference</h2>`;
             eastSeries.forEach(series => {
-                html += formatSeriesResult(series.result, userTeam);
+                const isUserInvolved = series.result.higherSeed.id === userTeam.id || series.result.lowerSeed.id === userTeam.id;
+                html += UIRenderer.seriesResultCard({ seriesResult: series.result, isUserInvolved, isFinals: false, seriesKey: getSeriesKey(series) });
             });
         }
 
         if (westSeries.length > 0) {
             html += `<h2 style="margin: 30px 0 20px 0; color: #667eea;">Western Conference</h2>`;
             westSeries.forEach(series => {
-                html += formatSeriesResult(series.result, userTeam);
+                const isUserInvolved = series.result.higherSeed.id === userTeam.id || series.result.lowerSeed.id === userTeam.id;
+                html += UIRenderer.seriesResultCard({ seriesResult: series.result, isUserInvolved, isFinals: false, seriesKey: getSeriesKey(series) });
             });
         }
 
         if (finalsSeries.length > 0) {
             html += `<h2 style="margin: 30px 0 20px 0; color: #ffd700; text-align: center;">🏆 NBA FINALS 🏆</h2>`;
             finalsSeries.forEach(series => {
-                html += formatSeriesResult(series.result, userTeam, true);
+                const isUserInvolved = series.result.higherSeed.id === userTeam.id || series.result.lowerSeed.id === userTeam.id;
+                html += UIRenderer.seriesResultCard({ seriesResult: series.result, isUserInvolved, isFinals: true, seriesKey: getSeriesKey(series) });
             });
 
             const champion = finalsSeries[0].result.winner;
@@ -3245,30 +3255,41 @@ export class UIRenderer {
     /**
      * Series result card (used within championship results)
      */
-    static seriesResultCard({ seriesResult, isUserInvolved, isFinals }) {
+    static seriesResultCard({ seriesResult, isUserInvolved, isFinals, seriesKey }) {
         const bgColor = isUserInvolved ? 'rgba(102,126,234,0.3)' : 'rgba(255,255,255,0.05)';
         const borderColor = isUserInvolved ? '#667eea' : 'rgba(255,255,255,0.1)';
+        const cardId = seriesKey ? `series-card-${seriesKey}` : `series-card-${Math.random().toString(36).substr(2,6)}`;
 
         let html = `
-            <div style="background: ${bgColor}; padding: 20px; margin-bottom: 20px; border-radius: 10px; border: 2px solid ${borderColor};">
-                <div style="text-align: center; margin-bottom: 15px;">
-                    <h3 style="font-size: 1.5em; margin-bottom: 5px;">
-                        ${seriesResult.winner.name} defeat ${seriesResult.loser.name}
-                    </h3>
-                    <p style="font-size: 1.2em; opacity: 0.9;">Series: ${seriesResult.seriesScore}</p>
+            <div style="background: ${bgColor}; padding: 15px 20px; margin-bottom: 15px; border-radius: 10px; border: 2px solid ${borderColor}; cursor: pointer;"
+                 onclick="document.getElementById('${cardId}-games').classList.toggle('hidden')">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="font-size: 1.3em; margin-bottom: 3px;">
+                            ${seriesResult.winner.name} defeat ${seriesResult.loser.name}
+                        </h3>
+                        <span style="font-size: 1.05em; opacity: 0.8;">Series: ${seriesResult.seriesScore}</span>
+                    </div>
+                    <div style="opacity: 0.4; font-size: 0.85em;">▼ Games</div>
                 </div>
-
-                <div style="display: grid; gap: 8px; max-width: 600px; margin: 0 auto;">
+            </div>
+            <div id="${cardId}-games" class="hidden" style="margin: -10px 0 15px 0; padding: 0 20px 15px 20px; background: ${bgColor}; border-radius: 0 0 10px 10px; border: 2px solid ${borderColor}; border-top: none;">
+                <div style="display: grid; gap: 6px; max-width: 600px; margin: 0 auto;">
         `;
 
-        seriesResult.games.forEach(game => {
+        seriesResult.games.forEach((game, idx) => {
             const homeWon = game.winner.id === game.homeTeam.id;
+            const hasBox = isUserInvolved && game.boxScore;
+            const onclick = hasBox && seriesKey ? `onclick="event.stopPropagation(); showPlayoffBoxScore('${seriesKey}', ${idx})"` : '';
+            const cursorStyle = hasBox ? 'cursor: pointer;' : '';
+
             html += `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px;">
-                    <span style="flex: 1;">Game ${game.gameNumber}</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: rgba(255,255,255,0.05); border-radius: 5px; ${cursorStyle}" ${onclick}>
+                    <span style="min-width: 55px; font-size: 0.85em; opacity: 0.6;">Game ${game.gameNumber}</span>
                     <span style="flex: 2; text-align: right; ${homeWon ? 'font-weight: bold;' : 'opacity: 0.7;'}">${game.homeTeam.name} ${game.homeScore}</span>
-                    <span style="margin: 0 15px;">-</span>
+                    <span style="margin: 0 10px; opacity: 0.3;">-</span>
                     <span style="flex: 2; text-align: left; ${!homeWon ? 'font-weight: bold;' : 'opacity: 0.7;'}">${game.awayScore} ${game.awayTeam.name}</span>
+                    ${hasBox ? '<span style="margin-left: 8px; opacity: 0.4; font-size: 0.8em;">📊</span>' : ''}
                 </div>
             `;
         });

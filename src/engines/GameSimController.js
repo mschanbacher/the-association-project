@@ -1258,11 +1258,6 @@ export class GameSimController {
         document.getElementById('championshipPlayoffModal').classList.remove('hidden');
     }
 
-    formatSeriesResult(seriesResult, userTeam, isFinals = false) {
-        const isUserInvolved = seriesResult.higherSeed.id === userTeam.id || seriesResult.lowerSeed.id === userTeam.id;
-        return UIRenderer.seriesResultCard({ seriesResult, isUserInvolved, isFinals });
-    }
-
     continueAfterChampionshipRound() {
         const { gameState, helpers } = this.ctx;
         const playoffData = gameState.championshipPlayoffData;

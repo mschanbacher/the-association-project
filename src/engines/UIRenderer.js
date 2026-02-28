@@ -4085,17 +4085,19 @@ export class UIRenderer {
 
             // Round 1 (4 matchups)
             html += `<div class="bv-round bv-r1">
-                <div class="bv-round-label">First Round</div>`;
+                <div class="bv-round-label">First Round</div>
+                <div class="bv-round-matchups">`;
             for (let i = 0; i < 4; i++) {
                 const p = bracket.r1Pairings[i];
                 const r = bracket.r1Results[i];
                 html += matchupCell(p.higher, p.lower, i + 1, 8 - i, r, userTeam.id, activeSeriesInfo);
             }
-            html += `</div>`;
+            html += `</div></div>`;
 
             // Round 2 (2 matchups)
             html += `<div class="bv-round bv-r2">
-                <div class="bv-round-label">Conf Semis</div>`;
+                <div class="bv-round-label">Conf Semis</div>
+                <div class="bv-round-matchups">`;
             for (let i = 0; i < 2; i++) {
                 const r = bracket.r2Results[i];
                 if (r) {
@@ -4118,11 +4120,12 @@ export class UIRenderer {
                     }
                 }
             }
-            html += `</div>`;
+            html += `</div></div>`;
 
             // Conf Finals (1 matchup)
             html += `<div class="bv-round bv-r3">
-                <div class="bv-round-label">Conf Finals</div>`;
+                <div class="bv-round-label">Conf Finals</div>
+                <div class="bv-round-matchups">`;
             if (bracket.cfResult) {
                 const hSeed = bracket.seeds.findIndex(t => t.id === bracket.cfResult.result.higherSeed.id) + 1;
                 const lSeed = bracket.seeds.findIndex(t => t.id === bracket.cfResult.result.lowerSeed.id) + 1;
@@ -4140,7 +4143,7 @@ export class UIRenderer {
                     html += matchupCell(null, null, '?', '?', null, userTeam.id, null);
                 }
             }
-            html += `</div>`;
+            html += `</div></div>`;
 
             html += `</div></div>`;
             return html;
@@ -4178,10 +4181,11 @@ export class UIRenderer {
                 .bv-container { padding: 10px; }
                 .bv-conf { margin-bottom: 25px; }
                 .bv-conf-header { font-size: 1.3em; font-weight: bold; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid rgba(255,255,255,0.1); }
-                .bv-rounds { display: flex; gap: 15px; align-items: flex-start; }
-                .bv-round { flex: 1; min-width: 0; }
-                .bv-round-label { font-size: 0.75em; text-transform: uppercase; opacity: 0.5; margin-bottom: 8px; text-align: center; letter-spacing: 0.5px; }
-                .bv-matchup { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 6px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.08); position: relative; }
+                .bv-rounds { display: flex; gap: 15px; align-items: stretch; }
+                .bv-round { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+                .bv-round-label { font-size: 0.75em; text-transform: uppercase; opacity: 0.5; margin-bottom: 8px; text-align: center; letter-spacing: 0.5px; flex-shrink: 0; }
+                .bv-round-matchups { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
+                .bv-matchup { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 6px; border: 1px solid rgba(255,255,255,0.08); position: relative; }
                 .bv-team { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 4px; font-size: 0.85em; }
                 .bv-team + .bv-team { border-top: 1px solid rgba(255,255,255,0.06); }
                 .bv-seed { font-size: 0.75em; opacity: 0.5; min-width: 18px; text-align: center; }

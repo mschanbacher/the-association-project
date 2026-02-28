@@ -405,8 +405,11 @@ export class GameSimController {
                 playoffWatch: this._playoffWatch
             });
         } else if (gameState.currentTier === 3 && gameState.t3PlayoffData) {
-            // T3 bracket viewer — future
-            html = '<div style="padding:40px;text-align:center;opacity:0.7;">T3 bracket viewer coming soon</div>';
+            html = UIRenderer.t3BracketViewer({
+                playoffData: gameState.t3PlayoffData,
+                userTeam,
+                playoffWatch: this._playoffWatch
+            });
         } else {
             html = '<div style="padding:40px;text-align:center;opacity:0.7;">No active playoff bracket</div>';
         }

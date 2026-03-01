@@ -73,16 +73,16 @@ export class UIRenderer {
      * @returns {string} HTML string
      */
     static compactRating(player, getRatingColor) {
-        const rc = getRatingColor || (() => '#667eea');
+        const _rc = typeof getRatingColor === 'function' ? getRatingColor
+            : (r) => r >= 85 ? '#4ecdc4' : r >= 78 ? '#45b7d1' : r >= 70 ? '#96ceb4' : r >= 60 ? '#fbbc04' : '#f28b82';
         const off = player.offRating;
         const def = player.defRating;
         if (off === undefined && def === undefined) {
-            // Legacy: no off/def data
-            return `<span style="color: ${rc(player.rating)}; font-weight: bold;">⭐ ${player.rating}</span>`;
+            return `<span style="color: ${_rc(player.rating)}; font-weight: bold;">⭐ ${player.rating}</span>`;
         }
         const offColor = off >= 80 ? '#4ecdc4' : off >= 70 ? '#45b7d1' : off >= 60 ? '#fbbc04' : '#f28b82';
         const defColor = def >= 80 ? '#4ecdc4' : def >= 70 ? '#45b7d1' : def >= 60 ? '#fbbc04' : '#f28b82';
-        return `<span style="color: ${rc(player.rating)}; font-weight: bold;">⭐ ${player.rating}</span>`
+        return `<span style="color: ${_rc(player.rating)}; font-weight: bold;">⭐ ${player.rating}</span>`
              + `<span style="opacity: 0.75; margin-left: 6px; font-size: 0.88em;">`
              + `(<span style="color: ${offColor};" title="Offensive Rating">${off}</span>`
              + ` / `
@@ -98,7 +98,8 @@ export class UIRenderer {
      * @returns {string} HTML string
      */
     static detailedRatingHeader(player, getRatingColor) {
-        const rc = getRatingColor || (() => '#667eea');
+        const _rc = typeof getRatingColor === 'function' ? getRatingColor
+            : (r) => r >= 85 ? '#4ecdc4' : r >= 78 ? '#45b7d1' : r >= 70 ? '#96ceb4' : r >= 60 ? '#fbbc04' : '#f28b82';
         const off = player.offRating || player.rating;
         const def = player.defRating || player.rating;
         const offColor = off >= 80 ? '#4ecdc4' : off >= 70 ? '#45b7d1' : off >= 60 ? '#fbbc04' : '#f28b82';
@@ -111,7 +112,7 @@ export class UIRenderer {
         return `
             <div style="display: flex; align-items: center; gap: 18px;">
                 <div style="text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold; color: ${rc(player.rating)};">${player.rating}</div>
+                    <div style="font-size: 2em; font-weight: bold; color: ${_rc(player.rating)};">${player.rating}</div>
                     <div style="font-size: 0.75em; opacity: 0.6; margin-top: 2px;">OVR</div>
                 </div>
                 <div style="flex: 1;">
@@ -1520,7 +1521,7 @@ export class UIRenderer {
                             ${injuryDisplay}
                         </div>
                         <div style="margin-top: 4px; font-size: 0.9em;">
-                            ${UIRenderer.compactRating(player, getRatingColor)}
+                            ${UIRenderer.compactRating(player)}
                             <span style="opacity: 0.7; margin-left: 15px;">💰 ${fc(player.salary)}</span>
                             ${fatigueDisplay}
                             <span style="margin-left: 12px;">${attrPreview}</span>
@@ -1561,7 +1562,7 @@ export class UIRenderer {
                         <span style="color: ${contractColor}; margin-left: 10px; font-weight: bold;">📝 ${contractYears}yr</span>
                     </div>
                     <div style="margin-top: 4px; font-size: 0.9em;">
-                        ${UIRenderer.compactRating(player, getRatingColor)}
+                        ${UIRenderer.compactRating(player)}
                         <span style="opacity: 0.7; margin-left: 15px;">💰 ${fc(player.salary)}</span>
                     </div>
                 </div>

@@ -114,12 +114,20 @@ export class SaveLoadController {
         }
     }
 
-    /** Emergency fallback: write directly to localStorage */
+    /** Emergency fallback: write directly to localStorage with compression */
     _emergencyFallback() {
         try {
             const data = this.gameState.serialize ? this.gameState.serialize() : JSON.stringify(this.gameState);
-            localStorage.setItem('gbslSaveData', data);
-            console.log('🆘 Emergency save to localStorage:', Math.round(data.length / 1024), 'KB');
+            // Use StorageEngine.save which handles compression
+            this.StorageEngine.save(this.gameState).then(result => {
+                if (result.success) {
+                    console.log('🆘 Emergency re-save succeeded via StorageEngine');
+                } else {
+                    console.error('🆘 Emergency re-save also failed');
+                }
+            }).catch(err => {
+                console.error('Emergency save also failed:', err);
+            });
         } catch (e) {
             console.error('Emergency save also failed:', e);
         }

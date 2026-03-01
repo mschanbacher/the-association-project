@@ -28,53 +28,238 @@ const LS_KEYS = {
     LEGACY: 'gbslMultiTierGameState'
 };
 
+// ─── Inline LZ compression for localStorage ────────────────────
+// Minimal LZ-based compressor optimized for UTF-16 localStorage storage.
+// No external dependencies. Achieves ~60-70% reduction on JSON save data.
+const LZString = (() => {
+    const f = String.fromCharCode;
+    const keyStrUriSafe = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$";
+    const baseReverseDic = {};
+
+    function getBaseValue(alphabet, character) {
+        if (!baseReverseDic[alphabet]) {
+            baseReverseDic[alphabet] = {};
+            for (let i = 0; i < alphabet.length; i++) {
+                baseReverseDic[alphabet][alphabet.charAt(i)] = i;
+            }
+        }
+        return baseReverseDic[alphabet][character];
+    }
+
+    function _compress(uncompressed, bitsPerChar, getCharFromInt) {
+        if (uncompressed == null) return "";
+        let i, value, context_dictionary = {}, context_dictionaryToCreate = {},
+            context_c = "", context_wc = "", context_w = "",
+            context_enlargeIn = 2, context_dictSize = 3, context_numBits = 2,
+            context_data = [], context_data_val = 0, context_data_position = 0, ii;
+
+        for (ii = 0; ii < uncompressed.length; ii++) {
+            context_c = uncompressed.charAt(ii);
+            if (!Object.prototype.hasOwnProperty.call(context_dictionary, context_c)) {
+                context_dictionary[context_c] = context_dictSize++;
+                context_dictionaryToCreate[context_c] = true;
+            }
+            context_wc = context_w + context_c;
+            if (Object.prototype.hasOwnProperty.call(context_dictionary, context_wc)) {
+                context_w = context_wc;
+            } else {
+                if (Object.prototype.hasOwnProperty.call(context_dictionaryToCreate, context_w)) {
+                    if (context_w.charCodeAt(0) < 256) {
+                        for (i = 0; i < context_numBits; i++) {
+                            context_data_val = (context_data_val << 1);
+                            if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+                        }
+                        value = context_w.charCodeAt(0);
+                        for (i = 0; i < 8; i++) {
+                            context_data_val = (context_data_val << 1) | (value & 1);
+                            if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+                            value = value >> 1;
+                        }
+                    } else {
+                        value = 1;
+                        for (i = 0; i < context_numBits; i++) {
+                            context_data_val = (context_data_val << 1) | value;
+                            if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+                            value = 0;
+                        }
+                        value = context_w.charCodeAt(0);
+                        for (i = 0; i < 16; i++) {
+                            context_data_val = (context_data_val << 1) | (value & 1);
+                            if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+                            value = value >> 1;
+                        }
+                    }
+                    context_enlargeIn--;
+                    if (context_enlargeIn == 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
+                    delete context_dictionaryToCreate[context_w];
+                } else {
+                    value = context_dictionary[context_w];
+                    for (i = 0; i < context_numBits; i++) {
+                        context_data_val = (context_data_val << 1) | (value & 1);
+                        if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+                        value = value >> 1;
+                    }
+                }
+                context_enlargeIn--;
+                if (context_enlargeIn == 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
+                context_dictionary[context_wc] = context_dictSize++;
+                context_w = String(context_c);
+            }
+        }
+        if (context_w !== "") {
+            if (Object.prototype.hasOwnProperty.call(context_dictionaryToCreate, context_w)) {
+                if (context_w.charCodeAt(0) < 256) {
+                    for (i = 0; i < context_numBits; i++) {
+                        context_data_val = (context_data_val << 1);
+                        if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+                    }
+                    value = context_w.charCodeAt(0);
+                    for (i = 0; i < 8; i++) {
+                        context_data_val = (context_data_val << 1) | (value & 1);
+                        if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+                        value = value >> 1;
+                    }
+                } else {
+                    value = 1;
+                    for (i = 0; i < context_numBits; i++) {
+                        context_data_val = (context_data_val << 1) | value;
+                        if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+                        value = 0;
+                    }
+                    value = context_w.charCodeAt(0);
+                    for (i = 0; i < 16; i++) {
+                        context_data_val = (context_data_val << 1) | (value & 1);
+                        if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+                        value = value >> 1;
+                    }
+                }
+                context_enlargeIn--;
+                if (context_enlargeIn == 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
+                delete context_dictionaryToCreate[context_w];
+            } else {
+                value = context_dictionary[context_w];
+                for (i = 0; i < context_numBits; i++) {
+                    context_data_val = (context_data_val << 1) | (value & 1);
+                    if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+                    value = value >> 1;
+                }
+            }
+            context_enlargeIn--;
+            if (context_enlargeIn == 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
+        }
+        value = 2;
+        for (i = 0; i < context_numBits; i++) {
+            context_data_val = (context_data_val << 1) | (value & 1);
+            if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
+            value = value >> 1;
+        }
+        while (true) {
+            context_data_val = (context_data_val << 1);
+            if (context_data_position == bitsPerChar - 1) { context_data.push(getCharFromInt(context_data_val)); break; } else context_data_position++;
+        }
+        return context_data.join('');
+    }
+
+    function _decompress(length, resetValue, getNextValue) {
+        let dictionary = [], enlargeIn = 4, dictSize = 4, numBits = 3,
+            entry = "", result = [], i, w, c, bits, resb, maxpower, power,
+            data = { val: getNextValue(0), position: resetValue, index: 1 };
+
+        for (i = 0; i < 3; i++) dictionary[i] = i;
+
+        bits = 0; maxpower = Math.pow(2, 2); power = 1;
+        while (power != maxpower) {
+            resb = data.val & data.position;
+            data.position >>= 1;
+            if (data.position == 0) { data.position = resetValue; data.val = getNextValue(data.index++); }
+            bits |= (resb > 0 ? 1 : 0) * power;
+            power <<= 1;
+        }
+
+        switch (bits) {
+            case 0: bits = 0; maxpower = Math.pow(2, 8); power = 1;
+                while (power != maxpower) { resb = data.val & data.position; data.position >>= 1; if (data.position == 0) { data.position = resetValue; data.val = getNextValue(data.index++); } bits |= (resb > 0 ? 1 : 0) * power; power <<= 1; }
+                c = f(bits); break;
+            case 1: bits = 0; maxpower = Math.pow(2, 16); power = 1;
+                while (power != maxpower) { resb = data.val & data.position; data.position >>= 1; if (data.position == 0) { data.position = resetValue; data.val = getNextValue(data.index++); } bits |= (resb > 0 ? 1 : 0) * power; power <<= 1; }
+                c = f(bits); break;
+            case 2: return "";
+        }
+        dictionary[3] = c; w = c; result.push(c);
+
+        while (true) {
+            if (data.index > length) return "";
+            bits = 0; maxpower = Math.pow(2, numBits); power = 1;
+            while (power != maxpower) { resb = data.val & data.position; data.position >>= 1; if (data.position == 0) { data.position = resetValue; data.val = getNextValue(data.index++); } bits |= (resb > 0 ? 1 : 0) * power; power <<= 1; }
+            switch (c = bits) {
+                case 0: bits = 0; maxpower = Math.pow(2, 8); power = 1;
+                    while (power != maxpower) { resb = data.val & data.position; data.position >>= 1; if (data.position == 0) { data.position = resetValue; data.val = getNextValue(data.index++); } bits |= (resb > 0 ? 1 : 0) * power; power <<= 1; }
+                    dictionary[dictSize++] = f(bits); c = dictSize - 1; enlargeIn--; break;
+                case 1: bits = 0; maxpower = Math.pow(2, 16); power = 1;
+                    while (power != maxpower) { resb = data.val & data.position; data.position >>= 1; if (data.position == 0) { data.position = resetValue; data.val = getNextValue(data.index++); } bits |= (resb > 0 ? 1 : 0) * power; power <<= 1; }
+                    dictionary[dictSize++] = f(bits); c = dictSize - 1; enlargeIn--; break;
+                case 2: return result.join('');
+            }
+            if (enlargeIn == 0) { enlargeIn = Math.pow(2, numBits); numBits++; }
+            if (dictionary[c]) { entry = dictionary[c]; } else { if (c === dictSize) { entry = w + w.charAt(0); } else { return null; } }
+            result.push(entry);
+            dictionary[dictSize++] = w + entry.charAt(0);
+            enlargeIn--;
+            if (enlargeIn == 0) { enlargeIn = Math.pow(2, numBits); numBits++; }
+            w = entry;
+        }
+    }
+
+    return {
+        compressToUTF16(input) {
+            if (input == null) return "";
+            return _compress(input, 15, n => f(n + 32)) + " ";
+        },
+        decompressFromUTF16(compressed) {
+            if (compressed == null) return "";
+            if (compressed === "") return null;
+            return _decompress(compressed.length, 16384, index => compressed.charCodeAt(index) - 32);
+        }
+    };
+})();
+const COMPRESSED_PREFIX = 'LZ|'; // Prefix to detect compressed data
+
 export class StorageEngine {
 
     static _db = null;
     static _ready = false;
-    static _useIndexedDB = false; // Only true on http(s):// with working IndexedDB
+    static _useIndexedDB = false; // True when IndexedDB is successfully opened
 
     // ─── Initialization ─────────────────────────────────────────
 
     static async init() {
         if (StorageEngine._ready) return true;
 
-        // Detect protocol — IndexedDB is unreliable on file://
-        const isFileProtocol = window.location.protocol === 'file:';
+        // Always try IndexedDB first — it works on file:// in modern browsers
+        // and has effectively unlimited storage (critical for Hall of Fame data)
+        if (window.indexedDB) {
+            try {
+                StorageEngine._db = await StorageEngine._openDB();
+                StorageEngine._useIndexedDB = true;
+                StorageEngine._ready = true;
+                console.log(`✅ StorageEngine: IndexedDB initialized (${window.location.protocol})`);
 
-        if (isFileProtocol) {
-            console.log('📦 StorageEngine: file:// detected — using localStorage (IndexedDB unreliable on file://)');
-            StorageEngine._useIndexedDB = false;
-            StorageEngine._ready = true;
-            return true;
+                // Migrate localStorage → IndexedDB if needed
+                await StorageEngine._migrateToIndexedDB();
+                return true;
+            } catch (err) {
+                console.warn('⚠️ StorageEngine: IndexedDB failed, falling back to localStorage', err);
+            }
         }
 
-        // On http(s)://, try IndexedDB
-        if (!window.indexedDB) {
-            console.log('📦 StorageEngine: IndexedDB not available — using localStorage');
-            StorageEngine._useIndexedDB = false;
-            StorageEngine._ready = true;
-            return true;
-        }
-
-        try {
-            StorageEngine._db = await StorageEngine._openDB();
-            StorageEngine._useIndexedDB = true;
-            StorageEngine._ready = true;
-            console.log('✅ StorageEngine: IndexedDB initialized (http origin)');
-
-            // Migrate localStorage → IndexedDB if needed
-            await StorageEngine._migrateToIndexedDB();
-            return true;
-        } catch (err) {
-            console.warn('⚠️ StorageEngine: IndexedDB failed, using localStorage', err);
-            StorageEngine._useIndexedDB = false;
-            StorageEngine._ready = true;
-            return true;
-        }
+        // Fallback: localStorage only (compressed)
+        console.log('📦 StorageEngine: Using localStorage with LZ compression');
+        StorageEngine._useIndexedDB = false;
+        StorageEngine._ready = true;
+        return true;
     }
 
-    // ─── Save ───────────────────────────────────────────────────
+        // ─── Save ───────────────────────────────────────────────────
 
     static async save(gameState, slot = 'autosave') {
         StorageEngine._ensureReady();
@@ -89,21 +274,10 @@ export class StorageEngine {
             }
 
             const sizeKB = Math.round(data.length / 1024);
+            let idbSuccess = false;
+            let lsSuccess = false;
 
-            // ALWAYS write to localStorage (primary for file://, backup for http)
-            try {
-                localStorage.setItem(LS_KEYS.SAVE_DATA, data);
-            } catch (lsErr) {
-                if (lsErr.message && lsErr.message.includes('quota')) {
-                    console.warn(`⚠️ StorageEngine: localStorage quota exceeded (${sizeKB}KB)`);
-                    // If we have IndexedDB, we can still save there
-                    if (!StorageEngine._useIndexedDB) {
-                        return { success: false, sizeKB, storage: 'none', error: 'quota' };
-                    }
-                }
-            }
-
-            // Also write to IndexedDB if available
+            // PRIMARY: Write to IndexedDB (no size limit)
             if (StorageEngine._useIndexedDB) {
                 try {
                     await StorageEngine._put(STORES.SAVES, {
@@ -113,19 +287,42 @@ export class StorageEngine {
                         season: gameState.currentSeason || gameState._currentSeason,
                         sizeKB
                     });
+                    idbSuccess = true;
                 } catch (idbErr) {
-                    console.warn('⚠️ StorageEngine: IndexedDB write failed, localStorage still has data', idbErr);
+                    console.warn('⚠️ StorageEngine: IndexedDB write failed', idbErr);
                 }
             }
 
-            return { success: true, sizeKB, storage: StorageEngine._useIndexedDB ? 'indexeddb+localStorage' : 'localStorage' };
+            // BACKUP: Write compressed to localStorage (best-effort, may fail on large saves)
+            try {
+                const compressed = COMPRESSED_PREFIX + LZString.compressToUTF16(data);
+                const compressedKB = Math.round(compressed.length * 2 / 1024);
+                localStorage.setItem(LS_KEYS.SAVE_DATA, compressed);
+                lsSuccess = true;
+                console.log(`💾 localStorage backup: ${sizeKB}KB → ${compressedKB}KB compressed (${Math.round((1 - compressedKB/sizeKB) * 100)}% reduction)`);
+            } catch (lsErr) {
+                if (lsErr.message && lsErr.message.includes('quota')) {
+                    console.warn(`⚠️ StorageEngine: localStorage quota exceeded (${sizeKB}KB raw) — IndexedDB is primary`);
+                } else {
+                    console.warn('⚠️ StorageEngine: localStorage write failed', lsErr);
+                }
+            }
+
+            // Success if at least one store worked
+            if (idbSuccess || lsSuccess) {
+                const storage = idbSuccess && lsSuccess ? 'indexeddb+localStorage'
+                    : idbSuccess ? 'indexeddb' : 'localStorage';
+                return { success: true, sizeKB, storage };
+            }
+
+            return { success: false, sizeKB, storage: 'none', error: 'all-stores-failed' };
         } catch (err) {
             console.error('❌ StorageEngine: Save failed:', err);
             return { success: false, sizeKB: 0, storage: 'none' };
         }
     }
 
-    // ─── Load ───────────────────────────────────────────────────
+        // ─── Load ───────────────────────────────────────────────────
 
     static async load(slot = 'autosave') {
         StorageEngine._ensureReady();
@@ -144,10 +341,22 @@ export class StorageEngine {
         }
 
         // localStorage (primary for file://, fallback for http)
-        const data = localStorage.getItem(LS_KEYS.SAVE_DATA);
+        let data = localStorage.getItem(LS_KEYS.SAVE_DATA);
         if (data) {
-            console.log(`📂 StorageEngine: Loaded from localStorage (${Math.round(data.length/1024)}KB)`);
-            return data;
+            // Detect and decompress LZ-compressed data
+            if (data.startsWith(COMPRESSED_PREFIX)) {
+                const decompressed = LZString.decompressFromUTF16(data.slice(COMPRESSED_PREFIX.length));
+                if (decompressed) {
+                    console.log(`📂 StorageEngine: Loaded from localStorage (compressed ${Math.round(data.length*2/1024)}KB → ${Math.round(decompressed.length/1024)}KB)`);
+                    return decompressed;
+                } else {
+                    console.error('❌ StorageEngine: Failed to decompress localStorage data');
+                }
+            } else {
+                // Uncompressed (legacy) — return as-is
+                console.log(`📂 StorageEngine: Loaded from localStorage (${Math.round(data.length/1024)}KB uncompressed)`);
+                return data;
+            }
         }
 
         // Legacy format
@@ -228,7 +437,7 @@ export class StorageEngine {
     static async saveSeasonSnapshot(season, snapshot) {
         StorageEngine._ensureReady();
         if (!StorageEngine._useIndexedDB) {
-            console.log('📜 StorageEngine: Season history requires IndexedDB (http origin)');
+            console.log('📜 StorageEngine: Season history requires IndexedDB (not available)');
             return;
         }
         await StorageEngine._put(STORES.HISTORY, {
@@ -283,23 +492,33 @@ export class StorageEngine {
         return info;
     }
 
-    // ─── Migration (localStorage → IndexedDB, http only) ────────
+    // ─── Migration (localStorage → IndexedDB) ────────────────────
 
     static async _migrateToIndexedDB() {
         if (!StorageEngine._useIndexedDB) return;
 
-        const meta = await StorageEngine._get(STORES.META, 'migration');
+        const meta = await StorageEngine._get(STORES.META, 'migration_v2');
         if (meta && meta.completed) return;
 
-        const data = localStorage.getItem(LS_KEYS.SAVE_DATA)
+        let rawData = localStorage.getItem(LS_KEYS.SAVE_DATA)
             || localStorage.getItem(LS_KEYS.LEGACY);
 
-        if (!data) {
-            await StorageEngine._put(STORES.META, { key: 'migration', completed: true, timestamp: Date.now() });
+        if (!rawData) {
+            await StorageEngine._put(STORES.META, { key: 'migration_v2', completed: true, timestamp: Date.now() });
             return;
         }
 
         try {
+            // Decompress if needed before storing in IDB (IDB stores raw JSON)
+            let data = rawData;
+            if (rawData.startsWith(COMPRESSED_PREFIX)) {
+                const decompressed = LZString.decompressFromUTF16(rawData.slice(COMPRESSED_PREFIX.length));
+                if (decompressed) {
+                    data = decompressed;
+                    console.log(`🔄 StorageEngine: Decompressed localStorage data for IDB migration`);
+                }
+            }
+
             const sizeKB = Math.round(data.length / 1024);
             console.log(`🔄 StorageEngine: Copying ${sizeKB}KB to IndexedDB (keeping localStorage copy)...`);
 
@@ -310,7 +529,7 @@ export class StorageEngine {
                 sizeKB
             });
 
-            await StorageEngine._put(STORES.META, { key: 'migration', completed: true, timestamp: Date.now() });
+            await StorageEngine._put(STORES.META, { key: 'migration_v2', completed: true, timestamp: Date.now() });
 
             // NOTE: We do NOT delete from localStorage — it stays as backup
             console.log(`✅ StorageEngine: Migration complete (data in both stores)`);

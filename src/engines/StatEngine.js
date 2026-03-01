@@ -22,9 +22,9 @@ export const StatEngine = {
     POSITION_ARCHETYPES,
 
     TIER_PACE: {
-        1: { targetPoints: 104, variance: 8 },  // NBA: strength bonus adds ~3-5, landing ~108-112
-        2: { targetPoints: 86,  variance: 9 },   // G-League: with bonus lands ~90-95
-        3: { targetPoints: 72,  variance: 10 },   // Low college: with bonus lands ~74-80
+        1: { targetPoints: 100, variance: 8 },  // NBA: strength bonus adds ~3-5, landing ~105-112
+        2: { targetPoints: 82,  variance: 9 },   // G-League: with bonus lands ~86-92
+        3: { targetPoints: 68,  variance: 10 },   // Low college: with bonus lands ~70-78
     },
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -52,16 +52,24 @@ export const StatEngine = {
         const homeCoachMods = CoachEngine.getGameModifiers(homeTeam);
         const awayCoachMods = CoachEngine.getGameModifiers(awayTeam);
 
-        // === MATCHUP MODIFIERS (Phase 2) ===
-        // Compare starters head-to-head using measurables and physical attributes
+        // === TEAM DEFENSE MODIFIERS ===
+        // Opponent's average defensive rating suppresses your shooting percentages.
+        // Centered on 75 (neutral). A team with avg defRating 82 = elite D = negative modifier.
+        const homeTeamDefMod = this._calcTeamDefenseModifier(homeRotation, isPlayoffs);
+        const awayTeamDefMod = this._calcTeamDefenseModifier(awayRotation, isPlayoffs);
+
+        // === MATCHUP MODIFIERS ===
+        // Compare starters head-to-head using measurables, attributes, and off vs def ratings
         const homeMatchups = this._calculateMatchupModifiers(homeRotation, awayRotation);
         const awayMatchups = this._calculateMatchupModifiers(awayRotation, homeRotation);
 
+        // When generating home stats, opponent (away) defense suppresses home shooting
         const homeRawStats = homeRotation.map((entry, idx) =>
-            this._generatePlayerGameStats(entry, tier, homeChemistry, homeBoost, isPlayoffs, homeCoachMods, awayCoachMods, homeMatchups[idx] || 0)
+            this._generatePlayerGameStats(entry, tier, homeChemistry, homeBoost, isPlayoffs, homeCoachMods, awayCoachMods, homeMatchups[idx] || 0, awayTeamDefMod)
         );
+        // When generating away stats, opponent (home) defense suppresses away shooting
         const awayRawStats = awayRotation.map((entry, idx) =>
-            this._generatePlayerGameStats(entry, tier, awayChemistry, 0, isPlayoffs, awayCoachMods, homeCoachMods, awayMatchups[idx] || 0)
+            this._generatePlayerGameStats(entry, tier, awayChemistry, 0, isPlayoffs, awayCoachMods, homeCoachMods, awayMatchups[idx] || 0, homeTeamDefMod)
         );
 
         const pace = this.TIER_PACE[tier] || this.TIER_PACE[1];
@@ -194,6 +202,36 @@ export const StatEngine = {
     },
 
     // ─────────────────────────────────────────────────────────────────────────
+    // TEAM DEFENSE MODIFIER
+    // ─────────────────────────────────────────────────────────────────────────
+    // Calculates how a team's defensive roster quality suppresses opponent shooting.
+    // Uses minutes-weighted average of effectiveDefRating across the rotation.
+    // Returns a negative modifier (good defense hurts opponent FG%).
+    //
+    // Scale: avg defRating 75 → 0.0 (neutral)
+    //        avg defRating 82 → ~-0.014 (elite D, ~1.4% FG% reduction)
+    //        avg defRating 68 → ~+0.014 (poor D, 1.4% FG% boost to opponent)
+    // Playoffs amplify by 1.5x (defense tightens in postseason).
+
+    _calcTeamDefenseModifier(rotation, isPlayoffs) {
+        const active = rotation.filter(e => e.minutes > 0);
+        if (active.length === 0) return 0;
+
+        const totalMinutes = active.reduce((sum, e) => sum + e.minutes, 0);
+        const weightedDefRating = active.reduce((sum, e) =>
+            sum + (e.effectiveDefRating || e.effectiveRating) * e.minutes, 0) / totalMinutes;
+
+        // Center on 75 (league average), scale to shooting % impact
+        // 0.002 per defRating point → ±0.014 at 7 points from average
+        let modifier = (weightedDefRating - 75) * -0.002;
+
+        // Playoffs: defense tightens
+        if (isPlayoffs) modifier *= 1.5;
+
+        return modifier;
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
     // ROTATION BUILDER — delegates to BasketballMath
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -213,8 +251,8 @@ export const StatEngine = {
     // PER-PLAYER STAT GENERATION
     // ─────────────────────────────────────────────────────────────────────────
 
-    _generatePlayerGameStats(entry, tier, chemModifier, homeBoost, isPlayoffs, teamCoachMods, opponentCoachMods, matchupModifier) {
-        const { player, effectiveRating, effectiveOffRating, minutes, isStarter, usageShare } = entry;
+    _generatePlayerGameStats(entry, tier, chemModifier, homeBoost, isPlayoffs, teamCoachMods, opponentCoachMods, matchupModifier, oppTeamDefMod) {
+        const { player, effectiveRating, effectiveOffRating, effectiveDefRating, minutes, isStarter, usageShare } = entry;
 
         if (minutes === 0) return emptyStatLine(player, isStarter);
 
@@ -302,21 +340,34 @@ export const StatEngine = {
         statLine.turnovers = Math.round(generateStat(archetype.turnovers, scaledTOMod));
         statLine.fouls     = Math.max(0, Math.min(6, Math.round(generateStat(archetype.fouls, scaledFoulMod))));
 
-        // === ATTRIBUTE-BASED STAT ADJUSTMENTS ===
+        // === DEFENSIVE RATING-BASED STAT SCALING ===
+        // defRating drives blocks, steals, and defensive rebounds.
+        // Attribute bonuses provide additional differentiation on top.
+        const defRating = (effectiveDefRating || effectiveRating);
+        const defDelta = defRating - 75;
+        const defScale = 1.0 + (defDelta * 0.012); // ±1.2% per defRating point
+
+        // Scale defensive stats by defRating
+        statLine.steals = Math.max(0, Math.round(statLine.steals * defScale));
+        statLine.blocks = Math.max(0, Math.round(statLine.blocks * defScale));
+        // Rebounds partially defensive (contested boards) — half scaling
+        statLine.rebounds = Math.max(0, Math.round(statLine.rebounds * (1.0 + defDelta * 0.006)));
+
+        // === ATTRIBUTE BONUSES (on top of defRating scaling) ===
         if (player.attributes) {
             const a = player.attributes;
             // Verticality + Strength boost rebounds (max ±2)
-            const reboundBoost = ((a.verticality || 50) - 50 + (a.strength || 50) - 50) * 0.015 * minutesFactor;
+            const reboundBoost = ((a.verticality || 50) - 50 + (a.strength || 50) - 50) * 0.012 * minutesFactor;
             statLine.rebounds = Math.max(0, Math.round(statLine.rebounds + reboundBoost));
             // Basketball IQ boosts assists and reduces turnovers
             const iqMod = ((a.basketballIQ || 50) - 50) * 0.01 * minutesFactor;
             statLine.assists = Math.max(0, Math.round(statLine.assists + iqMod * 1.5));
             statLine.turnovers = Math.max(0, Math.round(statLine.turnovers - iqMod * 0.8));
-            // Verticality boosts blocks
-            const vertBlockBoost = ((a.verticality || 50) - 50) * 0.008 * minutesFactor;
+            // Verticality boosts blocks (additional on top of defRating scaling)
+            const vertBlockBoost = ((a.verticality || 50) - 50) * 0.006 * minutesFactor;
             statLine.blocks = Math.max(0, Math.round(statLine.blocks + vertBlockBoost));
-            // Speed boosts steals
-            const speedStealBoost = ((a.speed || 50) - 50) * 0.006 * minutesFactor;
+            // Speed boosts steals (additional on top of defRating scaling)
+            const speedStealBoost = ((a.speed || 50) - 50) * 0.004 * minutesFactor;
             statLine.steals = Math.max(0, Math.round(statLine.steals + speedStealBoost));
         }
 
@@ -333,11 +384,13 @@ export const StatEngine = {
         const threePctBonus = offRatingDelta * 0.0015;
         const ftPctBonus = offRatingDelta * 0.002;
         const shootingHeat = this._normalRandom() * 0.06;
-        // Opponent defensive intensity affects shooting (scaled by their coachability aggregate)
-        const oppDefPenalty = scaledDefMod;
+        // Opponent defense: coaching scheme + roster defensive talent
+        const oppCoachDefPenalty = scaledDefMod;
+        const oppRosterDefPenalty = oppTeamDefMod || 0;
+        const totalDefPenalty = oppCoachDefPenalty + oppRosterDefPenalty;
 
-        const twoPtPct = Math.max(0.30, Math.min(0.62, (archetype.baseFgPct + 0.04) + fgPctBonus + shootingHeat + oppDefPenalty));
-        const threePtPct = Math.max(0.15, Math.min(0.45, archetype.baseThreePct + threePctBonus + shootingHeat + oppDefPenalty * 0.8));
+        const twoPtPct = Math.max(0.30, Math.min(0.62, (archetype.baseFgPct + 0.04) + fgPctBonus + shootingHeat + totalDefPenalty));
+        const threePtPct = Math.max(0.15, Math.min(0.45, archetype.baseThreePct + threePctBonus + shootingHeat + totalDefPenalty * 0.8));
         const ftPct = Math.max(0.40, Math.min(0.95, archetype.baseFtPct + ftPctBonus + (this._normalRandom() * 0.05)));
 
         const twoPM = this._binomialRoll(twoPA, twoPtPct);

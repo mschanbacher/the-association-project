@@ -238,6 +238,10 @@ export class GamePipeline {
 
         const homeCourtBonus = game.tier === 1 ? 3 : game.tier === 2 ? 2.5 : 2;
 
+        // Team defense modifiers: opponent's roster defRating suppresses your shooting
+        const homeTeamDefMod = GamePipeline._calcTeamDefenseModifier(homeRotation, game.isPlayoffs);
+        const awayTeamDefMod = GamePipeline._calcTeamDefenseModifier(awayRotation, game.isPlayoffs);
+
         for (const entry of homeRotation) {
             game.homePlayerStats[entry.player.id] = GamePipeline._emptyStatLine(entry.player, entry.isStarter);
         }
@@ -249,7 +253,8 @@ export class GamePipeline {
             homeRotation, awayRotation,
             homeChemistry, awayChemistry,
             homeCoachMods, awayCoachMods,
-            homeCourtBonus
+            homeCourtBonus,
+            homeTeamDefMod, awayTeamDefMod
         };
     }
 
@@ -329,6 +334,8 @@ export class GamePipeline {
         const defCoachMods = isHome ? setup.awayCoachMods : setup.homeCoachMods;
         const homeBonus = isHome ? setup.homeCourtBonus : 0;
         const momentumBoost = game.momentum * (isHome ? 0.15 : -0.15);
+        // Opponent's team defense modifier (their roster defRating suppresses our shooting)
+        const oppTeamDefMod = isHome ? setup.awayTeamDefMod : setup.homeTeamDefMod;
 
         // Consume clock
         const possTime = GamePipeline._getPossessionTime(game);
@@ -351,7 +358,9 @@ export class GamePipeline {
         const ratingBonus2pt = offRatingDelta * 0.003;    // 2PT: ±0.3% per rating point
         const ratingBonus3pt = offRatingDelta * 0.0015;   // 3PT: ±0.15% per rating point
         const ratingBonusFt  = offRatingDelta * 0.002;    // FT: ±0.2% per rating point
-        const defenseImpact = (defCoachMods.defenseModifier || 0) * 0.5;
+        // Opponent defense: coaching scheme + roster defensive talent
+        const defCoachImpact = (defCoachMods.defenseModifier || 0) * 0.5;
+        const defenseImpact = defCoachImpact + (oppTeamDefMod || 0);
         const chemBonus = (chemistry - 1.0) * 0.03;
 
         // === INTENTIONAL FOUL CHECK ===
@@ -535,7 +544,22 @@ export class GamePipeline {
 
     static _pickDefender(rotation) {
         const onCourt = rotation.filter(e => e.onCourt);
-        return onCourt.length > 0 ? onCourt[Math.floor(Math.random() * onCourt.length)] : null;
+        if (onCourt.length === 0) return null;
+        // Weight by defensive rating — better defenders get more steals/blocks
+        const weights = onCourt.map(e => {
+            const defR = e.effectiveDefRating || e.effectiveRating || 70;
+            const pos = e.player.position || 'SF';
+            // Position weight: bigs contest more, guards steal more — both are "defending"
+            const posWeight = pos === 'C' ? 1.3 : pos === 'PF' ? 1.2 : 1.0;
+            return Math.max(0.5, (defR - 50) * 0.04) * posWeight;
+        });
+        const total = weights.reduce((s, w) => s + w, 0);
+        let r = Math.random() * total;
+        for (let i = 0; i < onCourt.length; i++) {
+            r -= weights[i];
+            if (r <= 0) return onCourt[i];
+        }
+        return onCourt[onCourt.length - 1];
     }
 
     static _pickAssister(onCourt, shooter) {
@@ -558,7 +582,11 @@ export class GamePipeline {
         if (onCourt.length === 0) return null;
         const weights = onCourt.map(e => {
             const pos = e.player.position || 'SF';
-            return pos === 'C' ? 4 : pos === 'PF' ? 3 : pos === 'SF' ? 1.5 : 1;
+            const posWeight = pos === 'C' ? 4 : pos === 'PF' ? 3 : pos === 'SF' ? 1.5 : 1;
+            // defRating boost for rebounding: defRating 85 → 1.12x, defRating 65 → 0.88x
+            const defR = e.effectiveDefRating || e.effectiveRating || 75;
+            const defBoost = 1.0 + (defR - 75) * 0.012;
+            return posWeight * Math.max(0.5, defBoost);
         });
         const total = weights.reduce((s, w) => s + w, 0);
         let r = Math.random() * total;
@@ -788,10 +816,25 @@ export class GamePipeline {
             const pos = entry.player.position || 'SF';
             const s = stats.find(st => st.playerId === entry.player.id);
             if (!s || s.minutesPlayed === 0) continue;
-            const blockRate = pos === 'C' ? 0.12 : pos === 'PF' ? 0.08 : 0.02;
+            const posRate = pos === 'C' ? 0.12 : pos === 'PF' ? 0.08 : 0.02;
+            // Scale block rate by defensive rating: defRating 85 → 1.12x, defRating 65 → 0.88x
+            const defR = entry.effectiveDefRating || entry.effectiveRating || 75;
+            const defScale = 1.0 + (defR - 75) * 0.012;
+            const blockRate = posRate * Math.max(0.5, defScale);
             const blocks = Math.floor(s.minutesPlayed * blockRate * (0.5 + Math.random()));
             s.blocks += blocks;
         }
+    }
+
+    static _calcTeamDefenseModifier(rotation, isPlayoffs) {
+        const active = rotation.filter(e => e.minutes > 0);
+        if (active.length === 0) return 0;
+        const totalMinutes = active.reduce((sum, e) => sum + e.minutes, 0);
+        const weightedDefRating = active.reduce((sum, e) =>
+            sum + (e.effectiveDefRating || e.effectiveRating) * e.minutes, 0) / totalMinutes;
+        let modifier = (weightedDefRating - 75) * -0.002;
+        if (isPlayoffs) modifier *= 1.5;
+        return modifier;
     }
 
     static _emptyStatLine(player, isStarter) {

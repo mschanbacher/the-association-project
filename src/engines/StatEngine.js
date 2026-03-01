@@ -628,36 +628,65 @@ export const StatEngine = {
                 const efficiencyScore = a.fieldGoalPct * 20;
                 // Team success: up to 30 points (heavily weighted — MVP must be on a good team)
                 const teamScore = teamWinPct * 30;
+                // Offensive talent: offRating component (up to ~7 pts for elite scorer)
+                const offR = p.player.offRating || p.player.rating || 50;
+                const offTalentScore = (offR - 60) * 0.18;
                 // Penalty for turnovers
                 const toPenalty = a.turnoversPerGame * 0.5;
                 
                 return {
                     ...p,
-                    mvpScore: scoringScore + assistScore + reboundScore + efficiencyScore + teamScore - toPenalty
+                    mvpScore: scoringScore + assistScore + reboundScore + efficiencyScore + teamScore + offTalentScore - toPenalty
                 };
             })
             .sort((a, b) => b.mvpScore - a.mvpScore);
 
         // ── DPOY ──
-        // Steals, blocks, team defensive performance (lower opponent scoring = better)
+        // Hybrid: defensive rating (ability) + defensive stats (production) + team defense context
+        // defRating provides the core ability assessment, stats validate production,
+        // team defense ensures the player contributes to actual defensive success.
+
+        // Pre-calculate team defensive rankings for DPOY team context bonus
+        const teamDefRankings = [...teams]
+            .map(t => {
+                if (!t.roster || t.roster.length === 0) return { team: t, avgDef: 50 };
+                const avgDef = t.roster.reduce((sum, p) => sum + (p.defRating || p.rating || 50), 0) / t.roster.length;
+                return { team: t, avgDef };
+            })
+            .sort((a, b) => b.avgDef - a.avgDef);
+        const teamDefRankMap = {};
+        teamDefRankings.forEach((entry, idx) => { teamDefRankMap[entry.team.id] = idx + 1; });
+        const totalTeams = teams.length || 1;
+
         const dpoyScores = allPlayers
             .filter(p => p.avgs.gamesStarted >= p.avgs.gamesPlayed * 0.5)
             .map(p => {
                 const a = p.avgs;
-                // Blocks: up to 40 points (heavily weighted for DPOY)
-                const blockScore = a.blocksPerGame * 15;
-                // Steals: up to 30 points
-                const stealScore = a.stealsPerGame * 15;
-                // Rebounds: up to 15 points (contesting shots, securing possessions)
-                const reboundScore = a.reboundsPerGame * 1.0;
-                // Position bonus: C and PF naturally contend more
-                const posBonus = (p.player.position === 'C' ? 3 : p.player.position === 'PF' ? 2 : 0);
+                const defR = p.player.defRating || p.player.rating || 50;
+
+                // Defensive Rating component (35% weight) — the core ability
+                // Scale: defRating 85 → 29.75, defRating 70 → 24.5, defRating 60 → 21.0
+                const defRatingScore = defR * 0.35;
+
+                // Defensive stats component (50% weight) — production validation
+                // Blocks: up to ~22 pts for elite blocker (1.5 BPG)
+                const blockScore = a.blocksPerGame * 12;
+                // Steals: up to ~18 pts for elite stealer (1.5 SPG)
+                const stealScore = a.stealsPerGame * 12;
+                // Rebounds: up to ~12 pts for elite rebounder
+                const reboundScore = a.reboundsPerGame * 0.8;
+
+                // Team defense context (15% weight) — best defender on a top defense
+                // Top-5 team → +5, bottom-5 → 0
+                const teamRank = teamDefRankMap[p.team.id] || totalTeams;
+                const teamDefBonus = Math.max(0, 5 * (1 - (teamRank - 1) / Math.max(1, totalTeams - 1)));
+
                 // Minutes: must actually play significant minutes
-                const minutesBonus = Math.min(5, a.minutesPerGame * 0.15);
-                
+                const minutesBonus = Math.min(3, a.minutesPerGame * 0.10);
+
                 return {
                     ...p,
-                    dpoyScore: blockScore + stealScore + reboundScore + posBonus + minutesBonus
+                    dpoyScore: defRatingScore + blockScore + stealScore + reboundScore + teamDefBonus + minutesBonus
                 };
             })
             .sort((a, b) => b.dpoyScore - a.dpoyScore);
@@ -713,10 +742,15 @@ export const StatEngine = {
             .filter(p => p.avgs.gamesStarted >= p.avgs.gamesPlayed * 0.5)
             .map(p => {
                 const a = p.avgs;
-                const allLeagueScore = (a.pointsPerGame * 1.0) + (a.assistsPerGame * 1.3) + 
+                // Offensive production
+                const offProd = (a.pointsPerGame * 1.0) + (a.assistsPerGame * 1.3) + 
                                        (a.reboundsPerGame * 1.0) + (a.stealsPerGame * 2.5) + 
                                        (a.blocksPerGame * 2.5) + (a.fieldGoalPct * 10) -
                                        (a.turnoversPerGame * 0.8);
+                // Defensive talent bonus: two-way players edge out one-way scorers
+                const defR = p.player.defRating || p.player.rating || 50;
+                const defBonus = (defR - 60) * 0.10;
+                const allLeagueScore = offProd + defBonus;
                 return { ...p, allLeagueScore };
             })
             .sort((a, b) => b.allLeagueScore - a.allLeagueScore);
@@ -934,7 +968,7 @@ export const StatEngine = {
         };
 
         const mvpExtra = awards.mvp ? `${awards.mvp.avgs.fieldGoalPct.toFixed(1)}% FG · ${awards.mvp.team.wins}-${awards.mvp.team.losses}` : '';
-        const dpoyExtra = awards.dpoy ? `${awards.dpoy.avgs.stealsPerGame} SPG · ${awards.dpoy.avgs.blocksPerGame} BPG` : '';
+        const dpoyExtra = awards.dpoy ? `DEF ${awards.dpoy.player.defRating || '??'} · ${awards.dpoy.avgs.stealsPerGame} SPG · ${awards.dpoy.avgs.blocksPerGame} BPG` : '';
         const mipExtra = awards.mostImproved && awards.mostImproved.prevAvgs ? 
             `+${awards.mostImproved.improvement.toFixed(1)} composite improvement` : '';
 

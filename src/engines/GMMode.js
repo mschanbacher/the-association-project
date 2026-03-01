@@ -304,6 +304,16 @@ export class GMMode {
                 this._simulateAllGamesOnDate(simDate, true); // silent for batch
             }
 
+            // Check if we need to interrupt for a user injury decision
+            if (this.gameState.pendingInjuries && this.gameState.pendingInjuries.length > 0) {
+                this.gameState.currentDate = this.deps.CalendarEngine.addDays(simDate, 1);
+                this.deps.saveGameState();
+                this.deps.updateUI();
+                this.deps.showNextInjuryModal();
+                // User makes injury decisions, then clicks Sim Week again to resume
+                return;
+            }
+
             // Process AI-AI trades
             const notable = this.processAiToAiTrades(simDate);
 
@@ -356,6 +366,14 @@ export class GMMode {
                            games.tier2.filter(g => !g.played).length +
                            games.tier3.filter(g => !g.played).length;
             if (unplayed > 0) this._simulateAllGamesOnDate(simDate, true);
+
+            // Interrupt for user injury
+            if (this.gameState.pendingInjuries && this.gameState.pendingInjuries.length > 0) {
+                this.gameState.currentDate = this.deps.CalendarEngine.addDays(simDate, 1);
+                this.deps.saveGameState(); this.deps.updateUI();
+                this.deps.showNextInjuryModal();
+                return;
+            }
 
             const notable = this.processAiToAiTrades(simDate);
 
@@ -506,7 +524,7 @@ export class GMMode {
                 this.deps.updateInjuries(awayTeam);
                 
                 // Check injuries
-                if (!isSilent && isUserGame) {
+                if (isUserGame) {
                     const userGamesPlayed = userTeam ? (userTeam.wins + userTeam.losses) : 0;
                     const injuries = this.deps.checkForInjuries(homeTeam, awayTeam, userGamesPlayed, false);
                     
@@ -519,11 +537,15 @@ export class GMMode {
                     });
                     
                     if (userTeamInjuries.length > 0) {
+                        // Store pending injuries — caller decides when to show modal
                         this.gameState.pendingInjuries = userTeamInjuries;
-                        this.deps.saveGameState();
-                        this.deps.updateUI();
-                        this.deps.showNextInjuryModal();
-                        return; // Pause for injury decision
+                        if (!isSilent) {
+                            // In single-day sim, show immediately
+                            this.deps.saveGameState();
+                            this.deps.updateUI();
+                            this.deps.showNextInjuryModal();
+                        }
+                        return; // Exit this tier's game loop
                     }
                 } else {
                     // Silent mode or AI game — auto-handle injuries
@@ -670,6 +692,16 @@ export class GMMode {
             if (unplayed > 0) {
                 this._simulateAllGamesOnDate(currentDate, true);
                 gamesSimulated += unplayed;
+            }
+
+            // Interrupt for user injury decision
+            if (this.gameState.pendingInjuries && this.gameState.pendingInjuries.length > 0) {
+                this.gameState.currentDate = this.deps.CalendarEngine.addDays(currentDate, 1);
+                this.deps.saveGameState();
+                this.deps.updateUI();
+                this.deps.showNextInjuryModal();
+                // User makes decision, then clicks Finish Season again to resume
+                return;
             }
 
             // Process AI-AI trades

@@ -200,7 +200,7 @@ export class TeamFactory {
         const position = TeamFactory.randomPosition();
         const age = Math.floor(19 + Math.random() * 16);
 
-        const { measurables, attributes, rating } = PA.generate(position, tier, age);
+        const { measurables, attributes, rating, offRating, defRating } = PA.generate(position, tier, age);
         const salary = TeamFactory.generateSalary(rating, tier);
         const contractYears = TeamFactory.determineContractLength(age, rating);
         const enduranceThreshold = Math.max(60, Math.min(90, 65 + Math.round((attributes.endurance - 50) * 0.4)));
@@ -208,7 +208,7 @@ export class TeamFactory {
         return {
             id: playerId,
             name: `${firstName} ${lastName}`,
-            position, rating, age, tier, salary,
+            position, rating, offRating, defRating, age, tier, salary,
             contractYears,
             originalContractLength: contractYears,
             measurables, attributes,
@@ -237,7 +237,7 @@ export class TeamFactory {
         const college = TeamFactory.randomCollege();
         const age = Math.random() < 0.7 ? 21 : 22;
 
-        const { measurables, attributes, rating } = PA.generate(position, targetTier, age);
+        const { measurables, attributes, rating, offRating, defRating } = PA.generate(position, targetTier, age);
         const clampedRating = Math.max(48, Math.min(78, rating));
         const salary = TeamFactory.generateSalary(clampedRating, targetTier);
         const contractYears = TeamFactory.determineContractLength(age, clampedRating);
@@ -248,7 +248,7 @@ export class TeamFactory {
         return {
             id: playerId,
             name: `${firstName} ${lastName}`,
-            position, rating: clampedRating, age, tier: targetTier,
+            position, rating: clampedRating, offRating, defRating, age, tier: targetTier,
             salary, contractYears,
             originalContractLength: contractYears,
             measurables, attributes,

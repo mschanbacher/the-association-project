@@ -64,7 +64,9 @@ export class DraftEngine {
             prospects.push({
                 id: startId + i,
                 name: `${firstName} ${lastName}`,
-                position, rating: attrData.rating, age, salary, contractYears,
+                position, rating: attrData.rating,
+                offRating: attrData.offRating, defRating: attrData.defRating,
+                age, salary, contractYears,
                 originalContractLength: contractYears,
                 measurables: attrData.measurables,
                 attributes: attrData.attributes,

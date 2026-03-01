@@ -21,16 +21,38 @@ export class PlayerAttributes {
     static POSITION_AVG_WINGSPAN = { PG: 78, SG: 80.5, SF: 84, PF: 86.5, C: 90 };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // RATING WEIGHTS BY POSITION
+    // OFFENSIVE RATING WEIGHTS BY POSITION
     // ─────────────────────────────────────────────────────────────────────────
+    // Clutch weighs heavily (scoring under pressure). IQ drives playmaking.
+    // Speed enables transition offense. Strength/vert for interior scoring.
+    // Intangibles (workEthic, coachability, collaboration) excluded — they
+    // act as standalone modifiers in other systems, not raw basketball ability.
 
-    static RATING_WEIGHTS = {
-        PG: { speed: 0.22, basketballIQ: 0.22, endurance: 0.12, clutch: 0.12, verticality: 0.08, strength: 0.06, coachability: 0.08, workEthic: 0.05, collaboration: 0.05 },
-        SG: { speed: 0.18, clutch: 0.16, verticality: 0.14, basketballIQ: 0.14, endurance: 0.10, strength: 0.08, coachability: 0.08, workEthic: 0.06, collaboration: 0.06 },
-        SF: { verticality: 0.16, speed: 0.14, strength: 0.14, basketballIQ: 0.14, clutch: 0.12, endurance: 0.10, coachability: 0.08, workEthic: 0.06, collaboration: 0.06 },
-        PF: { strength: 0.20, verticality: 0.18, basketballIQ: 0.12, endurance: 0.12, clutch: 0.10, speed: 0.08, coachability: 0.08, workEthic: 0.06, collaboration: 0.06 },
-        C:  { strength: 0.22, verticality: 0.18, endurance: 0.14, basketballIQ: 0.12, clutch: 0.08, speed: 0.06, coachability: 0.08, workEthic: 0.06, collaboration: 0.06 }
+    static OFF_RATING_WEIGHTS = {
+        PG: { speed: 0.25, basketballIQ: 0.30, endurance: 0.08, verticality: 0.05, strength: 0.05, clutch: 0.27 },
+        SG: { speed: 0.20, basketballIQ: 0.15, endurance: 0.08, verticality: 0.12, strength: 0.08, clutch: 0.37 },
+        SF: { speed: 0.15, basketballIQ: 0.18, endurance: 0.08, verticality: 0.16, strength: 0.15, clutch: 0.28 },
+        PF: { speed: 0.08, basketballIQ: 0.15, endurance: 0.10, verticality: 0.22, strength: 0.22, clutch: 0.23 },
+        C:  { speed: 0.04, basketballIQ: 0.12, endurance: 0.10, verticality: 0.24, strength: 0.30, clutch: 0.20 },
     };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // DEFENSIVE RATING WEIGHTS BY POSITION
+    // ─────────────────────────────────────────────────────────────────────────
+    // Strength/vert dominate for bigs (rim protection). Speed/IQ dominate for
+    // guards (lateral quickness, anticipation). Endurance reflects sustained
+    // defensive effort. Clutch has minimal defensive value (2%).
+
+    static DEF_RATING_WEIGHTS = {
+        PG: { speed: 0.32, basketballIQ: 0.28, endurance: 0.22, verticality: 0.04, strength: 0.12, clutch: 0.02 },
+        SG: { speed: 0.28, basketballIQ: 0.22, endurance: 0.18, verticality: 0.12, strength: 0.18, clutch: 0.02 },
+        SF: { speed: 0.18, basketballIQ: 0.18, endurance: 0.16, verticality: 0.20, strength: 0.26, clutch: 0.02 },
+        PF: { speed: 0.08, basketballIQ: 0.14, endurance: 0.16, verticality: 0.28, strength: 0.32, clutch: 0.02 },
+        C:  { speed: 0.04, basketballIQ: 0.12, endurance: 0.14, verticality: 0.34, strength: 0.34, clutch: 0.02 },
+    };
+
+    // Composite rating blend: offense is slightly more valuable for overall impact
+    static OFF_DEF_BLEND = { off: 0.55, def: 0.45 };
 
     // ─────────────────────────────────────────────────────────────────────────
     // ATTRIBUTE DEFINITIONS (for display)
@@ -77,8 +99,10 @@ export class PlayerAttributes {
     static generate(position, tier, age) {
         const measurables = this._generateMeasurables(position);
         const attributes = this._generateSkillAttributes(position, tier, age);
+        const offRating = this.calculateOffRating(position, attributes, measurables);
+        const defRating = this.calculateDefRating(position, attributes, measurables);
         const rating = this.calculateRating(position, attributes, measurables);
-        return { measurables, attributes, rating };
+        return { measurables, attributes, rating, offRating, defRating };
     }
 
     /**
@@ -159,16 +183,49 @@ export class PlayerAttributes {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CALCULATE COMPOSITE RATING FROM ATTRIBUTES
+    // CALCULATE RATINGS FROM ATTRIBUTES
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Derive rating from attributes + measurables
+     * Calculate offensive rating from attributes + measurables.
+     * Reflects scoring ability, playmaking, and clutch performance.
+     */
+    static calculateOffRating(position, attributes, measurables) {
+        return this._calcWeightedRating(
+            this.OFF_RATING_WEIGHTS[position] || this.OFF_RATING_WEIGHTS['SF'],
+            attributes, measurables, position,
+            { heightScale: 0.25, wingspanScale: 0.15 } // Measurables less important for offense
+        );
+    }
+
+    /**
+     * Calculate defensive rating from attributes + measurables.
+     * Reflects rim protection, on-ball defense, and effort.
+     */
+    static calculateDefRating(position, attributes, measurables) {
+        return this._calcWeightedRating(
+            this.DEF_RATING_WEIGHTS[position] || this.DEF_RATING_WEIGHTS['SF'],
+            attributes, measurables, position,
+            { heightScale: 0.35, wingspanScale: 0.30 } // Measurables matter more for defense
+        );
+    }
+
+    /**
+     * Composite rating: weighted blend of offensive and defensive ratings.
+     * This is the number used for trades, free agency, draft, and general display.
      */
     static calculateRating(position, attributes, measurables) {
-        const weights = this.RATING_WEIGHTS[position] || this.RATING_WEIGHTS['SF'];
+        const off = this.calculateOffRating(position, attributes, measurables);
+        const def = this.calculateDefRating(position, attributes, measurables);
+        return Math.max(40, Math.min(99, Math.round(
+            off * this.OFF_DEF_BLEND.off + def * this.OFF_DEF_BLEND.def
+        )));
+    }
 
-        // Weighted attribute sum
+    /**
+     * Internal: weighted sum of attributes with measurables bonus.
+     */
+    static _calcWeightedRating(weights, attributes, measurables, position, measScales) {
         let weightedSum = 0;
         let totalWeight = 0;
         for (const [attr, weight] of Object.entries(weights)) {
@@ -181,9 +238,8 @@ export class PlayerAttributes {
         if (measurables) {
             const avgH = this.POSITION_AVG_HEIGHT[position] || 79;
             const avgW = this.POSITION_AVG_WINGSPAN[position] || 84;
-            const heightBonus = (measurables.height - avgH) * 0.3;
-            const wingspanBonus = (measurables.wingspan - avgW) * 0.2;
-            rating += heightBonus + wingspanBonus;
+            rating += (measurables.height - avgH) * measScales.heightScale;
+            rating += (measurables.wingspan - avgW) * measScales.wingspanScale;
         }
 
         return Math.max(40, Math.min(99, Math.round(rating)));
@@ -225,12 +281,13 @@ export class PlayerAttributes {
 
         // Now iteratively adjust to hit target rating
         let currentRating = this.calculateRating(position, attrs, measurables);
-        const weights = this.RATING_WEIGHTS[position] || this.RATING_WEIGHTS['SF'];
+        // Use offensive weights for iteration — they dominate the composite (55%)
+        const iterWeights = this.OFF_RATING_WEIGHTS[position] || this.OFF_RATING_WEIGHTS['SF'];
         let iterations = 0;
         while (Math.abs(currentRating - targetRating) > 1 && iterations < 20) {
             const diff = targetRating - currentRating;
             // Spread the adjustment across the heaviest-weighted attributes
-            const sortedAttrs = Object.entries(weights).sort((a, b) => b[1] - a[1]);
+            const sortedAttrs = Object.entries(iterWeights).sort((a, b) => b[1] - a[1]);
             for (let i = 0; i < Math.min(4, sortedAttrs.length); i++) {
                 const [attrKey] = sortedAttrs[i];
                 attrs[attrKey] = Math.max(15, Math.min(99, Math.round(attrs[attrKey] + diff * 0.5)));
@@ -239,7 +296,9 @@ export class PlayerAttributes {
             iterations++;
         }
 
-        return { measurables, attributes: attrs, rating: currentRating };
+        const finalOffRating = this.calculateOffRating(position, attrs, measurables);
+        const finalDefRating = this.calculateDefRating(position, attrs, measurables);
+        return { measurables, attributes: attrs, rating: currentRating, offRating: finalOffRating, defRating: finalDefRating };
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -299,7 +358,9 @@ export class PlayerAttributes {
             player.attributes[key] = Math.max(15, Math.min(99, Math.round(player.attributes[key] + change)));
         }
 
-        // Recalculate derived rating
+        // Recalculate derived ratings
+        player.offRating = this.calculateOffRating(player.position, player.attributes, player.measurables);
+        player.defRating = this.calculateDefRating(player.position, player.attributes, player.measurables);
         const newRating = this.calculateRating(player.position, player.attributes, player.measurables);
         return newRating;
     }
@@ -371,16 +432,24 @@ export class PlayerAttributes {
      * If they don't, generate from their existing rating.
      */
     static ensureAttributes(player) {
-        if (player.attributes && player.measurables) return false; // Already has them
-        const pos = player.position || 'SF';
-        const tier = player.tier || 1;
-        const age = player.age || 25;
-        const targetRating = player.rating || 70;
-        const generated = this.generateFromRating(pos, targetRating, tier, age);
-        player.measurables = generated.measurables;
-        player.attributes = generated.attributes;
-        // Keep original rating if it exists; don't overwrite on migration
-        if (!player.rating) player.rating = generated.rating;
-        return true; // Was migrated
+        const needsMigration = !player.attributes || !player.measurables;
+        if (needsMigration) {
+            const pos = player.position || 'SF';
+            const tier = player.tier || 1;
+            const age = player.age || 25;
+            const targetRating = player.rating || 70;
+            const generated = this.generateFromRating(pos, targetRating, tier, age);
+            player.measurables = generated.measurables;
+            player.attributes = generated.attributes;
+            // Keep original rating if it exists; don't overwrite on migration
+            if (!player.rating) player.rating = generated.rating;
+        }
+        // Always ensure offRating/defRating are present (derived from attributes)
+        if (player.offRating === undefined || player.defRating === undefined) {
+            const pos = player.position || 'SF';
+            player.offRating = this.calculateOffRating(pos, player.attributes, player.measurables);
+            player.defRating = this.calculateDefRating(pos, player.attributes, player.measurables);
+        }
+        return needsMigration;
     }
 }

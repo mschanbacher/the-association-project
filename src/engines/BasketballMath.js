@@ -132,12 +132,21 @@ export function buildRotation(team, getFatiguePenaltyFn, isPlayoffs, CoachEngine
         })
         .map(p => {
             let effectiveRating = p.rating;
+            let effectiveOffRating = p.offRating || p.rating;
+            let effectiveDefRating = p.defRating || p.rating;
             if (p.injuryStatus === 'day-to-day' && p.injury && p.injury.ratingPenalty) {
                 effectiveRating += p.injury.ratingPenalty;
+                effectiveOffRating += p.injury.ratingPenalty;
+                effectiveDefRating += p.injury.ratingPenalty;
             }
-            effectiveRating += getFatiguePenaltyFn(p.fatigue || 0);
+            const fatiguePen = getFatiguePenaltyFn(p.fatigue || 0);
+            effectiveRating += fatiguePen;
+            effectiveOffRating += fatiguePen;
+            effectiveDefRating += fatiguePen;
             effectiveRating = Math.max(50, effectiveRating);
-            return { player: p, effectiveRating };
+            effectiveOffRating = Math.max(50, effectiveOffRating);
+            effectiveDefRating = Math.max(50, effectiveDefRating);
+            return { player: p, effectiveRating, effectiveOffRating, effectiveDefRating };
         });
 
     if (available.length === 0) return [];

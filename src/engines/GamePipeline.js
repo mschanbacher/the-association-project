@@ -346,11 +346,11 @@ export class GamePipeline {
         const shooterStats = stats[shooter.player.id];
         const archetype = POSITION_ARCHETYPES[shooter.player.position] || POSITION_ARCHETYPES['SF'];
 
-        // Rating-based modifiers — 3PT is less affected by raw talent than 2PT
-        const ratingDelta = shooter.effectiveRating - 75 + homeBonus + momentumBoost;
-        const ratingBonus2pt = ratingDelta * 0.003;    // 2PT: ±0.3% per rating point
-        const ratingBonus3pt = ratingDelta * 0.0015;   // 3PT: ±0.15% per rating point
-        const ratingBonusFt  = ratingDelta * 0.002;    // FT: ±0.2% per rating point
+        // Rating-based modifiers — use offensive rating for shooting calculations
+        const offRatingDelta = (shooter.effectiveOffRating || shooter.effectiveRating) - 75 + homeBonus + momentumBoost;
+        const ratingBonus2pt = offRatingDelta * 0.003;    // 2PT: ±0.3% per rating point
+        const ratingBonus3pt = offRatingDelta * 0.0015;   // 3PT: ±0.15% per rating point
+        const ratingBonusFt  = offRatingDelta * 0.002;    // FT: ±0.2% per rating point
         const defenseImpact = (defCoachMods.defenseModifier || 0) * 0.5;
         const chemBonus = (chemistry - 1.0) * 0.03;
 

@@ -139,38 +139,45 @@ export const StatEngine = {
         let totalStarterEdge = 0;
 
         for (let i = 0; i < myStarters.length; i++) {
-            const me = myStarters[i].player;
-            const them = theirStarters[i] ? theirStarters[i].player : null;
+            const me = myStarters[i];
+            const them = theirStarters[i];
             if (!them) continue;
 
             let matchupEdge = 0;
 
+            // --- Offense vs Defense rating comparison ---
+            // My offensive ability vs their defensive ability (±2 max)
+            const myOff = me.effectiveOffRating || me.effectiveRating;
+            const theirDef = them.effectiveDefRating || them.effectiveRating;
+            const offDefEdge = (myOff - theirDef) * 0.08;
+            matchupEdge += Math.max(-2, Math.min(2, offDefEdge));
+
             // --- Physical measurables comparison ---
-            const myM = me.measurables || {};
-            const theirM = them.measurables || {};
+            const myM = me.player.measurables || {};
+            const theirM = them.player.measurables || {};
 
-            // Height advantage: ±2 max (0.15 per inch diff)
+            // Height advantage: ±1.5 max (0.12 per inch diff — slightly reduced since off/def covers more)
             const heightDiff = (myM.height || 78) - (theirM.height || 78);
-            matchupEdge += Math.max(-2, Math.min(2, heightDiff * 0.15));
+            matchupEdge += Math.max(-1.5, Math.min(1.5, heightDiff * 0.12));
 
-            // Wingspan advantage: ±1.5 max (0.12 per inch diff)
+            // Wingspan advantage: ±1 max (0.08 per inch diff)
             const wingDiff = (myM.wingspan || 82) - (theirM.wingspan || 82);
-            matchupEdge += Math.max(-1.5, Math.min(1.5, wingDiff * 0.12));
+            matchupEdge += Math.max(-1, Math.min(1, wingDiff * 0.08));
 
             // --- Physical attribute comparison ---
-            const myA = me.attributes || {};
-            const theirA = them.attributes || {};
+            const myA = me.player.attributes || {};
+            const theirA = them.player.attributes || {};
 
-            // Speed advantage: ±1.5 max (faster player gets offensive edge)
+            // Speed advantage: ±1 max (faster player gets offensive edge)
             const speedDiff = (myA.speed || 50) - (theirA.speed || 50);
-            matchupEdge += Math.max(-1.5, Math.min(1.5, speedDiff * 0.02));
+            matchupEdge += Math.max(-1, Math.min(1, speedDiff * 0.015));
 
-            // Strength advantage: ±1.5 max (stronger player wins boards/post)
+            // Strength advantage: ±1 max (stronger player wins boards/post)
             const strDiff = (myA.strength || 50) - (theirA.strength || 50);
-            matchupEdge += Math.max(-1.5, Math.min(1.5, strDiff * 0.015));
+            matchupEdge += Math.max(-1, Math.min(1, strDiff * 0.012));
 
-            // Cap total per-matchup to ±4
-            matchupEdge = Math.max(-4, Math.min(4, matchupEdge));
+            // Cap total per-matchup to ±5 (slightly wider than before due to off/def component)
+            matchupEdge = Math.max(-5, Math.min(5, matchupEdge));
 
             mods[i] = matchupEdge;
             totalStarterEdge += matchupEdge;
@@ -207,7 +214,7 @@ export const StatEngine = {
     // ─────────────────────────────────────────────────────────────────────────
 
     _generatePlayerGameStats(entry, tier, chemModifier, homeBoost, isPlayoffs, teamCoachMods, opponentCoachMods, matchupModifier) {
-        const { player, effectiveRating, minutes, isStarter, usageShare } = entry;
+        const { player, effectiveRating, effectiveOffRating, minutes, isStarter, usageShare } = entry;
 
         if (minutes === 0) return emptyStatLine(player, isStarter);
 
@@ -237,10 +244,11 @@ export const StatEngine = {
             coachEffectScale = 0.7 + (coachability / 100) * 0.6;
         }
 
-        const boostedRating = effectiveRating + homeBoost + matchupMod + clutchMod;
-        const ratingDelta = boostedRating - 75;
-        const primaryScale = 1.0 + (ratingDelta * 0.020);
-        const secondaryScale = 1.0 + (ratingDelta * 0.008);
+        // Use offensive rating for scoring/shooting calculations
+        const offRating = (effectiveOffRating || effectiveRating) + homeBoost + matchupMod + clutchMod;
+        const offRatingDelta = offRating - 75;
+        const primaryScale = 1.0 + (offRatingDelta * 0.020);
+        const secondaryScale = 1.0 + (offRatingDelta * 0.008);
         const minutesFactor = minutes / 36;
         const usageMod = usageShare || 1.0;
         const chemMod = chemModifier || 1.0;
@@ -321,9 +329,9 @@ export const StatEngine = {
         const threePA = Math.round(fga * adjustedThreePtRate);
         const twoPA = fga - threePA;
 
-        const fgPctBonus = ratingDelta * 0.003;
-        const threePctBonus = ratingDelta * 0.0015;
-        const ftPctBonus = ratingDelta * 0.002;
+        const fgPctBonus = offRatingDelta * 0.003;
+        const threePctBonus = offRatingDelta * 0.0015;
+        const ftPctBonus = offRatingDelta * 0.002;
         const shootingHeat = this._normalRandom() * 0.06;
         // Opponent defensive intensity affects shooting (scaled by their coachability aggregate)
         const oppDefPenalty = scaledDefMod;

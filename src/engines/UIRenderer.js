@@ -66,6 +66,128 @@ export class UIRenderer {
 
     // ═══════════════════════════════════════════════════════════════
     /**
+     * Compact inline rating display: "78 OVR (82 / 74)" with color coding.
+     * Used in roster rows, trade rows, FA lists, draft boards.
+     * @param {Object} player - Must have .rating, optionally .offRating / .defRating
+     * @param {Function} getRatingColor - Color function for overall rating
+     * @returns {string} HTML string
+     */
+    static compactRating(player, getRatingColor) {
+        const rc = getRatingColor || (() => '#667eea');
+        const off = player.offRating;
+        const def = player.defRating;
+        if (off === undefined && def === undefined) {
+            // Legacy: no off/def data
+            return `<span style="color: ${rc(player.rating)}; font-weight: bold;">⭐ ${player.rating}</span>`;
+        }
+        const offColor = off >= 80 ? '#4ecdc4' : off >= 70 ? '#45b7d1' : off >= 60 ? '#fbbc04' : '#f28b82';
+        const defColor = def >= 80 ? '#4ecdc4' : def >= 70 ? '#45b7d1' : def >= 60 ? '#fbbc04' : '#f28b82';
+        return `<span style="color: ${rc(player.rating)}; font-weight: bold;">⭐ ${player.rating}</span>`
+             + `<span style="opacity: 0.75; margin-left: 6px; font-size: 0.88em;">`
+             + `(<span style="color: ${offColor};" title="Offensive Rating">${off}</span>`
+             + ` / `
+             + `<span style="color: ${defColor};" title="Defensive Rating">${def}</span>)`
+             + `</span>`;
+    }
+
+    /**
+     * Detailed three-number rating header with off/def balance bar.
+     * Used in scout detail, player profile, 📊 expand panels.
+     * @param {Object} player - Must have .rating, .offRating, .defRating
+     * @param {Function} getRatingColor - Color function
+     * @returns {string} HTML string
+     */
+    static detailedRatingHeader(player, getRatingColor) {
+        const rc = getRatingColor || (() => '#667eea');
+        const off = player.offRating || player.rating;
+        const def = player.defRating || player.rating;
+        const offColor = off >= 80 ? '#4ecdc4' : off >= 70 ? '#45b7d1' : off >= 60 ? '#fbbc04' : '#f28b82';
+        const defColor = def >= 80 ? '#4ecdc4' : def >= 70 ? '#45b7d1' : def >= 60 ? '#fbbc04' : '#f28b82';
+        // Balance bar: position a marker between pure-offense and pure-defense
+        const range = Math.max(1, (off + def));
+        const offPct = Math.round((off / range) * 100);
+        const offLabel = off > def + 3 ? 'Offensive' : def > off + 3 ? 'Defensive' : 'Two-Way';
+        const labelColor = off > def + 3 ? offColor : def > off + 3 ? defColor : '#aaa';
+        return `
+            <div style="display: flex; align-items: center; gap: 18px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 2em; font-weight: bold; color: ${rc(player.rating)};">${player.rating}</div>
+                    <div style="font-size: 0.75em; opacity: 0.6; margin-top: 2px;">OVR</div>
+                </div>
+                <div style="flex: 1;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.4em; font-weight: bold; color: ${offColor};">${off}</div>
+                            <div style="font-size: 0.7em; opacity: 0.6;">OFF</div>
+                        </div>
+                        <div style="text-align: center; padding-top: 4px;">
+                            <div style="font-size: 0.85em; font-weight: bold; color: ${labelColor};">${offLabel}</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.4em; font-weight: bold; color: ${defColor};">${def}</div>
+                            <div style="font-size: 0.7em; opacity: 0.6;">DEF</div>
+                        </div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 6px; position: relative; overflow: hidden;">
+                        <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${offPct}%; background: linear-gradient(90deg, ${offColor}, transparent); border-radius: 4px;"></div>
+                        <div style="position: absolute; right: 0; top: 0; height: 100%; width: ${100 - offPct}%; background: linear-gradient(270deg, ${defColor}, transparent); border-radius: 4px;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Attribute grid split into OFF and DEF sections.
+     * @param {Object} attributes - Player attributes object
+     * @param {Object} PlayerAttributes - The PlayerAttributes class (for PHYSICAL_ATTRS, MENTAL_ATTRS)
+     * @returns {string} HTML string
+     */
+    static splitAttributeGrid(attributes, PlayerAttributes) {
+        if (!attributes || !PlayerAttributes) return '';
+        const allDefs = { ...(PlayerAttributes.PHYSICAL_ATTRS || {}), ...(PlayerAttributes.MENTAL_ATTRS || {}) };
+
+        // Offensive attributes: clutch, basketballIQ, speed are offense-primary
+        const offKeys = ['clutch', 'basketballIQ', 'speed'];
+        // Defensive attributes: strength, verticality, endurance are defense-primary
+        const defKeys = ['strength', 'verticality', 'endurance'];
+        // Intangibles: modifiers that don't directly feed ratings
+        const intKeys = ['workEthic', 'coachability', 'collaboration'];
+
+        const attrCell = (key) => {
+            const val = attributes[key] || 50;
+            const def = allDefs[key] || {};
+            const color = val >= 80 ? '#4ecdc4' : val >= 70 ? '#45b7d1' : val >= 60 ? '#96ceb4' : val >= 50 ? '#fbbc04' : val >= 40 ? '#ffa07a' : '#f28b82';
+            return `<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(255,255,255,0.04); border-radius: 4px;">
+                <span style="font-size: 0.85em;">${def.icon || ''} ${def.name || key}</span>
+                <span style="font-weight: bold; color: ${color};">${val}</span>
+            </div>`;
+        };
+
+        const section = (label, emoji, keys, accentColor) => {
+            if (keys.length === 0) return '';
+            return `
+                <div>
+                    <div style="font-size: 0.8em; font-weight: bold; color: ${accentColor}; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        ${emoji} ${label}
+                    </div>
+                    <div style="display: grid; gap: 4px;">
+                        ${keys.map(k => attrCell(k)).join('')}
+                    </div>
+                </div>
+            `;
+        };
+
+        return `
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+                ${section('Offense', '⚔️', offKeys, '#4ecdc4')}
+                ${section('Defense', '🛡️', defKeys, '#45b7d1')}
+                ${section('Intangibles', '🧠', intKeys, '#96ceb4')}
+            </div>
+        `;
+    }
+
+    /**
      * Render a small colored tier badge for a player.
      */
     static getTierBadge(player) {
@@ -364,7 +486,7 @@ export class UIRenderer {
                         ${rosterBySalary.slice(0, 10).map(p => `
                             <tr style="border-top: 1px solid rgba(255,255,255,0.05);">
                                 <td style="padding: 6px 8px;">${p.name} <span style="opacity: 0.5;">${p.position}</span></td>
-                                <td style="padding: 6px 8px; text-align: center; color: ${getRatingColor(p.rating)};">${p.rating}</td>
+                                <td style="padding: 6px 8px; text-align: center; color: ${getRatingColor(p.rating)};">${p.rating}${p.offRating !== undefined ? `<span style="font-size: 0.75em; opacity: 0.6; margin-left: 4px;">(${p.offRating}/${p.defRating})</span>` : ''}</td>
                                 <td style="padding: 6px 8px; text-align: right; font-weight: bold;">${formatCurrency(p.salary)}</td>
                                 <td style="padding: 6px 8px; text-align: center; color: ${p.contractYears <= 1 ? '#fbbc04' : '#aaa'};">${p.contractYears <= 1 ? 'Expiring' : p.contractYears + 'yr'}</td>
                                 ${isRelegation && p.preRelegationSalary ? `<td style="padding: 6px 8px; text-align: right; opacity: 0.4; text-decoration: line-through;">${formatCurrency(p.preRelegationSalary)}</td>` : (isRelegation ? '<td style="padding: 6px 8px;"></td>' : '')}
@@ -597,7 +719,7 @@ export class UIRenderer {
                     <span style="opacity: 0.8; margin-left: 10px;">Age ${player.age}</span>
                 </div>
                 <div style="margin-top: 4px; font-size: 0.9em;">
-                    <span style="color: ${rc(player.rating)}; font-weight: bold;">⭐ ${player.rating}</span>
+                    ${UIRenderer.compactRating(player, rc)}
                     <span style="opacity: 0.7; margin-left: 15px;">💰 ${fc(player.salary)}</span>
                 </div>
             </div>
@@ -902,7 +1024,7 @@ export class UIRenderer {
                             <span style="opacity: 0.8; margin-left: 10px;">${player.age} years old</span>
                         </div>
                         <div style="margin-top: 4px;">
-                            <span style="color: ${ratingColor}; font-weight: bold;">⭐ ${player.rating}</span>
+                            ${UIRenderer.compactRating(player)}
                             <span style="opacity: 0.7; margin-left: 15px;">💰 ${UIRenderer.formatCurrency(player.salary)}/yr</span>
                             ${!canAfford ? '<span style="color: #ea4335; margin-left: 10px;">⚠️ Can\'t afford</span>' : ''}
                         </div>
@@ -930,7 +1052,7 @@ export class UIRenderer {
                             <span style="opacity: 0.8; margin-left: 10px;">Age ${player.age}</span>
                         </div>
                         <div>
-                            <span style="color: ${ratingColor}; font-weight: bold;">⭐ ${player.rating}</span>
+                            ${UIRenderer.compactRating(player)}
                             <span style="opacity: 0.7; margin-left: 15px;">💰 ${UIRenderer.formatCurrency(player.salary)}/yr</span>
                             <span style="color: #fbbc04; margin-left: 15px;">📝 New: ${newContractYears} year${newContractYears > 1 ? 's' : ''}</span>
                             ${!canAfford ? '<span style="color: #ea4335; margin-left: 10px;">⚠️ Can\'t afford</span>' : ''}
@@ -1040,6 +1162,7 @@ export class UIRenderer {
                     </div>
                     <div style="text-align: right;">
                         <div style="color: ${ratingColor}; font-weight: bold; font-size: 1.1em;">⭐ ${result.player.rating}</div>
+                        ${result.player.offRating !== undefined ? `<div style="font-size: 0.8em; opacity: 0.75; margin-top: 1px;"><span style="color: ${result.player.offRating >= 70 ? '#4ecdc4' : '#fbbc04'};">${result.player.offRating}</span> / <span style="color: ${result.player.defRating >= 70 ? '#45b7d1' : '#fbbc04'};">${result.player.defRating}</span></div>` : ''}
                         <div style="font-size: 0.85em; opacity: 0.7; margin-top: 3px;">${result.teamName} ${tradedIndicator}</div>
                     </div>
                 </div>
@@ -1072,7 +1195,10 @@ export class UIRenderer {
                                 <div style="font-size: 0.9em; opacity: 0.8;">${result.player.position} | Age ${result.player.age}</div>
                             </div>
                         </div>
-                        <div style="color: ${ratingColor}; font-weight: bold; font-size: 1.3em;">⭐ ${result.player.rating}</div>
+                        <div style="text-align: right;">
+                            <div style="color: ${ratingColor}; font-weight: bold; font-size: 1.3em;">⭐ ${result.player.rating}</div>
+                            ${result.player.offRating !== undefined ? `<div style="font-size: 0.85em; opacity: 0.75;"><span style="color: ${result.player.offRating >= 70 ? '#4ecdc4' : '#fbbc04'};">${result.player.offRating}</span> / <span style="color: ${result.player.defRating >= 70 ? '#45b7d1' : '#fbbc04'};">${result.player.defRating}</span></div>` : ''}
+                        </div>
                     </div>
                 </div>
             `;
@@ -1095,7 +1221,7 @@ export class UIRenderer {
                 <div>
                     <strong>${player.name}</strong>
                     <span style="opacity: 0.8; margin-left: 10px;">${player.position} · Age ${player.age}</span>
-                    <span style="color: ${ratingColor}; margin-left: 10px; font-weight: bold;">⭐ ${player.rating}</span>
+                    <span style="margin-left: 10px;">${UIRenderer.compactRating(player)}</span>
                     <span style="opacity: 0.7; margin-left: 10px;">💰 ${UIRenderer.formatCurrency(player.salary)}/yr</span>
                 </div>
                 <button onclick="signFreeAgent(${player.id})" ${!canAfford ? 'disabled' : ''} class="success" style="padding: 6px 16px; ${!canAfford ? 'opacity: 0.4; cursor: not-allowed;' : ''}">Sign</button>
@@ -1160,7 +1286,7 @@ export class UIRenderer {
                     <span style="color: #fbbc04; margin-left: 8px; font-weight: bold;">⭐ YOUR PLAYER</span>
                     ${watched ? '<span style="color: #bb86fc; margin-left: 6px;" title="On Watch List">🔍</span>' : ''}
                 </td>
-                <td style="padding: 10px; text-align: center; font-weight: bold;">${player.rating}</td>
+                <td style="padding: 10px; text-align: center; font-weight: bold;">${player.rating}${player.offRating !== undefined ? `<div style="font-size: 0.72em; opacity: 0.65; font-weight: normal;">${player.offRating}/${player.defRating}</div>` : ''}</td>
                 <td style="padding: 10px; text-align: center; font-weight: bold; color: ${gradeColor};">${fitGrade}</td>
                 <td style="padding: 10px; text-align: center;">${player.position}</td>
                 <td style="padding: 10px; text-align: center;">${player.age}</td>
@@ -1194,7 +1320,7 @@ export class UIRenderer {
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); background: ${bg};">
                 <td style="padding: 10px;"><input type="checkbox" id="fa_${player.id}" onchange="toggleFreeAgentSelection('${player.id}')" ${isChecked ? 'checked' : ''} style="width: 20px; height: 20px; cursor: pointer;"></td>
                 <td style="padding: 10px;"><strong>${player.name}</strong>${gradBadge}${isWatched ? ' <span style="color: #bb86fc;" title="On Watch List">🔍</span>' : ''}</td>
-                <td style="padding: 10px; text-align: center; font-weight: bold;">${player.rating}</td>
+                <td style="padding: 10px; text-align: center; font-weight: bold;">${player.rating}${player.offRating !== undefined ? `<div style="font-size: 0.72em; opacity: 0.65; font-weight: normal;">${player.offRating}/${player.defRating}</div>` : ''}</td>
                 <td style="padding: 10px; text-align: center; font-weight: bold; color: ${gradeColor};">${fitGrade}</td>
                 <td style="padding: 10px; text-align: center;">${player.position}</td>
                 <td style="padding: 10px; text-align: center;">${player.age}</td>
@@ -1394,7 +1520,7 @@ export class UIRenderer {
                             ${injuryDisplay}
                         </div>
                         <div style="margin-top: 4px; font-size: 0.9em;">
-                            <span style="color: ${ratingColor}; font-weight: bold;">⭐ ${player.rating}</span>
+                            ${UIRenderer.compactRating(player, getRatingColor)}
                             <span style="opacity: 0.7; margin-left: 15px;">💰 ${fc(player.salary)}</span>
                             ${fatigueDisplay}
                             <span style="margin-left: 12px;">${attrPreview}</span>
@@ -1435,7 +1561,7 @@ export class UIRenderer {
                         <span style="color: ${contractColor}; margin-left: 10px; font-weight: bold;">📝 ${contractYears}yr</span>
                     </div>
                     <div style="margin-top: 4px; font-size: 0.9em;">
-                        <span style="color: ${ratingColor}; font-weight: bold;">⭐ ${player.rating}</span>
+                        ${UIRenderer.compactRating(player, getRatingColor)}
                         <span style="opacity: 0.7; margin-left: 15px;">💰 ${fc(player.salary)}</span>
                     </div>
                 </div>
@@ -1521,11 +1647,12 @@ export class UIRenderer {
                             ${player.position} · Age ${player.age} · T${player._teamTier} ${player._teamName}
                             ${player.college ? ` · 🎓 ${player.college}` : ''}
                         </div>
+                        <div style="font-size: 0.85em; opacity: 0.7; margin-top: 2px;">${fc(player.salary)} · ${player.contractYears}yr</div>
                     </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 2em; font-weight: bold; color: ${rc(player.rating)};">${player.rating}</div>
-                        <div style="font-size: 0.85em; opacity: 0.7;">${fc(player.salary)} · ${player.contractYears}yr</div>
-                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    ${UIRenderer.detailedRatingHeader(player, rc)}
                 </div>
                 
                 ${player.measurables ? `
@@ -1536,16 +1663,8 @@ export class UIRenderer {
                 </div>
                 ` : ''}
                 
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 15px;">
-                    ${(attrKeys || []).map(key => {
-                        const val = (attrs || {})[key] || 50;
-                        const def = (PlayerAttributes.PHYSICAL_ATTRS || {})[key] || (PlayerAttributes.MENTAL_ATTRS || {})[key] || {};
-                        const color = val >= 70 ? '#34a853' : val >= 55 ? '#fbbc04' : val >= 40 ? '#f28b82' : '#ea4335';
-                        return `<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(255,255,255,0.04); border-radius: 4px;">
-                            <span style="font-size: 0.85em;">${def.icon || ''} ${def.name || key}</span>
-                            <span style="font-weight: bold; color: ${color};">${val}</span>
-                        </div>`;
-                    }).join('')}
+                <div style="margin-bottom: 15px;">
+                    ${UIRenderer.splitAttributeGrid(attrs || player.attributes, PlayerAttributes)}
                 </div>
                 
                 <div style="background: rgba(102,126,234,0.1); border-radius: 8px; padding: 15px; border: 1px solid rgba(102,126,234,0.3);">
@@ -1598,7 +1717,7 @@ export class UIRenderer {
             <td style="padding: 8px;"><strong>${p.name}</strong>${p.isCollegeGrad ? ' 🎓' : ''}</td>
             <td style="padding: 8px; text-align: center; font-weight: bold;">${p.position}</td>
             <td style="padding: 8px; text-align: center;">${p.age}</td>
-            <td style="padding: 8px; text-align: center; font-weight: bold; color: ${rc(p.rating)};">${p.rating}</td>
+            <td style="padding: 8px; text-align: center; font-weight: bold; color: ${rc(p.rating)};">${p.rating}${p.offRating !== undefined ? `<div style="font-size: 0.75em; opacity: 0.7; font-weight: normal;">${p.offRating}/${p.defRating}</div>` : ''}</td>
             <td style="padding: 8px; text-align: center; font-weight: bold; color: ${gc(fit.grade)};">${fit.grade}</td>
             <td style="padding: 8px; text-align: right; font-size: 0.9em;">${fc(p.salary)}</td>
             <td style="padding: 8px; text-align: center;">${contractLabel}</td>
@@ -1637,7 +1756,7 @@ export class UIRenderer {
             <td style="padding: 7px 8px;"><strong>${p.name}</strong>${gradBadge}</td>
             <td style="padding: 7px 8px; text-align: center; font-weight: bold;">${p.position}</td>
             <td style="padding: 7px 8px; text-align: center;">${p.age}</td>
-            <td style="padding: 7px 8px; text-align: center; font-weight: bold; color: ${rc(p.rating)};">${p.rating}</td>
+            <td style="padding: 7px 8px; text-align: center; font-weight: bold; color: ${rc(p.rating)};">${p.rating}${p.offRating !== undefined ? `<div style="font-size: 0.72em; opacity: 0.7; font-weight: normal;">${p.offRating}/${p.defRating}</div>` : ''}</td>
             <td style="padding: 7px 8px; text-align: center; font-weight: bold; color: ${gc(fit.grade)}; font-size: 1.1em;">${fit.grade}</td>
             <td style="padding: 7px 8px; text-align: center; color: ${gc(fit.systemFit.grade)};">${fit.systemFit.grade}</td>
             <td style="padding: 7px 8px; text-align: center; font-size: 0.85em;">${fit.roleFit.label.replace(/🔥|📢|⬆️|⚠️/g, '').trim()}</td>
@@ -2958,6 +3077,7 @@ export class UIRenderer {
                     </td>
                     <td style="padding: 8px 10px; text-align: center; font-weight: bold; color: ${getRatingColor(player.rating)};">
                         ${player.rating}
+                        ${player.offRating !== undefined ? `<div style="font-size: 0.72em; opacity: 0.65; font-weight: normal;">${player.offRating}/${player.defRating}</div>` : ''}
                     </td>
                     <td style="padding: 8px 10px; text-align: center; color: ${ceilingColor};">
                         ↑${player.projectedCeiling}
@@ -2980,7 +3100,14 @@ export class UIRenderer {
         const m = player.measurables || {};
         const a = player.attributes || {};
 
-        let html = '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 0.88em;">';
+        let html = '';
+
+        // Rating header with off/def balance
+        html += `<div style="margin-bottom: 14px;">`;
+        html += UIRenderer.detailedRatingHeader(player, PlayerAttributes.getAttrColor);
+        html += `</div>`;
+
+        html += '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; font-size: 0.88em;">';
 
         // Column 1: Measurables
         html += '<div>';
@@ -2990,13 +3117,11 @@ export class UIRenderer {
         html += `<div style="margin-bottom: 4px;">Wingspan: <strong>${PlayerAttributes.formatWingspan(m.wingspan || 82)}</strong></div>`;
         html += '</div>';
 
-        // Column 2: Physical Attributes
-        html += '<div>';
-        html += '<div style="font-weight: bold; margin-bottom: 8px; opacity: 0.8;">💪 PHYSICAL</div>';
-        for (const [key, def] of Object.entries(PlayerAttributes.PHYSICAL_ATTRS)) {
+        // Helper for attribute bar
+        const attrBar = (key, def) => {
             const val = a[key] || 50;
             const color = PlayerAttributes.getAttrColor(val);
-            html += `<div style="margin-bottom: 6px;">
+            return `<div style="margin-bottom: 6px;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
                     <span>${def.icon} ${def.name}</span>
                     <span style="color: ${color}; font-weight: bold;">${val}</span>
@@ -3005,24 +3130,33 @@ export class UIRenderer {
                     <div style="height: 100%; width: ${val}%; background: ${color}; border-radius: 3px;"></div>
                 </div>
             </div>`;
+        };
+
+        // Column 2: Offensive Attributes
+        const offKeys = ['clutch', 'basketballIQ', 'speed'];
+        const allDefs = { ...PlayerAttributes.PHYSICAL_ATTRS, ...PlayerAttributes.MENTAL_ATTRS };
+        html += '<div>';
+        html += '<div style="font-weight: bold; margin-bottom: 8px; color: #4ecdc4;">⚔️ OFFENSE</div>';
+        for (const key of offKeys) {
+            if (allDefs[key]) html += attrBar(key, allDefs[key]);
         }
         html += '</div>';
 
-        // Column 3: Mental Attributes
+        // Column 3: Defensive Attributes
+        const defKeys = ['strength', 'verticality', 'endurance'];
         html += '<div>';
-        html += '<div style="font-weight: bold; margin-bottom: 8px; opacity: 0.8;">🧠 MENTAL</div>';
-        for (const [key, def] of Object.entries(PlayerAttributes.MENTAL_ATTRS)) {
-            const val = a[key] || 50;
-            const color = PlayerAttributes.getAttrColor(val);
-            html += `<div style="margin-bottom: 6px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
-                    <span>${def.icon} ${def.name}</span>
-                    <span style="color: ${color}; font-weight: bold;">${val}</span>
-                </div>
-                <div style="height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
-                    <div style="height: 100%; width: ${val}%; background: ${color}; border-radius: 3px;"></div>
-                </div>
-            </div>`;
+        html += '<div style="font-weight: bold; margin-bottom: 8px; color: #45b7d1;">🛡️ DEFENSE</div>';
+        for (const key of defKeys) {
+            if (allDefs[key]) html += attrBar(key, allDefs[key]);
+        }
+        html += '</div>';
+
+        // Column 4: Intangibles
+        const intKeys = ['workEthic', 'coachability', 'collaboration'];
+        html += '<div>';
+        html += '<div style="font-weight: bold; margin-bottom: 8px; color: #96ceb4;">🧠 INTANGIBLES</div>';
+        for (const key of intKeys) {
+            if (allDefs[key]) html += attrBar(key, allDefs[key]);
         }
         html += '</div>';
 
@@ -3329,6 +3463,7 @@ export class UIRenderer {
                             </div>
                             <div style="text-align: right;">
                                 <div style="font-weight: bold;">${player.rating}</div>
+                                ${player.offRating !== undefined ? `<div style="font-size: 0.75em; opacity: 0.6;">${player.offRating}/${player.defRating}</div>` : ''}
                                 <div style="opacity: 0.6; font-size: 0.85em;">${yearsLeft}yr${yearsLeft !== 1 ? 's' : ''}</div>
                             </div>
                         </div>
@@ -3386,7 +3521,7 @@ export class UIRenderer {
                         <span style="color: ${contractColor}; margin-left: 10px; font-weight: bold;">📝 ${contractYears}yr${contractYears > 1 ? 's' : ''}</span>
                     </div>
                     <div style="margin-top: 4px; font-size: 0.9em;">
-                        <span style="color: ${getRatingColor(player.rating)}; font-weight: bold;">⭐ ${player.rating}</span>
+                        ${UIRenderer.compactRating(player, getRatingColor)}
                         <span style="opacity: 0.7; margin-left: 15px;">💰 ${formatCurrency(player.salary)}</span>
                         ${!canAfford && !rosterFull ? `<span style="color: #ea4335; margin-left: 10px;">⚠️ Can't afford</span>` : ''}
                     </div>
@@ -3429,6 +3564,13 @@ export class UIRenderer {
                         <div style="color: ${getRatingColor(prospect.rating)}; font-weight: bold; font-size: 1.3em;">
                             ⭐ ${prospect.rating}
                         </div>
+                        ${prospect.offRating !== undefined ? `
+                        <div style="font-size: 0.8em; opacity: 0.75; margin-top: 2px;">
+                            <span style="color: ${prospect.offRating >= 70 ? '#4ecdc4' : '#fbbc04'};">${prospect.offRating}</span>
+                            /
+                            <span style="color: ${prospect.defRating >= 70 ? '#45b7d1' : '#fbbc04'};">${prospect.defRating}</span>
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -3458,7 +3600,7 @@ export class UIRenderer {
                 <div style="padding: 6px; margin-bottom: 4px; background: rgba(255,255,255,0.03); border-radius: 4px;">
                     <div style="display: flex; justify-content: space-between;">
                         <span>${player.name}</span>
-                        <span style="color: ${getRatingColor(player.rating)};">⭐ ${player.rating}</span>
+                        <span>${UIRenderer.compactRating(player, getRatingColor)}</span>
                     </div>
                     <div style="opacity: 0.7; font-size: 0.85em; margin-top: 2px;">
                         ${player.position} | Age ${player.age}

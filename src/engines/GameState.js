@@ -62,10 +62,14 @@ class GameState {
         this._lastAiTradeCheck = 0;            // Game number of last AI trade check
         this._scoutingWatchList = [];           // User-curated scouting watch list
         
+        // --- Persistent: playoff state (survives save/load during playoffs) ---
+        this._postseasonResults = null;         // Playoff/promo-rel results for current offseason
+        this._championshipPlayoffData = null;   // T1 interactive playoff bracket data
+        this._t2PlayoffData = null;             // T2 interactive playoff state
+        this._t3PlayoffData = null;             // T3 interactive playoff state
+        
         // --- Transient: regenerated during gameplay, reset on load ---
         this._pendingInjuries = [];             // Injuries awaiting user decision
-        this._postseasonResults = null;         // Playoff/promo-rel results for current offseason
-        this._championshipPlayoffData = null;   // Active playoff bracket data
         this._userPlayoffResult = null;         // User's playoff outcome
         this._seasonEndData = null;             // Cached season-end summary for modals
         
@@ -204,6 +208,12 @@ class GameState {
     
     get championshipPlayoffData() { return this._championshipPlayoffData; }
     set championshipPlayoffData(value) { this._championshipPlayoffData = value; }
+    
+    get t2PlayoffData() { return this._t2PlayoffData; }
+    set t2PlayoffData(value) { this._t2PlayoffData = value; }
+    
+    get t3PlayoffData() { return this._t3PlayoffData; }
+    set t3PlayoffData(value) { this._t3PlayoffData = value; }
     
     get userPlayoffResult() { return this._userPlayoffResult; }
     set userPlayoffResult(value) { this._userPlayoffResult = value; }
@@ -607,6 +617,83 @@ class GameState {
     }
     
     // ============================================
+    // PLAYOFF SERIALIZATION HELPERS
+    // ============================================
+    // Team objects in playoff data are live references to gameState team arrays.
+    // For serialization we replace them with { _ref: teamId } markers,
+    // and on deserialization we re-link them to the loaded team objects.
+    
+    /**
+     * Returns true if `obj` looks like a team object (has id + roster/city).
+     * Avoids false positives on series results, player objects, etc.
+     */
+    static _isTeamObj(obj) {
+        return obj && typeof obj === 'object' && typeof obj.id === 'string' && 
+               (Array.isArray(obj.roster) || obj.city !== undefined || obj.division !== undefined) &&
+               obj._ref === undefined;
+    }
+    
+    /**
+     * Recursively walk a data structure and replace team objects with { _ref: teamId }.
+     * Preserves all non-team data (scores, strings, numbers, booleans, null) as-is.
+     * Handles arrays, plain objects, and the known playoff sub-structures.
+     */
+    static _dehydrate(obj) {
+        if (obj === null || obj === undefined) return obj;
+        if (typeof obj !== 'object') return obj; // number, string, boolean
+        
+        // Team object → reference marker
+        if (GameState._isTeamObj(obj)) {
+            return { _ref: obj.id };
+        }
+        
+        // Array → map each element
+        if (Array.isArray(obj)) {
+            return obj.map(item => GameState._dehydrate(item));
+        }
+        
+        // Plain object → recurse into each value
+        const result = {};
+        for (const key of Object.keys(obj)) {
+            // Skip transient/internal properties (leading underscore working data)
+            if (key.startsWith('_pending') || key.startsWith('_current')) continue;
+            result[key] = GameState._dehydrate(obj[key]);
+        }
+        return result;
+    }
+    
+    /**
+     * Recursively walk a deserialized structure and replace { _ref: teamId }
+     * markers with actual team objects from the provided lookup map.
+     */
+    static _rehydrate(obj, teamLookup) {
+        if (obj === null || obj === undefined) return obj;
+        if (typeof obj !== 'object') return obj;
+        
+        // Reference marker → team object
+        if (obj._ref !== undefined) {
+            const team = teamLookup[obj._ref];
+            if (!team) {
+                console.warn(`⚠️ Playoff rehydrate: team ${obj._ref} not found`);
+                return obj; // Leave marker as-is if team disappeared
+            }
+            return team;
+        }
+        
+        // Array → map each element
+        if (Array.isArray(obj)) {
+            return obj.map(item => GameState._rehydrate(item, teamLookup));
+        }
+        
+        // Plain object → recurse into each value
+        const result = {};
+        for (const key of Object.keys(obj)) {
+            result[key] = GameState._rehydrate(obj[key], teamLookup);
+        }
+        return result;
+    }
+    
+    // ============================================
     // SERIALIZATION (Save/Load)
     // ============================================
     
@@ -691,7 +778,7 @@ class GameState {
         };
         
         return JSON.stringify({
-            _v: 3, // Save format version — v3 adds offseason/persistent state
+            _v: 4, // Save format version — v4 adds playoff state persistence
             currentSeason: this._currentSeason,
             currentTier: this._currentTier,
             userTeamId: this._userTeamId,
@@ -718,6 +805,11 @@ class GameState {
             retirementHistory: this._retirementHistory,
             lastAiTradeCheck: this._lastAiTradeCheck,
             scoutingWatchList: this._scoutingWatchList,
+            // v4: playoff state persistence (dehydrated: team objects → {_ref: id})
+            postseasonResults: GameState._dehydrate(this._postseasonResults),
+            championshipPlayoffData: GameState._dehydrate(this._championshipPlayoffData),
+            t2PlayoffData: GameState._dehydrate(this._t2PlayoffData),
+            t3PlayoffData: GameState._dehydrate(this._t3PlayoffData),
             lastSaveTime: new Date().toISOString(),
             gameVersion: this._gameVersion
         });
@@ -851,6 +943,26 @@ class GameState {
         state._retirementHistory = data.retirementHistory || [];
         state._lastAiTradeCheck = data.lastAiTradeCheck || 0;
         state._scoutingWatchList = data.scoutingWatchList || [];
+        
+        // v4: playoff state persistence (rehydrate team references)
+        if (data._v >= 4 && (data.postseasonResults || data.championshipPlayoffData || data.t2PlayoffData || data.t3PlayoffData)) {
+            // Build team lookup map: id → team object
+            const teamLookup = {};
+            for (const team of [...state._tier1Teams, ...state._tier2Teams, ...state._tier3Teams]) {
+                teamLookup[team.id] = team;
+            }
+            
+            state._postseasonResults = data.postseasonResults 
+                ? GameState._rehydrate(data.postseasonResults, teamLookup) : null;
+            state._championshipPlayoffData = data.championshipPlayoffData 
+                ? GameState._rehydrate(data.championshipPlayoffData, teamLookup) : null;
+            state._t2PlayoffData = data.t2PlayoffData 
+                ? GameState._rehydrate(data.t2PlayoffData, teamLookup) : null;
+            state._t3PlayoffData = data.t3PlayoffData 
+                ? GameState._rehydrate(data.t3PlayoffData, teamLookup) : null;
+            
+            console.log('🏆 Playoff state restored from save');
+        }
         
         console.log(`📁 Game loaded: Season ${state._currentSeason}, ${state._tier1Teams.length + state._tier2Teams.length + state._tier3Teams.length} teams${isV2 ? ' (v2+ compressed)' : ''}`);
         

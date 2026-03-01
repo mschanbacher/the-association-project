@@ -419,6 +419,20 @@ export class TradeController {
             source: 'user_proposed'
         });
 
+        // Log to trade history
+        if (gameState.tradeHistory) {
+            gameState.tradeHistory.push({
+                season: gameState.currentSeason,
+                date: gameState.currentDate,
+                tier: gameState.currentTier,
+                team1: { id: userTeam.id, name: userTeam.name },
+                team2: { id: aiTeam.id, name: aiTeam.name },
+                team1Gave: result.playersToTeam2.map(p => ({ id: p.id, name: p.name, position: p.position, rating: p.rating })),
+                team2Gave: result.playersToTeam1.map(p => ({ id: p.id, name: p.name, position: p.position, rating: p.rating })),
+                type: 'user-proposed'
+            });
+        }
+
         helpers.updateUI();
     }
 
@@ -457,7 +471,7 @@ export class TradeController {
                 aiTeamName: proposal.aiTeamName,
                 aiTeamId: proposal.aiTeamId
             });
-            this.showAiTradeProposal();
+            // Don't auto-show — caller (sim loop) decides when to display
         } else {
             gameState.lastAiTradeCheck = userGamesPlayed;
         }
@@ -554,6 +568,20 @@ export class TradeController {
             userReceived: proposal.aiGives.map(p => p.name),
             source: 'ai_proposal'
         });
+
+        // Log to trade history
+        if (gameState.tradeHistory) {
+            gameState.tradeHistory.push({
+                season: gameState.currentSeason,
+                date: gameState.currentDate,
+                tier: gameState.currentTier,
+                team1: { id: aiTeam.id, name: proposal.aiTeamName },
+                team2: { id: userTeam.id, name: userTeam.name },
+                team1Gave: proposal.aiGives.map(p => ({ id: p.id, name: p.name, position: p.position, rating: p.rating })),
+                team2Gave: proposal.userGives.map(p => ({ id: p.id, name: p.name, position: p.position, rating: p.rating })),
+                type: 'ai-proposal-accepted'
+            });
+        }
 
         document.getElementById('aiTradeProposalModal').classList.add('hidden');
         helpers.updateUI();

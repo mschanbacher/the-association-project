@@ -61,6 +61,9 @@ class GameState {
         this._retirementHistory = [];          // Accumulates across seasons
         this._lastAiTradeCheck = 0;            // Game number of last AI trade check
         this._scoutingWatchList = [];           // User-curated scouting watch list
+        this._tradeHistory = [];               // All trades (user + AI-AI) across seasons
+        this._lastAiToAiTradeDate = null;      // Date string of last AI-AI trade check
+        this._pendingBreakingNews = null;       // Notable trade to show user
         
         // --- Persistent: playoff state (survives save/load during playoffs) ---
         this._postseasonResults = null;         // Playoff/promo-rel results for current offseason
@@ -198,6 +201,13 @@ class GameState {
     
     get scoutingWatchList() { return this._scoutingWatchList; }
     set scoutingWatchList(value) { this._scoutingWatchList = value; }
+
+    get tradeHistory() { return this._tradeHistory; }
+    set tradeHistory(value) { this._tradeHistory = value; }
+    get lastAiToAiTradeDate() { return this._lastAiToAiTradeDate; }
+    set lastAiToAiTradeDate(value) { this._lastAiToAiTradeDate = value; }
+    get pendingBreakingNews() { return this._pendingBreakingNews; }
+    set pendingBreakingNews(value) { this._pendingBreakingNews = value; }
     
     // --- Transient: season/offseason flow ---
     get pendingInjuries() { return this._pendingInjuries; }
@@ -805,6 +815,8 @@ class GameState {
             retirementHistory: this._retirementHistory,
             lastAiTradeCheck: this._lastAiTradeCheck,
             scoutingWatchList: this._scoutingWatchList,
+            tradeHistory: this._tradeHistory,
+            lastAiToAiTradeDate: this._lastAiToAiTradeDate,
             // v4: playoff state persistence (dehydrated: team objects → {_ref: id})
             postseasonResults: GameState._dehydrate(this._postseasonResults),
             championshipPlayoffData: GameState._dehydrate(this._championshipPlayoffData),
@@ -943,6 +955,8 @@ class GameState {
         state._retirementHistory = data.retirementHistory || [];
         state._lastAiTradeCheck = data.lastAiTradeCheck || 0;
         state._scoutingWatchList = data.scoutingWatchList || [];
+        state._tradeHistory = data.tradeHistory || [];
+        state._lastAiToAiTradeDate = data.lastAiToAiTradeDate || null;
         
         // v4: playoff state persistence (rehydrate team references)
         if (data._v >= 4 && (data.postseasonResults || data.championshipPlayoffData || data.t2PlayoffData || data.t3PlayoffData)) {

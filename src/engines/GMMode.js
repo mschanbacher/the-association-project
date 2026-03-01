@@ -199,6 +199,26 @@ export class GMMode {
         if (unplayedToday > 0) {
             // Simulate today's games
             this._simulateAllGamesOnDate(currentDate, false);
+
+            // Check for pending AI-to-user trade proposal
+            if (this.gameState.pendingTradeProposal) {
+                this.deps.saveGameState();
+                this.deps.updateUI();
+                this.deps.showAiTradeProposal();
+                return; // User deals with proposal before continuing
+            }
+
+            // Process AI-AI trades
+            const notable = this.processAiToAiTrades(currentDate);
+            if (notable) {
+                this.showBreakingNews(notable).then(() => {
+                    this._showPostGameIfUserPlayed(currentDate);
+                    this.deps.saveGameState();
+                    this.deps.updateUI();
+                });
+                return;
+            }
+
             this._showPostGameIfUserPlayed(currentDate);
             this.deps.saveGameState();
             this.deps.updateUI();
@@ -283,6 +303,31 @@ export class GMMode {
             if (unplayed > 0) {
                 this._simulateAllGamesOnDate(simDate, true); // silent for batch
             }
+
+            // Process AI-AI trades
+            const notable = this.processAiToAiTrades(simDate);
+
+            // Check if we need to interrupt for a user trade proposal or breaking news
+            if (this.gameState.pendingTradeProposal) {
+                // AI wants to trade with user — pause sim and show proposal
+                this.gameState.currentDate = this.deps.CalendarEngine.addDays(simDate, 1);
+                this.deps.saveGameState();
+                this.deps.updateUI();
+                this.deps.showAiTradeProposal(); // Show the pending proposal modal
+                return; // Stop sim — user will resume after accepting/rejecting
+            }
+
+            if (notable) {
+                // Notable AI-AI trade — pause for Breaking News, then resume
+                this.gameState.currentDate = this.deps.CalendarEngine.addDays(simDate, 1);
+                this.deps.saveGameState();
+                this.deps.updateUI();
+                this.showBreakingNews(notable).then(() => {
+                    // Resume simming the remaining days
+                    this._resumeSimWeek(this.gameState.currentDate, endDate);
+                });
+                return;
+            }
             
             simDate = this.deps.CalendarEngine.addDays(simDate, 1);
         }
@@ -294,6 +339,44 @@ export class GMMode {
         if (this.gameState.isSeasonComplete()) {
             this.deps.showSeasonEnd();
         }
+    }
+
+    /**
+     * Resume a Sim Week after a Breaking News interruption.
+     * @param {string} fromDate - Current date to resume from
+     * @param {string} endDate - Original end date of the week
+     */
+    _resumeSimWeek(fromDate, endDate) {
+        let simDate = fromDate;
+        while (simDate < endDate) {
+            if (this.gameState.isSeasonComplete()) { this.deps.showSeasonEnd(); return; }
+
+            const games = this.deps.CalendarEngine.getGamesForDate(simDate, this.gameState);
+            const unplayed = games.tier1.filter(g => !g.played).length +
+                           games.tier2.filter(g => !g.played).length +
+                           games.tier3.filter(g => !g.played).length;
+            if (unplayed > 0) this._simulateAllGamesOnDate(simDate, true);
+
+            const notable = this.processAiToAiTrades(simDate);
+
+            if (this.gameState.pendingTradeProposal) {
+                this.gameState.currentDate = this.deps.CalendarEngine.addDays(simDate, 1);
+                this.deps.saveGameState(); this.deps.updateUI();
+                this.deps.showAiTradeProposal();
+                return;
+            }
+            if (notable) {
+                this.gameState.currentDate = this.deps.CalendarEngine.addDays(simDate, 1);
+                this.deps.saveGameState(); this.deps.updateUI();
+                this.showBreakingNews(notable).then(() => this._resumeSimWeek(this.gameState.currentDate, endDate));
+                return;
+            }
+
+            simDate = this.deps.CalendarEngine.addDays(simDate, 1);
+        }
+        this.gameState.currentDate = endDate;
+        this.deps.saveGameState(); this.deps.updateUI();
+        if (this.gameState.isSeasonComplete()) this.deps.showSeasonEnd();
     }
     
     /**
@@ -459,8 +542,19 @@ export class GMMode {
         simTierGames(todaysGames.tier2, this.gameState.tier2Teams, silent || !todaysGames.tier2.some(g => g.homeTeamId === userTeamId || g.awayTeamId === userTeamId));
         simTierGames(todaysGames.tier3, this.gameState.tier3Teams, silent || !todaysGames.tier3.some(g => g.homeTeamId === userTeamId || g.awayTeamId === userTeamId));
         
-        // Check for AI trade proposals (once per day the user team plays)
-        if (userTeamPlayedToday && !silent) {
+        // Check for AI-to-user trade proposals (runs during all sim modes)
+        // Note: only generates the proposal. Caller is responsible for showing the modal.
+        if (userTeamPlayedToday) {
+            this._generateUserTradeProposal();
+        }
+    }
+
+    /**
+     * Generate (but don't show) an AI-to-user trade proposal.
+     * Sets gameState.pendingTradeProposal if a viable one is found.
+     */
+    _generateUserTradeProposal() {
+        if (this.deps.checkForAiTradeProposals) {
             this.deps.checkForAiTradeProposals();
         }
     }
@@ -577,9 +671,32 @@ export class GMMode {
                 this._simulateAllGamesOnDate(currentDate, true);
                 gamesSimulated += unplayed;
             }
+
+            // Process AI-AI trades
+            const notable = this.processAiToAiTrades(currentDate);
             
             // Advance to next day
             this.gameState.currentDate = this.deps.CalendarEngine.addDays(currentDate, 1);
+
+            // Interrupt for AI-to-user trade proposal
+            if (this.gameState.pendingTradeProposal) {
+                this.deps.saveGameState();
+                this.deps.updateUI();
+                this.deps.showAiTradeProposal(); // Show the pending proposal modal
+                // User accepts/rejects, then must click Finish Season again to resume
+                return;
+            }
+
+            // Interrupt for notable AI-AI trade (Breaking News)
+            if (notable) {
+                this.deps.saveGameState();
+                this.deps.updateUI();
+                this.showBreakingNews(notable).then(() => {
+                    // Resume finishing season
+                    this.finishSeasonBatch();
+                });
+                return;
+            }
             
             // Break for UI update every batch
             if (gamesSimulated >= batchSize) {
@@ -858,13 +975,170 @@ export class GMMode {
     }
     
     /**
-     * Check for AI trade proposals
+     * Check for AI trade proposals (to user)
      */
     checkForAiTradeProposals() {
-        // Calls existing function (backward compatibility)
         if (this.deps.checkForAiTradeProposals) {
             this.deps.checkForAiTradeProposals();
         }
+    }
+
+    /**
+     * Process AI-to-AI trades for the current date.
+     * Called from all sim paths (simulateDay, simulateWeek, finishSeason).
+     * 
+     * Trade frequency targets (50-100% of team count per season):
+     *   T1: 15-30 trades across ~180 game days → ~0.12/day avg
+     *   T2: 43-86 trades across ~140 game days → ~0.46/day avg
+     *   T3: 72-144 trades across ~100 game days → ~1.08/day avg
+     * 
+     * @param {string} currentDate - Today's date string
+     * @returns {Object|null} Notable trade for Breaking News, or null
+     */
+    processAiToAiTrades(currentDate) {
+        const gs = this.gameState;
+
+        // Skip if same date already processed
+        if (gs.lastAiToAiTradeDate === currentDate) return null;
+        gs.lastAiToAiTradeDate = currentDate;
+
+        // Trade deadline: 75% of season
+        const seasonDates = gs.seasonDates;
+        if (!seasonDates) return null;
+        const deadlineDate = this.deps.CalendarEngine.toDateString(seasonDates.tradeDeadline);
+        if (!deadlineDate || currentDate > deadlineDate) return null;
+
+        // Deadline proximity multiplier: trades ramp up in the 2 weeks before deadline
+        let urgencyMultiplier = 1.0;
+        const daysUntilDeadline = this.deps.CalendarEngine.daysBetween(currentDate, deadlineDate);
+        if (daysUntilDeadline <= 7) urgencyMultiplier = 3.0;
+        else if (daysUntilDeadline <= 14) urgencyMultiplier = 2.0;
+
+        const helpers = this.deps;
+        const TradeEngine = this.deps.engines?.TradeEngine || this.deps.TradeEngine;
+        if (!TradeEngine) return null;
+
+        let notableTrade = null;
+
+        // Process each tier
+        const tierConfigs = [
+            { teams: gs.tier1Teams, tier: 1, dailyRate: 0.12, label: 'Tier 1' },
+            { teams: gs.tier2Teams, tier: 2, dailyRate: 0.46, label: 'Tier 2' },
+            { teams: gs.tier3Teams, tier: 3, dailyRate: 1.08, label: 'Tier 3' }
+        ];
+
+        for (const config of tierConfigs) {
+            if (!config.teams || config.teams.length === 0) continue;
+
+            // Determine how many trades to attempt today
+            const adjustedRate = config.dailyRate * urgencyMultiplier;
+            let tradesToAttempt = 0;
+            // Guaranteed trades + fractional chance
+            tradesToAttempt = Math.floor(adjustedRate);
+            if (Math.random() < (adjustedRate - tradesToAttempt)) tradesToAttempt++;
+
+            for (let i = 0; i < tradesToAttempt; i++) {
+                const proposal = TradeEngine.generateAiToAiTrade({
+                    teams: config.teams,
+                    userTeamId: gs.userTeamId,
+                    calculatePickValue: helpers.calculatePickValue || (() => 0),
+                    getEffectiveCap: helpers.getEffectiveCap,
+                    calculateTeamSalary: helpers.calculateTeamSalary,
+                    formatCurrency: helpers.formatCurrency || (v => `$${v}`)
+                });
+
+                if (!proposal) continue;
+
+                // Execute the trade
+                const result = TradeEngine.executeTrade({
+                    team1: proposal.team1,
+                    team2: proposal.team2,
+                    team1GivesPlayerIds: proposal.team1Gives.map(p => p.id),
+                    team2GivesPlayerIds: proposal.team2Gives.map(p => p.id),
+                    team1GivesPicks: proposal.team1GivesPicks || [],
+                    team2GivesPicks: proposal.team2GivesPicks || [],
+                    applyTradePenalty: helpers.applyTradePenalty || (() => {}),
+                    initializePlayerChemistry: helpers.initializePlayerChemistry || ((p) => { p.chemistry = 50; p.gamesWithTeam = 0; }),
+                    tradeDraftPick: helpers.tradeDraftPick || (() => {})
+                });
+
+                // Log to trade history
+                const tradeRecord = {
+                    season: gs.currentSeason,
+                    date: currentDate,
+                    tier: config.tier,
+                    team1: { id: proposal.team1.id, name: proposal.team1.name },
+                    team2: { id: proposal.team2.id, name: proposal.team2.name },
+                    team1Gave: proposal.team1Gives.map(p => ({ id: p.id, name: p.name, position: p.position, rating: p.rating })),
+                    team2Gave: proposal.team2Gives.map(p => ({ id: p.id, name: p.name, position: p.position, rating: p.rating })),
+                    type: 'ai-ai'
+                };
+                gs.tradeHistory.push(tradeRecord);
+
+                console.log(`🔄 ${config.label} Trade: ${proposal.team1.name} sends ${proposal.team1Gives.map(p => p.name).join(', ')} to ${proposal.team2.name} for ${proposal.team2Gives.map(p => p.name).join(', ')}`);
+
+                // Check if notable (for Breaking News)
+                if (!notableTrade && TradeEngine.isNotableTrade(proposal)) {
+                    notableTrade = tradeRecord;
+                }
+            }
+        }
+
+        return notableTrade;
+    }
+
+    /**
+     * Show Breaking News modal for a notable AI-AI trade.
+     * Returns a Promise that resolves when the user dismisses it.
+     */
+    showBreakingNews(trade) {
+        return new Promise((resolve) => {
+            const t1Gave = trade.team1Gave.map(p => `${p.name} (${p.position}, ${p.rating} OVR)`).join(', ');
+            const t2Gave = trade.team2Gave.map(p => `${p.name} (${p.position}, ${p.rating} OVR)`).join(', ');
+            const tierLabel = trade.tier === 1 ? 'NAPL' : trade.tier === 2 ? 'NARBL' : 'MBL';
+
+            const overlay = document.createElement('div');
+            overlay.id = 'breakingNewsOverlay';
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.85); z-index: 10001;
+                display: flex; align-items: center; justify-content: center;
+                animation: fadeIn 0.3s ease;
+            `;
+            overlay.innerHTML = `
+                <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 2px solid #ea4335;
+                            border-radius: 16px; padding: 30px 40px; max-width: 550px; width: 90%;
+                            box-shadow: 0 0 40px rgba(234,67,53,0.3); text-align: center;">
+                    <div style="color: #ea4335; font-size: 0.85em; font-weight: bold; letter-spacing: 3px; margin-bottom: 8px;">
+                        ⚡ BREAKING NEWS ⚡
+                    </div>
+                    <div style="font-size: 1.4em; font-weight: bold; margin-bottom: 20px; line-height: 1.3;">
+                        ${tierLabel} Trade Alert
+                    </div>
+                    <div style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 20px;">
+                        <div style="flex: 1; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 15px;">
+                            <div style="font-weight: bold; color: #fbbc04; margin-bottom: 8px;">${trade.team1.name}</div>
+                            <div style="font-size: 0.85em; opacity: 0.7; margin-bottom: 6px;">Sends:</div>
+                            <div style="font-size: 0.95em;">${t1Gave}</div>
+                        </div>
+                        <div style="display: flex; align-items: center; font-size: 1.5em; opacity: 0.5;">⇄</div>
+                        <div style="flex: 1; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 15px;">
+                            <div style="font-weight: bold; color: #fbbc04; margin-bottom: 8px;">${trade.team2.name}</div>
+                            <div style="font-size: 0.85em; opacity: 0.7; margin-bottom: 6px;">Sends:</div>
+                            <div style="font-size: 0.95em;">${t2Gave}</div>
+                        </div>
+                    </div>
+                    <button id="breakingNewsDismiss" class="primary" style="padding: 10px 30px; font-size: 1em;">
+                        Continue
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            document.getElementById('breakingNewsDismiss').onclick = () => {
+                overlay.remove();
+                resolve();
+            };
+        });
     }
     
     // ============================================

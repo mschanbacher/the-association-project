@@ -214,6 +214,141 @@ export class TradeEngine {
     }
 
     // ─────────────────────────────────────────────────────────────
+    // AI-TO-AI TRADE GENERATION
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Attempt to generate and validate an AI-to-AI trade.
+     * Both sides must agree (evaluateTrade score >= 8).
+     * @param {Object} params
+     * @param {Array} params.teams - All teams in this tier
+     * @param {number} params.userTeamId - Exclude user's team
+     * @param {Object} [params.draftContext] - For T1 pick trades
+     * @param {Function} params.calculatePickValue
+     * @param {Function} params.getEffectiveCap
+     * @param {Function} params.calculateTeamSalary
+     * @param {Function} params.formatCurrency
+     * @returns {Object|null} { team1, team2, team1Gives, team2Gives, team1GivesPicks, team2GivesPicks } or null
+     */
+    static generateAiToAiTrade(params) {
+        const { teams, userTeamId, draftContext,
+                calculatePickValue, getEffectiveCap, calculateTeamSalary, formatCurrency } = params;
+
+        const aiTeams = teams.filter(t => t.id !== userTeamId && t.roster && t.roster.length >= 8);
+        if (aiTeams.length < 2) return null;
+
+        // Pick two random teams
+        const shuffled = [...aiTeams].sort(() => Math.random() - 0.5);
+        const team1 = shuffled[0];
+        const team2 = shuffled[1];
+
+        // Find each team's position needs
+        const getNeeds = (team) => {
+            const counts = { PG: 0, SG: 0, SF: 0, PF: 0, C: 0 };
+            team.roster.forEach(p => counts[p.position]++);
+            return Object.keys(counts).filter(pos => counts[pos] < 2);
+        };
+
+        const needs1 = getNeeds(team1);
+        const needs2 = getNeeds(team2);
+
+        // Try need-based trade first, fall back to value trade
+        let team1Gives = [];
+        let team2Gives = [];
+
+        if (needs1.length > 0 && needs2.length > 0) {
+            // Team1 needs positions that team2 has surplus, and vice versa
+            const t2Candidates = team2.roster.filter(p => needs1.includes(p.position) && p.rating >= 60);
+            const t1Candidates = team1.roster.filter(p => needs2.includes(p.position) && p.rating >= 60);
+
+            if (t2Candidates.length > 0 && t1Candidates.length > 0) {
+                team2Gives = [t2Candidates[Math.floor(Math.random() * t2Candidates.length)]];
+                // Find matching value from team1
+                const targetValue = team2Gives[0].rating;
+                const targetSalary = team2Gives[0].salary;
+                const sorted = [...t1Candidates].sort((a, b) =>
+                    Math.abs(a.rating - targetValue) - Math.abs(b.rating - targetValue)
+                );
+                for (const candidate of sorted) {
+                    if (Math.abs(candidate.salary - targetSalary) <= 2000000 &&
+                        Math.abs(candidate.rating - targetValue) <= 8) {
+                        team1Gives = [candidate];
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Fall back: value-based trade (swap similar-rated players at different positions)
+        if (team1Gives.length === 0 || team2Gives.length === 0) {
+            const t1Pool = team1.roster.filter(p => p.rating >= 60).sort(() => Math.random() - 0.5);
+            const t2Pool = team2.roster.filter(p => p.rating >= 60).sort(() => Math.random() - 0.5);
+
+            for (const p1 of t1Pool) {
+                for (const p2 of t2Pool) {
+                    if (p1.position !== p2.position &&
+                        Math.abs(p1.rating - p2.rating) <= 8 &&
+                        Math.abs(p1.salary - p2.salary) <= 2000000) {
+                        team1Gives = [p1];
+                        team2Gives = [p2];
+                        break;
+                    }
+                }
+                if (team1Gives.length > 0) break;
+            }
+        }
+
+        if (team1Gives.length === 0 || team2Gives.length === 0) return null;
+
+        // Both sides evaluate
+        const eval1 = TradeEngine.evaluateTrade({
+            userGivesPlayers: team1Gives, aiGivesPlayers: team2Gives,
+            aiTeam: team1,
+            calculatePickValue: calculatePickValue || (() => 0),
+            getEffectiveCap, calculateTeamSalary,
+            formatCurrency: formatCurrency || (v => `$${v}`)
+        });
+
+        // For AI-AI, we flip perspective: team2 is "AI" evaluating what they give up
+        const eval2 = TradeEngine.evaluateTrade({
+            userGivesPlayers: team2Gives, aiGivesPlayers: team1Gives,
+            aiTeam: team2,
+            calculatePickValue: calculatePickValue || (() => 0),
+            getEffectiveCap, calculateTeamSalary,
+            formatCurrency: formatCurrency || (v => `$${v}`)
+        });
+
+        // Both must agree
+        if (!eval1.accepted || !eval2.accepted) return null;
+
+        return {
+            team1, team2,
+            team1Gives, team2Gives,
+            team1GivesPicks: [], team2GivesPicks: []
+        };
+    }
+
+    /**
+     * Determine if a trade is "notable" enough for Breaking News.
+     * Notable = involves a player rated 80+ or a team's top-2 player.
+     * @param {Object} trade - { team1, team2, team1Gives, team2Gives }
+     * @returns {boolean}
+     */
+    static isNotableTrade(trade) {
+        const allPlayers = [...trade.team1Gives, ...trade.team2Gives];
+        // Star player threshold
+        if (allPlayers.some(p => p.rating >= 80)) return true;
+        // Top-2 player on either team
+        const t1Sorted = [...trade.team1.roster].sort((a, b) => b.rating - a.rating);
+        const t2Sorted = [...trade.team2.roster].sort((a, b) => b.rating - a.rating);
+        const t1Top2 = new Set(t1Sorted.slice(0, 2).map(p => p.id));
+        const t2Top2 = new Set(t2Sorted.slice(0, 2).map(p => p.id));
+        if (trade.team1Gives.some(p => t1Top2.has(p.id))) return true;
+        if (trade.team2Gives.some(p => t2Top2.has(p.id))) return true;
+        return false;
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // TRADE EXECUTION
     // ─────────────────────────────────────────────────────────────
 

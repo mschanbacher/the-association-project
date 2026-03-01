@@ -2710,6 +2710,7 @@
                     showSeasonEnd: () => getGameSimController().showSeasonEnd(),
                     openRosterManagement, openTradeScreen: () => getTradeController().openTradeScreen(), saveGameState,
                     checkForAiTradeProposals: () => getTradeController().checkForAiTradeProposals(),
+                    showAiTradeProposal: () => getTradeController().showAiTradeProposal(),
                     checkForInjuries: (...args) => InjuryEngine.checkForInjuries(...args),
                     updateInjuries: (team) => InjuryEngine.updateInjuries(team),
                     processFatigueAfterGame: (...args) => FatigueEngine.processAfterGame(...args),
@@ -2719,6 +2720,23 @@
                     applyInjury, showNextInjuryModal, buildConferenceMap,
                     openRosterManagementHub,
                     resumeOffseason: () => getOffseasonController().resumeOffseason(),
+                    // Trade deps for AI-AI trades
+                    engines: { TradeEngine },
+                    TradeEngine,
+                    getEffectiveCap,
+                    calculateTeamSalary,
+                    calculatePickValue: (year, round) => {
+                        const yearsOut = year - gameState.currentSeason;
+                        const base = round === 1 ? 30 : 15;
+                        return Math.max(5, base - (yearsOut * 3));
+                    },
+                    applyTradePenalty: (team, tradedPlayer) => ChemistryEngine.applyTradePenalty(team, tradedPlayer),
+                    initializePlayerChemistry: (player) => ChemistryEngine.initializePlayer(player),
+                    tradeDraftPick: (fromTeamId, toTeamId, originalTeamId, year, round) => {
+                        if (!gameState.draftPickOwnership) return;
+                        const key = `${originalTeamId}_${year}_${round}`;
+                        gameState.draftPickOwnership[key] = toTeamId;
+                    },
                     eventBus, GameEvents, CalendarEngine, GameEngine
                 });
                 console.log('✅ GMMode initialized');

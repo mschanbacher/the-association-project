@@ -137,6 +137,9 @@ export class DashboardController {
         this.refreshStandings();
         this.refreshSchedule();
         this.refreshHistory();
+
+        // ── Notify React UI ──
+        if (window._notifyReact) window._notifyReact();
     }
 
     // ═══════════════════════════════════════════════════════════════

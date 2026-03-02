@@ -1226,8 +1226,14 @@
         </div>
     </div>
 
+    <!-- React UI root — mounts above the legacy game container -->
+    <div id="react-root"></div>
+
     <!-- Module imports — loads extracted engines and exposes them globally -->
     <script type="module">
+        // ── React UI ──
+        import './src/react/index.jsx';
+
         import { PlayerAttributes } from './src/engines/PlayerAttributes.js';
         import { CoachEngine } from './src/engines/CoachEngine.js';
         import { GameState } from './src/engines/GameState.js';
@@ -1899,6 +1905,10 @@
             console.log('Initial tier counts: T1=' + gameState.tier1Teams.length + ', T2=' + gameState.tier2Teams.length + ', T3=' + gameState.tier3Teams.length);
             
             getDashboardController().refresh();
+            
+            // Bridge to React UI
+            window._reactGameState = gameState;
+            if (window._notifyReact) window._notifyReact();
         }
 
         function getCurrentTeams() {
@@ -2740,6 +2750,10 @@
                     eventBus, GameEvents, CalendarEngine, GameEngine
                 });
                 console.log('✅ GMMode initialized');
+                
+                // ── Bridge gameState to React UI ──
+                window._reactGameState = gameState;
+                if (window._notifyReact) window._notifyReact();
                 
                 console.log('The Association Project loaded successfully!');
                 console.log('Rosters: All teams have 12-15 players');

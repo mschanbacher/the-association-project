@@ -16,6 +16,7 @@ import { NewGameFlow } from './screens/NewGameFlow.jsx';
 import { TradeScreen, AiTradeProposalModal } from './screens/TradeScreen.jsx';
 import { GameMenuModal } from './screens/GameMenuModal.jsx';
 import { OffseasonTracker } from './screens/OffseasonTracker.jsx';
+import { OffseasonModals } from './screens/OffseasonModals.jsx';
 
 function AppContent() {
   const { isReady, gameState, refresh } = useGame();
@@ -165,6 +166,7 @@ function AppContent() {
         isOpen={gameMenuOpen}
         onClose={() => setGameMenuOpen(false)}
       />
+      <OffseasonModals />
     </div>
   );
 }

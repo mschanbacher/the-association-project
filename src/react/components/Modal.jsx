@@ -4,7 +4,7 @@ import React, { useEffect, useCallback } from 'react';
  * Modal — reusable overlay + content container.
  * Renders into the React tree (no portal) since we control the full layout.
  */
-export function Modal({ isOpen, onClose, maxWidth = 700, children, zIndex = 1100 }) {
+export function Modal({ isOpen, onClose, maxWidth = 700, children, zIndex = 1100, noBg = false }) {
   const handleEsc = useCallback((e) => {
     if (e.key === 'Escape' && onClose) onClose();
   }, [onClose]);
@@ -36,7 +36,7 @@ export function Modal({ isOpen, onClose, maxWidth = 700, children, zIndex = 1100
     >
       <div
         style={{
-          background: 'var(--color-bg-raised)',
+          background: noBg ? 'transparent' : 'var(--color-bg-raised)',
           borderRadius: 'var(--radius-xl)',
           boxShadow: 'var(--shadow-lg)',
           maxWidth,

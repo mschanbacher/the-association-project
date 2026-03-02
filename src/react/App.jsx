@@ -12,10 +12,12 @@ import { CoachScreen } from './screens/CoachScreen.jsx';
 import { ScoutingScreen } from './screens/ScoutingScreen.jsx';
 import { PostGameModal } from './screens/PostGameModal.jsx';
 import { BoxScoreModal } from './screens/BoxScoreModal.jsx';
+import { NewGameFlow } from './screens/NewGameFlow.jsx';
 
 function AppContent() {
-  const { isReady, gameState } = useGame();
+  const { isReady, gameState, refresh } = useGame();
   const [activeScreen, setActiveScreen] = useState('dashboard');
+  const [gameStarted, setGameStarted] = useState(false);
 
   // ── Modal state ──
   const [postGameData, setPostGameData] = useState(null);
@@ -72,7 +74,35 @@ function AppContent() {
     });
   }, [postGameData]);
 
-  if (!isReady || !gameState?.userTeam) return null;
+  // ── New game flow: show when engines loaded but no team selected ──
+  const hasTeam = gameState?.userTeam || gameStarted;
+  const enginesLoaded = isReady && gameState?._raw?.tier1Teams;
+
+  // Hide legacy team selection modal when React takes over
+  useEffect(() => {
+    if (enginesLoaded) {
+      const legacyModal = document.getElementById('teamSelectionModal');
+      if (legacyModal) legacyModal.classList.add('hidden');
+    }
+  }, [enginesLoaded]);
+
+  if (!isReady) return null;
+
+  // Show new game flow if engines are ready but no team picked yet
+  if (enginesLoaded && !hasTeam) {
+    return (
+      <NewGameFlow
+        gameState={gameState}
+        onComplete={() => {
+          setGameStarted(true);
+          refresh?.();
+        }}
+      />
+    );
+  }
+
+  // Still loading or waiting for team
+  if (!hasTeam) return null;
 
   const screens = {
     dashboard:  <DashboardScreen />,

@@ -2711,8 +2711,9 @@
                 } else {
                     // Generate free agent pool for new games
                     gameState.freeAgents = generateFreeAgentPool();
-                    // Show team selection modal
-                    document.getElementById('teamSelectionModal').classList.remove('hidden');
+                    // React handles the new game flow — keep legacy modal hidden
+                    // (React's NewGameFlow will call window.selectTeam when ready)
+                    document.getElementById('teamSelectionModal').classList.add('hidden');
                 }
                 
                 

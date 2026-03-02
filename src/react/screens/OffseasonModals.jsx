@@ -1,42 +1,47 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useGame } from '../hooks/GameBridge.jsx';
-import { Modal } from '../components/Modal.jsx';
 
 /* ═══════════════════════════════════════════════════════════════
-   OffseasonModals — intercepts legacy modal shows and re-renders
-   their content inside React Modal containers.
+   OffseasonModals — intercepts legacy modal shows and renders
+   their content inside a React-controlled overlay.
    
-   Strategy: Override classList.remove on each legacy modal element
-   so that when legacy code tries to show a modal (by removing
-   the 'hidden' class), we capture the content and show it in
-   React instead. This fires synchronously at the exact point
-   of the show call — no race conditions.
+   Key insight: we can't just copy innerHTML because programmatic
+   event handlers (el.onclick = fn) don't survive innerHTML copies.
+   Instead, we MOVE the actual .modal-content DOM node from the
+   hidden legacy modal into our React overlay container. This
+   preserves all event handlers, both inline and programmatic.
+   
+   When closing, we move the node back to its original parent.
    ═══════════════════════════════════════════════════════════════ */
 
 const MODAL_CONFIG = [
-  { id: 'seasonEndModal',             key: 'seasonEnd',           content: 'seasonEndContent',              title: '🏁 Season Complete',             maxWidth: 1000 },
-  { id: 'championshipPlayoffModal',   key: 'postseason',          content: 'championshipPlayoffContent',    title: '🏆 Postseason Results',          maxWidth: 1000 },
-  { id: 'playoffModal',               key: 'playoff',             content: 'playoffContent',                title: '🏆 Playoffs',                   maxWidth: 1000 },
-  { id: 'developmentModal',           key: 'development',         content: 'developmentSummary',            title: '🌟 Player Development Report',   maxWidth: 800 },
-  { id: 'financialTransitionModal',   key: 'financialTransition', content: 'financialTransitionContent',    title: '💰 Financial Transition',        maxWidth: 900 },
-  { id: 'complianceModal',            key: 'compliance',          content: 'complianceModalContent',        title: '📋 Roster Compliance',           maxWidth: 700 },
-  { id: 'draftResultsModal',          key: 'draft',               content: null,                            title: '🎓 Draft Results',               maxWidth: 1200 },
-  { id: 'freeAgencyModal',            key: 'freeAgency',          content: null,                            title: '🤝 Free Agency',                 maxWidth: 1100, noHeader: true },
-  { id: 'collegeGradFAModal',         key: 'collegeGrad',         content: null,                            title: '🎓 College Graduate Free Agency', maxWidth: 1000, noHeader: true },
-  { id: 'financeDashboardModal',      key: 'ownerMode',           content: null,                            title: '💼 Offseason Management',        maxWidth: 1100, noHeader: true },
-  { id: 'rosterModal',                key: 'rosterMgmt',          content: null,                            title: '📋 Roster Management',           maxWidth: 1600, noHeader: true },
-  { id: 'bracketViewerModal',         key: 'bracket',             content: 'bracketViewerContent',          title: '🏆 Bracket Viewer',              maxWidth: 1400 },
-  { id: 'allStarModal',               key: 'allStar',             content: null,                            title: '⭐ All-Star Weekend',            maxWidth: 900, noHeader: true },
-  { id: 'injuryModal',                key: 'injury',              content: null,                            title: '🏥 Injury Report',               maxWidth: 600, noHeader: true },
+  { id: 'seasonEndModal',             title: '🏁 Season Complete',               maxWidth: 1000 },
+  { id: 'championshipPlayoffModal',   title: '🏆 Postseason Results',            maxWidth: 1000 },
+  { id: 'playoffModal',               title: '🏆 Playoffs',                     maxWidth: 1000 },
+  { id: 'developmentModal',           title: '🌟 Player Development Report',     maxWidth: 800 },
+  { id: 'financialTransitionModal',   title: '💰 Financial Transition',          maxWidth: 900 },
+  { id: 'complianceModal',            title: '📋 Roster Compliance',             maxWidth: 700 },
+  { id: 'draftResultsModal',          title: '🎓 Draft Results',                 maxWidth: 1200 },
+  { id: 'freeAgencyModal',            title: '🤝 Free Agency',                   maxWidth: 1100 },
+  { id: 'collegeGradFAModal',         title: '🎓 College Graduate Free Agency',  maxWidth: 1000 },
+  { id: 'financeDashboardModal',      title: '💼 Offseason Management',          maxWidth: 1100 },
+  { id: 'rosterModal',                title: '📋 Roster Management',             maxWidth: 1600 },
+  { id: 'bracketViewerModal',         title: '🏆 Bracket Viewer',                maxWidth: 1400 },
+  { id: 'allStarModal',               title: '⭐ All-Star Weekend',              maxWidth: 900 },
+  { id: 'injuryModal',                title: '🏥 Injury Report',                 maxWidth: 700 },
+  { id: 'contractDecisionsModal',     title: '📝 Contract Decisions',            maxWidth: 900 },
+  { id: 'coachModal',                 title: '🎓 Coach Management',              maxWidth: 1100 },
+  { id: 'calendarModal',              title: '📅 Calendar',                      maxWidth: 1100 },
 ];
 
 export function OffseasonModals() {
   const { refresh } = useGame();
-  const [activeModal, setActiveModal] = useState(null);
-  const [modalHTML, setModalHTML] = useState('');
-  const [modalConfig, setModalConfig] = useState(null);
+  const [activeCfg, setActiveCfg] = useState(null);
+  const containerRef = useRef(null);
+  // Track the original parent and the moved content node
+  const movedRef = useRef({ contentNode: null, originalParent: null });
 
-  // Patch legacy modal elements so classList.remove('hidden') routes to React
+  // Patch legacy modals
   useEffect(() => {
     const cleanups = [];
 
@@ -44,102 +49,132 @@ export function OffseasonModals() {
       const el = document.getElementById(cfg.id);
       if (!el) return;
 
-      // Save original classList methods
       const origRemove = DOMTokenList.prototype.remove.bind(el.classList);
 
-      // Create patched remove
-      const patchedRemove = function(...args) {
+      el.classList.remove = function (...args) {
         if (args.includes('hidden') || args[0] === 'hidden') {
-          // Legacy is trying to show this modal — intercept!
-          // Grab content
-          const contentEl = cfg.content
-            ? document.getElementById(cfg.content)
-            : el.querySelector('.modal-content');
-          const html = contentEl ? contentEl.innerHTML : '';
-
-          if (html) {
-            // Show in React instead — do NOT remove 'hidden' from legacy
-            setModalHTML(html);
-            setModalConfig(cfg);
-            setActiveModal(cfg.key);
-            console.log(`🔄 Intercepted: ${cfg.id} → React (${html.length} chars)`);
-          } else {
-            // No content captured — fall through to legacy
-            console.warn(`⚠️ No content for ${cfg.id}, falling through to legacy`);
-            origRemove(...args);
-          }
-          return;
+          // Intercept — show in React overlay
+          setActiveCfg(cfg);
+          console.log(`🔄 Intercepted: ${cfg.id}`);
+          return; // Don't actually show the legacy modal
         }
         origRemove(...args);
       };
 
-      // Monkey-patch the specific element's classList.remove
-      el.classList.remove = patchedRemove;
-
-      cleanups.push(() => {
-        el.classList.remove = origRemove;
-      });
+      cleanups.push(() => { el.classList.remove = origRemove; });
     });
 
     return () => cleanups.forEach(fn => fn());
   }, []);
 
+  // When activeCfg changes, move the DOM content node into our container
+  useEffect(() => {
+    if (!activeCfg || !containerRef.current) return;
+
+    const legacyModal = document.getElementById(activeCfg.id);
+    if (!legacyModal) return;
+
+    // Find the .modal-content child
+    const contentNode = legacyModal.querySelector('.modal-content') || legacyModal.querySelector('[class*="modal"]') || legacyModal.firstElementChild;
+    if (!contentNode) return;
+
+    // Save reference for restore
+    movedRef.current = { contentNode, originalParent: legacyModal };
+
+    // Move the actual DOM node into our React container
+    containerRef.current.innerHTML = '';
+    containerRef.current.appendChild(contentNode);
+
+    // Make sure content is visible (in case it had display:none)
+    contentNode.style.display = '';
+    contentNode.style.maxHeight = '80vh';
+    contentNode.style.overflowY = 'auto';
+  }, [activeCfg]);
+
   const handleClose = useCallback(() => {
-    if (modalConfig) {
-      // Ensure legacy modal has 'hidden' (it should, but be safe)
-      const el = document.getElementById(modalConfig.id);
+    // Move the content node back to its original parent
+    const { contentNode, originalParent } = movedRef.current;
+    if (contentNode && originalParent) {
+      originalParent.appendChild(contentNode);
+      // Reset inline overrides
+      contentNode.style.maxHeight = '';
+      contentNode.style.overflowY = '';
+    }
+    movedRef.current = { contentNode: null, originalParent: null };
+
+    // Ensure legacy modal stays hidden
+    if (activeCfg) {
+      const el = document.getElementById(activeCfg.id);
       if (el) el.classList.add('hidden');
     }
-    setActiveModal(null);
-    setModalHTML('');
-    setModalConfig(null);
-    refresh?.();
-  }, [modalConfig, refresh]);
 
-  if (!activeModal || !modalConfig || !modalHTML) return null;
+    setActiveCfg(null);
+    refresh?.();
+  }, [activeCfg, refresh]);
+
+  // Also watch for the legacy code hiding the modal from the inside
+  // (e.g. an onclick handler calls classList.add('hidden'))
+  useEffect(() => {
+    if (!activeCfg) return;
+
+    const check = setInterval(() => {
+      const el = document.getElementById(activeCfg.id);
+      // If the legacy element got 'hidden' added back by an inside button,
+      // that means the user completed the interaction
+      if (el && el.classList.contains('hidden')) {
+        // But we need to check if it's because WE never removed it (it's always hidden)
+        // vs a button inside added it. Check if our container still has the content.
+        if (containerRef.current && containerRef.current.children.length > 0) {
+          // Content is still in our container — the legacy add('hidden') was from
+          // a button inside. That's fine — the legacy flow continues.
+          // But if a NEW modal was intercepted, activeCfg changed already.
+          // If the content was an injury confirm that should close this modal:
+          // We don't need to do anything because the next modal intercept or 
+          // sim resume will naturally proceed.
+        }
+      }
+    }, 300);
+
+    return () => clearInterval(check);
+  }, [activeCfg]);
+
+  // Listen for new interceptions that should replace the current one
+  // This happens naturally through setActiveCfg — the old content gets
+  // returned and new content gets moved in.
+
+  // ESC to close
+  useEffect(() => {
+    if (!activeCfg) return;
+    const onKey = (e) => { if (e.key === 'Escape') handleClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [activeCfg, handleClose]);
+
+  if (!activeCfg) return null;
 
   return (
-    <Modal isOpen={true} onClose={handleClose} maxWidth={modalConfig.maxWidth} zIndex={1200} noBg>
-      {!modalConfig.noHeader && (
-        <div style={{
-          padding: '16px 24px',
-          borderBottom: '1px solid rgba(255,255,255,0.1)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
-          borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
-        }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#fff' }}>
-            {modalConfig.title}
-          </h2>
-          <button onClick={handleClose} style={closeBtnStyle}>✕</button>
-        </div>
-      )}
-      <div style={{
-        background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
-        padding: modalConfig.noHeader ? '24px' : '16px 24px 24px',
-        borderRadius: modalConfig.noHeader ? 'var(--radius-xl)' : '0 0 var(--radius-xl) var(--radius-xl)',
-        maxHeight: '80vh',
-        overflowY: 'auto',
-        position: 'relative',
-      }}>
-        {modalConfig.noHeader && (
-          <button onClick={handleClose} style={{ ...closeBtnStyle, position: 'sticky', top: 0, float: 'right', zIndex: 10, marginBottom: 8 }}>✕</button>
-        )}
-        <div
-          dangerouslySetInnerHTML={{ __html: modalHTML }}
-          style={{ color: '#e8e8e8', fontSize: '14px', lineHeight: '1.6' }}
-        />
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1200,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(4px)',
+        padding: '20px',
+        animation: 'fadeIn 0.2s ease-out',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: activeCfg.maxWidth,
+          width: '100%',
+          animation: 'slideUp 0.2s ease-out',
+          position: 'relative',
+        }}
+      >
+        {/* The actual legacy .modal-content gets moved here */}
+        <div ref={containerRef} />
       </div>
-    </Modal>
+    </div>
   );
 }
-
-const closeBtnStyle = {
-  background: 'rgba(255,255,255,0.15)',
-  border: 'none',
-  color: '#fff',
-  borderRadius: '6px',
-  padding: '4px 12px',
-  cursor: 'pointer',
-  fontSize: '14px',
-};

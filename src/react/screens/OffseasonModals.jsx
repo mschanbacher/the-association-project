@@ -34,15 +34,22 @@ const MODAL_IDS = [
 ];
 
 // Module-level state for the classList interceptors
-let _showGen = 0;       // Incremented on every show — used to invalidate stale closes
-let _doClose = null;    // Points to the React close function
-let _doShow = null;     // Points to the React show function
+let _showGen = 0;
+let _doClose = null;
+let _doShow = null;
+let _overlayEl = null;  // Direct ref to overlay DOM for immediate hide
 
 export function OffseasonModals() {
   const { refresh } = useGame();
   const [activeCfg, setActiveCfg] = useState(null);
   const containerRef = useRef(null);
+  const overlayRef = useRef(null);
   const movedRef = useRef({ contentNode: null, originalParent: null });
+
+  // Keep overlay ref in sync for immediate DOM access
+  useEffect(() => {
+    _overlayEl = overlayRef.current;
+  });
 
   // Restore DOM node to original parent
   const restoreNode = useCallback(() => {
@@ -59,6 +66,8 @@ export function OffseasonModals() {
 
   // Close overlay
   const closeOverlay = useCallback(() => {
+    // Immediately hide via DOM so there's no visual lag
+    if (_overlayEl) _overlayEl.style.display = 'none';
     restoreNode();
     setActiveCfg(null);
     refresh?.();
@@ -66,8 +75,9 @@ export function OffseasonModals() {
 
   // Show a modal in the overlay
   const showModal = useCallback((cfg) => {
-    // Restore any previously moved node first
     restoreNode();
+    // Make sure overlay is visible (might have been hidden by closeOverlay)
+    if (_overlayEl) _overlayEl.style.display = '';
     setActiveCfg(cfg);
   }, [restoreNode]);
 
@@ -103,20 +113,23 @@ export function OffseasonModals() {
       // Intercept HIDE
       el.classList.add = function (...args) {
         if (args.includes('hidden') || args[0] === 'hidden') {
-          // Capture current gen — if a new show happens before our
-          // deferred close, the gen will have changed and we skip.
           const gen = _showGen;
           console.log(`🔄 Hide: ${cfg.id} (gen=${gen})`);
-          // Defer close to let the current handler finish
-          // (it might show the next modal after hiding this one)
+          
+          // Immediately hide the overlay via DOM (no waiting for React)
+          // This prevents the blur from lingering
+          if (_overlayEl) _overlayEl.style.display = 'none';
+          
+          // Defer the full close (restore node + React state) to let
+          // the current handler finish — it might show the next modal
           Promise.resolve().then(() => {
             if (_showGen === gen && _doClose) {
-              // No new modal was shown since this hide — close the overlay
               _doClose();
+            } else if (_showGen !== gen && _overlayEl) {
+              // A new modal was shown — make sure overlay is visible
+              _overlayEl.style.display = '';
             }
-            // else: a new show already replaced this, skip the close
           });
-          // Always update the legacy element's class for consistency
           origAdd(...args);
           return;
         }
@@ -148,6 +161,9 @@ export function OffseasonModals() {
     contentNode.style.display = '';
     contentNode.style.maxHeight = '80vh';
     contentNode.style.overflowY = 'auto';
+
+    // Ensure overlay is visible
+    if (overlayRef.current) overlayRef.current.style.display = '';
   }, [activeCfg]);
 
   // ESC to close
@@ -162,6 +178,7 @@ export function OffseasonModals() {
 
   return (
     <div
+      ref={overlayRef}
       onClick={(e) => { if (e.target === e.currentTarget) closeOverlay(); }}
       style={{
         position: 'fixed', inset: 0, zIndex: 1200,
@@ -175,7 +192,6 @@ export function OffseasonModals() {
       <div style={{
         maxWidth: activeCfg.maxWidth,
         width: '100%',
-        /* Subtle border glow to distinguish from legacy */
         filter: 'drop-shadow(0 0 20px rgba(102, 126, 234, 0.15))',
       }}>
         <div ref={containerRef} />

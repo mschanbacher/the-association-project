@@ -5,10 +5,10 @@ const navItems = [
   { id: 'roster', icon: '👥', label: 'Roster', converted: true },
   { id: 'standings', icon: '🏆', label: 'Standings', converted: true },
   { id: 'schedule', icon: '📅', label: 'Schedule', converted: true },
-  { id: 'finances', icon: '💰', label: 'Finances', action: 'openFinanceDashboard' },
+  { id: 'finances', icon: '💰', label: 'Finances', converted: true },
+  { id: 'coach', icon: '🎓', label: 'Coach', converted: true },
+  { id: 'history', icon: '📜', label: 'History', converted: true },
   { id: 'scouting', icon: '🔍', label: 'Scouting', action: 'openScoutingModal' },
-  { id: 'history', icon: '📜', label: 'History', action: 'openFranchiseHistory' },
-  { id: 'coach', icon: '🎓', label: 'Coach', action: 'openCoachManagement' },
 ];
 
 export function Sidebar({ activeScreen, onNavigate }) {
@@ -18,7 +18,6 @@ export function Sidebar({ activeScreen, onNavigate }) {
     if (item.converted) {
       onNavigate?.(item.id);
     } else if (item.action && window[item.action]) {
-      // Call existing game function for unconverted screens
       window[item.action]();
     }
   };
@@ -69,13 +68,7 @@ export function Sidebar({ activeScreen, onNavigate }) {
             </span>
             {item.label}
             {!item.converted && (
-              <span style={{
-                marginLeft: 'auto',
-                fontSize: 'var(--text-xs)',
-                opacity: 0.4,
-              }}>
-                ↗
-              </span>
+              <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', opacity: 0.4 }}>↗</span>
             )}
           </button>
         );

@@ -166,16 +166,17 @@ export function OffseasonModals() {
       style={{
         position: 'fixed', inset: 0, zIndex: 1200,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.5)',
-        backdropFilter: 'blur(4px)',
+        background: 'rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         padding: '20px',
-        animation: 'fadeIn 0.2s ease-out',
       }}
     >
       <div style={{
         maxWidth: activeCfg.maxWidth,
         width: '100%',
-        animation: 'slideUp 0.2s ease-out',
+        /* Subtle border glow to distinguish from legacy */
+        filter: 'drop-shadow(0 0 20px rgba(102, 126, 234, 0.15))',
       }}>
         <div ref={containerRef} />
       </div>

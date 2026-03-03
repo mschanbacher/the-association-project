@@ -293,25 +293,45 @@ export class StorageEngine {
                 }
             }
 
-            // BACKUP: Write compressed to localStorage (best-effort, may fail on large saves)
-            try {
-                const compressed = COMPRESSED_PREFIX + LZString.compressToUTF16(data);
-                const compressedKB = Math.round(compressed.length * 2 / 1024);
-                localStorage.setItem(LS_KEYS.SAVE_DATA, compressed);
-                lsSuccess = true;
-                console.log(`💾 localStorage backup: ${sizeKB}KB → ${compressedKB}KB compressed (${Math.round((1 - compressedKB/sizeKB) * 100)}% reduction)`);
-            } catch (lsErr) {
-                if (lsErr.message && lsErr.message.includes('quota')) {
-                    console.warn(`⚠️ StorageEngine: localStorage quota exceeded (${sizeKB}KB raw) — IndexedDB is primary`);
-                } else {
-                    console.warn('⚠️ StorageEngine: localStorage write failed', lsErr);
+            // BACKUP: Write compressed to localStorage
+            // LZ compression is expensive on large saves (2-4MB), so:
+            // - If IndexedDB succeeded, defer compression to avoid blocking UI
+            // - Throttle to at most once every 30 seconds
+            // - If IndexedDB failed, compress synchronously (it's our only storage)
+            const now = Date.now();
+            const LS_THROTTLE_MS = 30000;
+            if (idbSuccess) {
+                // Deferred + throttled — don't block the UI
+                if (!StorageEngine._lastLsBackup || (now - StorageEngine._lastLsBackup) > LS_THROTTLE_MS) {
+                    StorageEngine._lastLsBackup = now;
+                    setTimeout(() => {
+                        try {
+                            const compressed = COMPRESSED_PREFIX + LZString.compressToUTF16(data);
+                            localStorage.setItem(LS_KEYS.SAVE_DATA, compressed);
+                        } catch (e) { /* best effort */ }
+                    }, 50);
+                }
+                lsSuccess = true; // optimistic — IndexedDB is primary anyway
+            } else {
+                // No IndexedDB — must compress synchronously
+                try {
+                    const compressed = COMPRESSED_PREFIX + LZString.compressToUTF16(data);
+                    const compressedKB = Math.round(compressed.length * 2 / 1024);
+                    localStorage.setItem(LS_KEYS.SAVE_DATA, compressed);
+                    lsSuccess = true;
+                    console.log(`💾 localStorage: ${sizeKB}KB → ${compressedKB}KB compressed`);
+                } catch (lsErr) {
+                    if (lsErr.message && lsErr.message.includes('quota')) {
+                        console.warn(`⚠️ StorageEngine: localStorage quota exceeded (${sizeKB}KB raw)`);
+                    } else {
+                        console.warn('⚠️ StorageEngine: localStorage write failed', lsErr);
+                    }
                 }
             }
 
             // Success if at least one store worked
             if (idbSuccess || lsSuccess) {
-                const storage = idbSuccess && lsSuccess ? 'indexeddb+localStorage'
-                    : idbSuccess ? 'indexeddb' : 'localStorage';
+                const storage = idbSuccess ? 'indexeddb' : 'localStorage';
                 return { success: true, sizeKB, storage };
             }
 

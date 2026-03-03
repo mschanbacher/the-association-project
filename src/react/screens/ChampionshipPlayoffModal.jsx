@@ -15,6 +15,11 @@ export function ChampionshipPlayoffModal({ isOpen, data, onClose }) {
         {mode === 'complete' && <CompleteView data={data} />}
         {mode === 'series' && <SeriesWatchView data={data} />}
         {mode === 'postseason' && <PostseasonView data={data} />}
+        {mode === 't2-div-semis' && <T2DivSemisView data={data} />}
+        {mode === 't2-div-final' && <T2DivFinalView data={data} />}
+        {mode === 't2-national-result' && <T2NationalRoundView data={data} />}
+        {mode === 't2-elimination' && <T2EliminationView data={data} />}
+        {mode === 't2-complete' && <T2CompleteView data={data} />}
         {mode === 't3-metro-result' && <T3MetroResultView data={data} />}
         {mode === 't3-regional-result' && <T3RegionalResultView data={data} />}
         {mode === 't3-national-result' && <T3NationalRoundView data={data} />}
@@ -240,6 +245,157 @@ function SeriesWatchView({ data }) {
           {'\ud83c\udfc0'} Watch Game {nextGameNum}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/* ── T2 Division Semis Result ── */
+function T2DivSemisView({ data }) {
+  const { division, semi1, semi2, userTeam } = data;
+  return (
+    <div style={{ padding: 'var(--space-4)' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-3)' }}>
+        <div style={{ fontSize: '2.2em', fontWeight: 'var(--weight-bold)' }}>🏀 Division Playoffs</div>
+        <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-lg)' }}>{division} — Semifinals (Best of 3)</div>
+      </div>
+      <InlineSeriesCard result={semi1} userTeamId={userTeam?.id} />
+      <InlineSeriesCard result={semi2} userTeamId={userTeam?.id} />
+      <T2ActionBar onContinue={() => window.continueT2AfterDivisionSemis?.()} continueLabel="Continue to Division Final" />
+    </div>
+  );
+}
+
+/* ── T2 Division Final Result ── */
+function T2DivFinalView({ data }) {
+  const { division, divFinal, userTeam } = data;
+  const isChampion = divFinal?.winner?.id === userTeam?.id;
+  return (
+    <div style={{ padding: 'var(--space-4)' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-3)' }}>
+        <div style={{ fontSize: '2.2em', fontWeight: 'var(--weight-bold)' }}>🏀 Division Final</div>
+        <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-lg)' }}>{division} — Championship (Best of 3)</div>
+      </div>
+      <InlineSeriesCard result={divFinal} userTeamId={userTeam?.id} />
+      {isChampion ? (
+        <div style={{
+          margin: 'var(--space-5) 0', padding: 'var(--space-5)', textAlign: 'center',
+          background: 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,237,78,0.08))',
+          borderRadius: 'var(--radius-xl)', border: '1px solid rgba(255,215,0,0.4)',
+        }}>
+          <div style={{ fontSize: '1.3em', fontWeight: 'var(--weight-bold)', color: '#ffd700', marginBottom: 'var(--space-1)' }}>🏆 Division Champions!</div>
+          <div style={{ opacity: 0.9 }}>Advancing to the NARBL National Tournament</div>
+        </div>
+      ) : (
+        <div style={{
+          margin: 'var(--space-5) 0', padding: 'var(--space-4)', textAlign: 'center',
+          background: 'var(--color-bg-sunken)', borderRadius: 'var(--radius-lg)',
+        }}>
+          <div style={{ opacity: 0.9 }}>Division Runner-Up — may qualify for National Tournament based on record</div>
+        </div>
+      )}
+      <T2ActionBar onContinue={() => window.continueT2AfterDivisionFinal?.()} continueLabel="Continue" />
+    </div>
+  );
+}
+
+/* ── T2 National Round Result ── */
+function T2NationalRoundView({ data }) {
+  const { roundName, roundNumber, roundResults, userTeam, isChampionshipRound, champion } = data;
+  const isUserChampion = champion && champion.id === userTeam?.id;
+  return (
+    <div style={{ padding: 'var(--space-4)' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
+        <div style={{ fontSize: '2.2em', fontWeight: 'var(--weight-bold)' }}>{isChampionshipRound ? '🏆 ' : ''}{roundName}</div>
+      </div>
+      {(roundResults || []).filter(Boolean).map((s, i) => {
+        const sr = s.result || s;
+        const isUser = sr.higherSeed?.id === userTeam?.id || sr.lowerSeed?.id === userTeam?.id;
+        return <InlineSeriesCard key={i} result={sr} userTeamId={userTeam?.id} highlight={isUser} />;
+      })}
+      {isChampionshipRound && champion && (
+        <div style={{
+          marginTop: 'var(--space-6)', padding: 'var(--space-6)', textAlign: 'center',
+          background: 'linear-gradient(135deg, rgba(192,192,192,0.25), rgba(192,192,192,0.08))',
+          borderRadius: 'var(--radius-xl)', border: '1px solid rgba(192,192,192,0.4)',
+        }}>
+          <div style={{ fontSize: '3em', marginBottom: 'var(--space-2)' }}>🏆</div>
+          <div style={{ fontSize: '2em', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-2)' }}>{champion.name}</div>
+          <div style={{ fontSize: '1.3em', fontWeight: 'var(--weight-bold)' }}>
+            {isUserChampion ? 'YOU ARE THE NARBL CHAMPION!' : 'NARBL CHAMPIONS'}
+          </div>
+        </div>
+      )}
+      <T2ActionBar
+        onContinue={() => window.continueT2AfterNationalRound?.()}
+        continueLabel={isChampionshipRound ? 'Continue to Off-Season' : 'Continue to Next Round'}
+      />
+    </div>
+  );
+}
+
+/* ── T2 Elimination ── */
+function T2EliminationView({ data }) {
+  const { userTeam, eliminatedIn, champion } = data;
+  return (
+    <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
+      <div style={{ fontSize: '2.2em', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-5)' }}>Season Over</div>
+      <div style={{
+        margin: 'var(--space-5) 0', padding: 'var(--space-5)',
+        background: 'rgba(102,126,234,0.1)', borderRadius: 'var(--radius-xl)',
+        border: '1px solid rgba(102,126,234,0.25)',
+      }}>
+        <div style={{ fontSize: '1.3em', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-2)' }}>{userTeam?.name}</div>
+        <div style={{ opacity: 0.9 }}>Eliminated in {eliminatedIn}</div>
+        <div style={{ marginTop: 'var(--space-2)', opacity: 0.7 }}>Final Record: {userTeam?.wins}-{userTeam?.losses}</div>
+      </div>
+      {champion && (
+        <div style={{
+          margin: 'var(--space-5) 0', padding: 'var(--space-5)',
+          background: 'rgba(192,192,192,0.06)', borderRadius: 'var(--radius-xl)',
+          border: '1px solid rgba(192,192,192,0.15)',
+        }}>
+          <div style={{ color: '#c0c0c0', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-1)' }}>NARBL Champion</div>
+          <div style={{ fontSize: '1.5em', fontWeight: 'var(--weight-bold)' }}>🏆 {champion.name}</div>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-6)' }}>
+        <Button variant="ghost" onClick={() => window.openBracketViewer?.()} style={{ opacity: 0.6 }}>📊 View Bracket</Button>
+        <Button variant="primary" size="lg" onClick={() => window.skipT2Playoffs?.()}>Continue to Off-Season</Button>
+      </div>
+    </div>
+  );
+}
+
+/* ── T2 Playoff Complete ── */
+function T2CompleteView({ data }) {
+  const { champion } = data;
+  return (
+    <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
+      <div style={{ fontSize: '2.5em', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-5)' }}>🏆 NARBL Playoffs Complete</div>
+      <div style={{
+        marginTop: 'var(--space-5)', padding: 'var(--space-6)',
+        background: 'linear-gradient(135deg, rgba(192,192,192,0.25), rgba(192,192,192,0.08))',
+        borderRadius: 'var(--radius-xl)', border: '1px solid rgba(192,192,192,0.4)',
+      }}>
+        <div style={{ fontSize: '3em', marginBottom: 'var(--space-2)' }}>🏆</div>
+        <div style={{ fontSize: '2em', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-2)' }}>{champion?.name || 'TBD'}</div>
+        <div style={{ fontSize: '1.3em', fontWeight: 'var(--weight-bold)' }}>NARBL CHAMPIONS</div>
+      </div>
+      <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-6)' }}>
+        <Button variant="ghost" onClick={() => window.openBracketViewer?.()} style={{ opacity: 0.6 }}>📊 View Bracket</Button>
+        <Button variant="primary" size="lg" onClick={() => window.skipT2Playoffs?.()}>Continue to Off-Season</Button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Shared: T2 Action Bar ── */
+function T2ActionBar({ onContinue, continueLabel }) {
+  return (
+    <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-6)' }}>
+      <Button variant="ghost" onClick={() => window.openBracketViewer?.()} style={{ opacity: 0.6 }}>📊 View Bracket</Button>
+      <Button variant="secondary" onClick={() => window.simAllT2Rounds?.()} style={{ opacity: 0.7 }}>Sim All</Button>
+      <Button variant="primary" size="lg" onClick={onContinue}>{continueLabel}</Button>
     </div>
   );
 }

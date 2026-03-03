@@ -1482,6 +1482,16 @@ export class GameSimController {
         const pd = gameState.t2PlayoffData;
         const userTeam = helpers.getUserTeam();
 
+        if (window._reactShowChampionship) {
+            window._reactShowChampionship({
+                mode: 't2-div-semis',
+                division: pd.userDivBracket.division,
+                semi1: pd.interactiveResults.divSemi1,
+                semi2: pd.interactiveResults.divSemi2,
+                userTeam,
+            });
+            return;
+        }
         const html = UIRenderer.t2DivisionSemisPage({
             division: pd.userDivBracket.division,
             semi1: pd.interactiveResults.divSemi1,
@@ -1493,13 +1503,8 @@ export class GameSimController {
                 return UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: isUser, isFinals: false, seriesKey: isUser ? key : undefined });
             }
         });
-
-        if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html });
-        } else {
-            document.getElementById('championshipPlayoffContent').innerHTML = html;
-            document.getElementById('championshipPlayoffModal').classList.remove('hidden');
-        }
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
     }
 
     continueT2AfterDivisionSemis() {
@@ -1540,6 +1545,14 @@ export class GameSimController {
         const userTeam = helpers.getUserTeam();
         const divFinal = pd.interactiveResults.divFinal;
 
+        if (window._reactShowChampionship) {
+            window._reactShowChampionship({
+                mode: 't2-div-final',
+                division: pd.userDivision,
+                divFinal, userTeam,
+            });
+            return;
+        }
         const html = UIRenderer.t2DivisionFinalPage({
             division: pd.userDivision,
             divFinal, userTeam,
@@ -1548,13 +1561,8 @@ export class GameSimController {
                 return UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: isUser, isFinals: true, seriesKey: isUser ? 't2-div-divFinal' : undefined });
             }
         });
-
-        if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html });
-        } else {
-            document.getElementById('championshipPlayoffContent').innerHTML = html;
-            document.getElementById('championshipPlayoffModal').classList.remove('hidden');
-        }
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
     }
 
     continueT2AfterDivisionFinal() {
@@ -1688,6 +1696,15 @@ export class GameSimController {
             postseason.t2.runnerUp = roundResults[0].result.loser;
         }
 
+        if (window._reactShowChampionship) {
+            window._reactShowChampionship({
+                mode: 't2-national-result',
+                roundName, roundNumber, roundResults, userTeam,
+                isChampionshipRound: roundNumber === 4,
+                champion: roundNumber === 4 ? roundResults[0].result.winner : null,
+            });
+            return;
+        }
         const roundIdx = pd.interactiveResults.nationalRounds.length - 1;
         const html = UIRenderer.t2NationalRoundPage({
             roundName, roundNumber, roundResults, userTeam,
@@ -1700,13 +1717,8 @@ export class GameSimController {
                 return UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: isUser, isFinals: isF, seriesKey: key });
             }
         });
-
-        if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html });
-        } else {
-            document.getElementById('championshipPlayoffContent').innerHTML = html;
-            document.getElementById('championshipPlayoffModal').classList.remove('hidden');
-        }
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
     }
 
     continueT2AfterNationalRound() {
@@ -1740,12 +1752,12 @@ export class GameSimController {
         const postseason = gameState.postseasonResults;
 
         // The background simulation already has all results — just use those
-        const t2CompleteHtml = UIRenderer.t2PlayoffCompleteQuick({ champion: postseason.t2.champion });
         if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html: t2CompleteHtml });
-        } else {
-            document.getElementById('championshipPlayoffContent').innerHTML = t2CompleteHtml;
+            window._reactShowChampionship({ mode: 't2-complete', champion: postseason.t2.champion });
+            return;
         }
+        const t2CompleteHtml = UIRenderer.t2PlayoffCompleteQuick({ champion: postseason.t2.champion });
+        document.getElementById('championshipPlayoffContent').innerHTML = t2CompleteHtml;
     }
 
     _showT2EliminationAndSummary(eliminatedIn) {
@@ -1753,17 +1765,21 @@ export class GameSimController {
         const postseason = gameState.postseasonResults;
         const userTeam = helpers.getUserTeam();
 
+        if (window._reactShowChampionship) {
+            window._reactShowChampionship({
+                mode: 't2-elimination',
+                userTeam,
+                eliminatedIn,
+                champion: postseason.t2.champion,
+            });
+            return;
+        }
         const html = UIRenderer.t2EliminationPage({
             userTeam,
             eliminatedIn,
             champion: postseason.t2.champion
         });
-
-        if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html });
-        } else {
-            document.getElementById('championshipPlayoffContent').innerHTML = html;
-        }
+        document.getElementById('championshipPlayoffContent').innerHTML = html;
     }
 
     _finishT2Playoffs() {

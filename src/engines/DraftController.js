@@ -353,6 +353,23 @@ export class DraftController {
 
     showDraftResults(draftResults) {
         this.currentDraftResults = draftResults;
+        const { helpers } = this.ctx;
+
+        if (window._reactShowDraftResults) {
+            const self = this;
+            window._draftResultsContinueCallback = () => {
+                self.currentDraftResults = [];
+                console.log('Draft complete, generating college graduates...');
+                self.startCollegeGraduateFA();
+            };
+            window._reactShowDraftResults({
+                results: draftResults,
+                userTeamId: helpers.getUserTeam().id,
+                getRatingColor: helpers.getRatingColor
+            });
+            return;
+        }
+
         this.showDraftRound(1);
         document.getElementById('draftResultsModal').classList.remove('hidden');
     }

@@ -24,6 +24,7 @@ import { FinancialTransitionModal } from './screens/FinancialTransitionModal.jsx
 import { AllStarModal } from './screens/AllStarModal.jsx';
 import { ContractDecisionsModal } from './screens/ContractDecisionsModal.jsx';
 import { SeasonEndModal } from './screens/SeasonEndModal.jsx';
+import { DraftResultsModal } from './screens/DraftResultsModal.jsx';
 
 function AppContent() {
   const { isReady, gameState, refresh } = useGame();
@@ -43,6 +44,7 @@ function AppContent() {
   const [allStarData, setAllStarData] = useState(null);
   const [contractDecisionsData, setContractDecisionsData] = useState(null);
   const [seasonEndData, setSeasonEndData] = useState(null);
+  const [draftResultsData, setDraftResultsData] = useState(null);
 
   // Hide the legacy game container elements once React takes over
   useEffect(() => {
@@ -84,6 +86,7 @@ function AppContent() {
     window._reactShowAllStar = (data) => setAllStarData(data);
     window._reactShowContractDecisions = (data) => setContractDecisionsData(data);
     window._reactShowSeasonEnd = (data) => setSeasonEndData(data);
+    window._reactShowDraftResults = (data) => setDraftResultsData(data);
 
     return () => {
       window.removeEventListener('reactShowPostGame', handlePostGame);
@@ -101,6 +104,7 @@ function AppContent() {
       delete window._reactShowAllStar;
       delete window._reactShowContractDecisions;
       delete window._reactShowSeasonEnd;
+      delete window._reactShowDraftResults;
     };
   }, []);
 
@@ -266,6 +270,14 @@ function AppContent() {
         onStay={() => {
           setSeasonEndData(null);
           window._seasonEndStayCallback?.();
+        }}
+      />
+      <DraftResultsModal
+        isOpen={!!draftResultsData}
+        data={draftResultsData}
+        onContinue={() => {
+          setDraftResultsData(null);
+          window._draftResultsContinueCallback?.();
         }}
       />
     </div>

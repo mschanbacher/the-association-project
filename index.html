@@ -2243,6 +2243,7 @@
                 window.simDay = () => gmMode.simulateDay();
                 window.simWeek = () => gmMode.simulateWeek();
                 window.finishSeason = () => gmMode.finishSeason();
+                window.resumeOffseason = () => getOffseasonController().resumeOffseason();
 
                 // ── Expose trade helpers on window for React ──
                 window.getPickOwner = (teamId, year, round) => {

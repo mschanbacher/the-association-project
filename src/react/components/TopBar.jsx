@@ -85,22 +85,74 @@ function SimControls({ gameState }) {
   const [simming, setSimming] = useState(false);
 
   const isComplete = gameState?.isSeasonComplete;
-  const inOffseason = gameState?.offseasonPhase && gameState?.offseasonPhase !== 'none';
+  const offPhase = gameState?.offseasonPhase;
+  const inOffseason = offPhase && offPhase !== 'none';
   const disabled = isComplete || simming;
 
   const wrap = useCallback((fn) => {
     return () => {
       if (simming) return;
       setSimming(true);
-      // Brief delay to show disabled state, then call
       setTimeout(() => {
         fn?.();
-        // Re-enable after a tick
         setTimeout(() => setSimming(false), 200);
       }, 10);
     };
   }, [simming]);
 
+  // ── Offseason mode: show "Continue Offseason" button ──
+  if (inOffseason) {
+    const PHASE_LABELS = {
+      season_ended: 'Review Season',
+      postseason: 'Playoffs',
+      promo_rel: 'Promotion / Relegation',
+      draft: 'Draft',
+      college_fa: 'College Free Agency',
+      development: 'Player Development',
+      free_agency: 'Free Agency',
+      roster_compliance: 'Roster Compliance',
+      owner_mode: 'Owner Decisions',
+      setup_complete: 'Start New Season',
+    };
+    const label = PHASE_LABELS[offPhase] || 'Continue';
+
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-2)',
+        background: 'var(--color-bg-sunken)',
+        borderRadius: 'var(--radius-md)',
+        padding: 2,
+      }}>
+        <button
+          onClick={wrap(() => window.resumeOffseason?.())}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 14px',
+            borderRadius: 'calc(var(--radius-md) - 2px)',
+            border: 'none',
+            background: 'var(--color-accent)',
+            color: '#1a1a2e',
+            fontSize: 'var(--text-xs)',
+            fontWeight: 'var(--weight-bold)',
+            fontFamily: 'var(--font-body)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            transition: 'opacity var(--duration-fast) ease',
+            opacity: simming ? 0.6 : 1,
+          }}
+        >
+          <span style={{ fontSize: '0.85em' }}>📋</span>
+          {label} →
+        </button>
+      </div>
+    );
+  }
+
+  // ── Regular season mode ──
   return (
     <div style={{
       display: 'flex',
@@ -110,38 +162,12 @@ function SimControls({ gameState }) {
       borderRadius: 'var(--radius-md)',
       padding: 2,
     }}>
-      <SimBtn
-        icon="▶"
-        label="Next"
-        onClick={wrap(() => window.simNextGame?.())}
-        disabled={disabled}
-      />
-      <SimBtn
-        icon="👁"
-        label="Watch"
-        onClick={wrap(() => window.watchNextGame?.())}
-        disabled={disabled}
-        accent
-      />
+      <SimBtn icon="▶" label="Next" onClick={wrap(() => window.simNextGame?.())} disabled={disabled} />
+      <SimBtn icon="👁" label="Watch" onClick={wrap(() => window.watchNextGame?.())} disabled={disabled} accent />
       <SimDivider />
-      <SimBtn
-        icon="📅"
-        label="Day"
-        onClick={wrap(() => window.simDay?.())}
-        disabled={disabled}
-      />
-      <SimBtn
-        icon="⏩"
-        label="Week"
-        onClick={wrap(() => window.simWeek?.())}
-        disabled={disabled}
-      />
-      <SimBtn
-        icon="⏭"
-        label="Finish"
-        onClick={wrap(() => window.finishSeason?.())}
-        disabled={disabled && !inOffseason}
-      />
+      <SimBtn icon="📅" label="Day" onClick={wrap(() => window.simDay?.())} disabled={disabled} />
+      <SimBtn icon="⏩" label="Week" onClick={wrap(() => window.simWeek?.())} disabled={disabled} />
+      <SimBtn icon="⏭" label="Finish" onClick={wrap(() => window.finishSeason?.())} disabled={disabled} />
     </div>
   );
 }

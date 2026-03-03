@@ -5,15 +5,17 @@ import { Button } from '../components/Button.jsx';
 export function DraftResultsModal({ isOpen, data, onContinue }) {
   const [activeTab, setActiveTab] = useState('round1');
 
-  if (!isOpen || !data) return null;
-
-  const { results = [], userTeamId, getRatingColor } = data;
-  const rc = getRatingColor || (() => 'var(--color-text)');
+  // All hooks MUST run before any early return
+  const results = data?.results || [];
+  const userTeamId = data?.userTeamId;
+  const rc = data?.getRatingColor || (() => 'var(--color-text)');
 
   const round1 = useMemo(() => results.filter(r => r.round === 1), [results]);
   const comp = useMemo(() => results.filter(r => r.round === 'Comp'), [results]);
   const round2 = useMemo(() => results.filter(r => r.round === 2), [results]);
   const userPicks = useMemo(() => results.filter(r => r.teamId === userTeamId), [results, userTeamId]);
+
+  if (!isOpen || !data) return null;
 
   const tabs = [
     { key: 'round1', label: 'Round 1', count: round1.length },

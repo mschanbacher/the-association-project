@@ -3049,7 +3049,7 @@
         window.closeTradeScreen = (...args) => getTradeController().closeTradeScreen(...args);
         window.confirmOffseasonDecisions = (...args) => getOffseasonController().confirmOffseasonDecisions(...args);
         window.continueAfterChampionshipRound = (...args) => getGameSimController().continueAfterChampionshipRound(...args);
-        window.closeBracketViewer = () => document.getElementById('bracketViewerModal').classList.add('hidden');
+        window.closeBracketViewer = () => { if (window._reactCloseBracket) window._reactCloseBracket(); document.getElementById('bracketViewerModal').classList.add('hidden'); };
         window.openBracketViewer = () => getGameSimController().openBracketViewer();
         window.showPlayoffBoxScore = (seriesKey, gameIdx) => getGameSimController().showPlayoffBoxScore(seriesKey, gameIdx);
         window.continueT2AfterDivisionFinal = (...args) => getGameSimController().continueT2AfterDivisionFinal(...args);

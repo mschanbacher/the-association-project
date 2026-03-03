@@ -14,8 +14,8 @@ import { useGame } from '../hooks/GameBridge.jsx';
    ═══════════════════════════════════════════════════════════════ */
 
 const MODAL_IDS = [
-  { id: 'bracketViewerModal',         maxWidth: 1400 },
 ];
+// All modals now converted to native React!
 
 // Module-level state for the classList interceptors
 let _showGen = 0;

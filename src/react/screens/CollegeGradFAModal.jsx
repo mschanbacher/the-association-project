@@ -14,28 +14,26 @@ export function CollegeGradFAModal({ isOpen, data, onClose }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [posFilter, setPosFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('rating');
-  const [phase, setPhase] = useState('select');
-  const [results, setResults] = useState(null);
 
+  // Reset selection state when new select-phase data arrives
+  const dataPhase = data?.phase || 'select';
   useEffect(() => {
-    if (data) {
+    if (dataPhase === 'select') {
       setSelectedIds(new Set());
       setPosFilter('ALL');
       setSortBy('rating');
-      setPhase(data.phase || 'select');
-      setResults(data.results || null);
     }
-  }, [data]);
+  }, [dataPhase]);
 
   if (!isOpen || !data) return null;
   const fc = data.formatCurrency || (v => `$${(v / 1e6).toFixed(1)}M`);
 
-  if (phase === 'results' && results) {
+  if (dataPhase === 'results' && data.results) {
     return (
       <Modal isOpen={isOpen} onClose={null} maxWidth={1000} zIndex={1300}>
         <ModalHeader>{'\ud83c\udf93'} College Graduate Signing Results</ModalHeader>
         <ModalBody style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-          <ResultsView results={results} onContinue={() => window.closeCollegeGradResults?.()} />
+          <ResultsView results={data.results} onContinue={() => window.closeCollegeGradResults?.()} />
         </ModalBody>
       </Modal>
     );
@@ -46,14 +44,13 @@ export function CollegeGradFAModal({ isOpen, data, onClose }) {
       data={data} fc={fc} selectedIds={selectedIds} setSelectedIds={setSelectedIds}
       posFilter={posFilter} setPosFilter={setPosFilter}
       sortBy={sortBy} setSortBy={setSortBy}
-      setPhase={setPhase} setResults={setResults}
     />
   );
 }
 
 /* ── Selection Phase ── */
-function SelectionView({ data, fc, selectedIds, setSelectedIds, posFilter, setPosFilter, sortBy, setSortBy, setPhase, setResults }) {
-  const { graduates, capSpace, rosterSize, season } = data;
+function SelectionView({ data, fc, selectedIds, setSelectedIds, posFilter, setPosFilter, sortBy, setSortBy }) {
+  const { graduates = [], capSpace = 0, rosterSize = 0, season = 0 } = data;
 
   const filtered = useMemo(() => {
     let list = posFilter === 'ALL' ? [...graduates] : graduates.filter(g => g.position === posFilter);

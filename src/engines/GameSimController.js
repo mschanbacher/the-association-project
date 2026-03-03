@@ -414,6 +414,11 @@ export class GameSimController {
             html = '<div style="padding:40px;text-align:center;opacity:0.7;">No active playoff bracket</div>';
         }
 
+        if (window._reactShowBracket) {
+            window._reactShowBracket({ html });
+            return;
+        }
+
         document.getElementById('bracketViewerContent').innerHTML = html;
         document.getElementById('bracketViewerModal').classList.remove('hidden');
     }

@@ -347,48 +347,86 @@ export function RecentActivityWidget() {
           No transactions yet this season
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {recentTrades.map((trade, i) => (
-            <div key={i} style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 'var(--space-3)',
-              padding: 'var(--space-2) 0',
-              borderBottom: i < recentTrades.length - 1 ? '1px solid var(--color-border-subtle)' : 'none',
-            }}>
-              <span style={{
-                fontSize: 'var(--text-md)',
-                lineHeight: 1,
-                marginTop: 2,
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {recentTrades.map((trade, i) => {
+            const t1Name = trade.team1?.name || trade.team1Name || 'Team';
+            const t2Name = trade.team2?.name || trade.team2Name || 'Team';
+            const t1Id = trade.team1?.id ?? trade.team1Id;
+            const t2Id = trade.team2?.id ?? trade.team2Id;
+            const t1Gave = trade.team1Gave || [];
+            const t2Gave = trade.team2Gave || [];
+            const isUserTrade = t1Id === userTeam.id || t2Id === userTeam.id;
+
+            return (
+              <div key={i} style={{
+                padding: 'var(--space-3)',
+                borderRadius: 'var(--radius-md)',
+                background: isUserTrade ? 'var(--color-accent-light)' : 'var(--color-bg-sunken)',
+                border: isUserTrade ? '1px solid var(--color-accent-subtle)' : '1px solid var(--color-border-subtle)',
               }}>
-                🔄
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Header: Team ↔ Team + date */}
                 <div style={{
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 'var(--weight-medium)',
-                  color: 'var(--color-text)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  marginBottom: 'var(--space-2)',
                 }}>
-                  {trade.team1Name || 'Team'} ↔ {trade.team2Name || 'Team'}
-                </div>
-                {trade.date && (
                   <div style={{
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--color-text-tertiary)',
-                    marginTop: 2,
+                    fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semi)',
                   }}>
-                    {trade.date}
+                    {t1Name} ↔ {t2Name}
                   </div>
-                )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    {isUserTrade && <Badge variant="accent">Your Team</Badge>}
+                    {trade.date && (
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                        {trade.date}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Trade details */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr auto 1fr',
+                  gap: 'var(--space-2)', alignItems: 'start',
+                  fontSize: 'var(--text-xs)',
+                }}>
+                  {/* Team 1 sends */}
+                  <div>
+                    <div style={{ color: 'var(--color-text-tertiary)', marginBottom: 2 }}>
+                      {t1Name.split(' ').pop()} sends:
+                    </div>
+                    {t1Gave.map((p, j) => (
+                      <div key={j} style={{ color: 'var(--color-text-secondary)' }}>
+                        {p.name} <span style={{ color: 'var(--color-text-tertiary)' }}>({p.position} {p.rating})</span>
+                      </div>
+                    ))}
+                    {t1Gave.length === 0 && <div style={{ color: 'var(--color-text-tertiary)' }}>—</div>}
+                  </div>
+
+                  {/* Arrow */}
+                  <div style={{
+                    color: 'var(--color-text-tertiary)', alignSelf: 'center',
+                    fontSize: 'var(--text-sm)', padding: '0 var(--space-1)',
+                  }}>
+                    ⇄
+                  </div>
+
+                  {/* Team 2 sends */}
+                  <div>
+                    <div style={{ color: 'var(--color-text-tertiary)', marginBottom: 2 }}>
+                      {t2Name.split(' ').pop()} sends:
+                    </div>
+                    {t2Gave.map((p, j) => (
+                      <div key={j} style={{ color: 'var(--color-text-secondary)' }}>
+                        {p.name} <span style={{ color: 'var(--color-text-tertiary)' }}>({p.position} {p.rating})</span>
+                      </div>
+                    ))}
+                    {t2Gave.length === 0 && <div style={{ color: 'var(--color-text-tertiary)' }}>—</div>}
+                  </div>
+                </div>
               </div>
-              {(trade.team1Id === userTeam.id || trade.team2Id === userTeam.id) && (
-                <Badge variant="accent">Your Team</Badge>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </Card>

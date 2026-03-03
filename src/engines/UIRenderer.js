@@ -4246,12 +4246,12 @@ export class UIRenderer {
 
             // Expandable game details
             if (expandId && hasGames) {
-                html += `<div id="${expandId}" class="hidden" style="margin: -4px 0 6px 0; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 0 0 6px 6px; border: 1px solid rgba(255,255,255,0.06); border-top: none; font-size: 0.8em;">`;
+                html += `<div id="${expandId}" class="hidden" style="margin: -4px 0 6px 0; padding: 6px 8px; background: var(--color-bg-active, rgba(255,255,255,0.03)); border-radius: 0 0 6px 6px; border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.06)); border-top: none; font-size: 0.8em;">`;
                 seriesResult.result.games.forEach((game, idx) => {
                     const homeWon = game.winner.id === game.homeTeam.id;
                     const hasBox = isUserSeries && game.boxScore;
                     const boxClick = hasBox && seriesKey ? `onclick="event.stopPropagation(); showPlayoffBoxScore('${seriesKey}', ${idx})" style="cursor:pointer;"` : '';
-                    html += `<div style="display: flex; align-items: center; padding: 3px 4px; gap: 4px; border-bottom: 1px solid rgba(255,255,255,0.04);" ${boxClick}>
+                    html += `<div style="display: flex; align-items: center; padding: 3px 4px; gap: 4px; border-bottom: 1px solid var(--color-border-subtle, rgba(255,255,255,0.04));" ${boxClick}>
                         <span style="min-width: 30px; opacity: 0.5;">G${game.gameNumber}</span>
                         <span style="flex:1; text-align:right; ${homeWon ? 'font-weight:bold;' : 'opacity:0.6;'}">${game.homeTeam.name} ${game.homeScore}</span>
                         <span style="opacity:0.3; margin: 0 3px;">-</span>
@@ -4368,19 +4368,19 @@ export class UIRenderer {
         let html = `<div class="bv-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h1 style="font-size: 1.8em;">🏆 NAPL Championship Bracket</h1>
-                <button onclick="closeBracketViewer()" style="padding: 8px 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; font-size: 1em;">✕ Close</button>
+                <button onclick="closeBracketViewer()" style="padding: 8px 20px; border-radius: 8px; border: 1px solid var(--color-border, rgba(255,255,255,0.3)); background: var(--color-bg-active, rgba(255,255,255,0.1)); color: var(--color-text, #fff); cursor: pointer; font-size: 1em;">✕ Close</button>
             </div>
             <style>
                 .bv-container { padding: 10px; }
                 .bv-conf { margin-bottom: 25px; }
-                .bv-conf-header { font-size: 1.3em; font-weight: bold; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid rgba(255,255,255,0.1); }
+                .bv-conf-header { font-size: 1.3em; font-weight: bold; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--color-border, rgba(255,255,255,0.1)); }
                 .bv-rounds { display: flex; gap: 15px; align-items: stretch; }
                 .bv-round { flex: 1; min-width: 0; display: flex; flex-direction: column; }
                 .bv-round-label { font-size: 0.75em; text-transform: uppercase; opacity: 0.5; margin-bottom: 8px; text-align: center; letter-spacing: 0.5px; flex-shrink: 0; }
                 .bv-round-matchups { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
-                .bv-matchup { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 6px; border: 1px solid rgba(255,255,255,0.08); position: relative; }
+                .bv-matchup { background: var(--color-bg-sunken, rgba(255,255,255,0.04)); border-radius: 8px; padding: 6px; border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.08)); position: relative; }
                 .bv-team { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 4px; font-size: 0.85em; }
-                .bv-team + .bv-team { border-top: 1px solid rgba(255,255,255,0.06); }
+                .bv-team + .bv-team { border-top: 1px solid var(--color-border-subtle, rgba(255,255,255,0.06)); }
                 .bv-seed { font-size: 0.75em; opacity: 0.5; min-width: 18px; text-align: center; }
                 .bv-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .bv-record { font-size: 0.75em; opacity: 0.5; }
@@ -4465,12 +4465,12 @@ export class UIRenderer {
             </div>`;
 
             if (expandId && hasGames) {
-                html += `<div id="${expandId}" class="hidden" style="margin: -4px 0 6px 0; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 0 0 6px 6px; border: 1px solid rgba(255,255,255,0.06); border-top: none; font-size: 0.8em;">`;
+                html += `<div id="${expandId}" class="hidden" style="margin: -4px 0 6px 0; padding: 6px 8px; background: var(--color-bg-active, rgba(255,255,255,0.03)); border-radius: 0 0 6px 6px; border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.06)); border-top: none; font-size: 0.8em;">`;
                 seriesResult.games.forEach((game, idx) => {
                     const homeWon = game.winner.id === game.homeTeam.id;
                     const hasBox = isUserSeries && game.boxScore;
                     const boxClick = hasBox && seriesKey ? `onclick="event.stopPropagation(); showPlayoffBoxScore('${seriesKey}', ${idx})" style="cursor:pointer;"` : '';
-                    html += `<div style="display: flex; align-items: center; padding: 3px 4px; gap: 4px; border-bottom: 1px solid rgba(255,255,255,0.04);" ${boxClick}>
+                    html += `<div style="display: flex; align-items: center; padding: 3px 4px; gap: 4px; border-bottom: 1px solid var(--color-border-subtle, rgba(255,255,255,0.04));" ${boxClick}>
                         <span style="min-width: 30px; opacity: 0.5;">G${game.gameNumber}</span>
                         <span style="flex:1; text-align:right; ${homeWon ? 'font-weight:bold;' : 'opacity:0.6;'}">${game.homeTeam.name} ${game.homeScore}</span>
                         <span style="opacity:0.3; margin: 0 3px;">-</span>
@@ -4564,19 +4564,19 @@ export class UIRenderer {
         return `<div class="bv-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h1 style="font-size: 1.8em;">🏀 Tier 2 Championship Bracket</h1>
-                <button onclick="closeBracketViewer()" style="padding: 8px 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; font-size: 1em;">✕ Close</button>
+                <button onclick="closeBracketViewer()" style="padding: 8px 20px; border-radius: 8px; border: 1px solid var(--color-border, rgba(255,255,255,0.3)); background: var(--color-bg-active, rgba(255,255,255,0.1)); color: var(--color-text, #fff); cursor: pointer; font-size: 1em;">✕ Close</button>
             </div>
             <style>
                 .bv-container { padding: 10px; }
                 .bv-conf { margin-bottom: 25px; }
-                .bv-conf-header { font-size: 1.3em; font-weight: bold; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid rgba(255,255,255,0.1); }
+                .bv-conf-header { font-size: 1.3em; font-weight: bold; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--color-border, rgba(255,255,255,0.1)); }
                 .bv-rounds { display: flex; gap: 15px; align-items: stretch; }
                 .bv-round { flex: 1; min-width: 0; display: flex; flex-direction: column; }
                 .bv-round-label { font-size: 0.75em; text-transform: uppercase; opacity: 0.5; margin-bottom: 8px; text-align: center; letter-spacing: 0.5px; flex-shrink: 0; }
                 .bv-round-matchups { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
-                .bv-matchup { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 6px; border: 1px solid rgba(255,255,255,0.08); position: relative; }
+                .bv-matchup { background: var(--color-bg-sunken, rgba(255,255,255,0.04)); border-radius: 8px; padding: 6px; border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.08)); position: relative; }
                 .bv-team { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 4px; font-size: 0.85em; }
-                .bv-team + .bv-team { border-top: 1px solid rgba(255,255,255,0.06); }
+                .bv-team + .bv-team { border-top: 1px solid var(--color-border-subtle, rgba(255,255,255,0.06)); }
                 .bv-seed { font-size: 0.75em; opacity: 0.5; min-width: 18px; text-align: center; }
                 .bv-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .bv-record { font-size: 0.75em; opacity: 0.5; }

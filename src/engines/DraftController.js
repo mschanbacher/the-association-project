@@ -573,9 +573,17 @@ export class DraftController {
             }
         });
 
-        document.getElementById('collegeGradList').innerHTML = '';
-        document.getElementById('collegeGradFAModal').querySelector('.modal-content').innerHTML =
-            UIRenderer.collegeGradResults({ signed, lost, results });
+        // The .modal-content may have been moved to React overlay by OffseasonModals
+        const listEl = document.getElementById('collegeGradList');
+        if (listEl) listEl.innerHTML = '';
+        const modalEl = document.getElementById('collegeGradFAModal');
+        let contentNode = modalEl && modalEl.querySelector('.modal-content');
+        if (!contentNode && listEl) {
+            contentNode = listEl.closest('.modal-content');
+        }
+        if (contentNode) {
+            contentNode.innerHTML = UIRenderer.collegeGradResults({ signed, lost, results });
+        }
     }
 
     skipCollegeGradFA() {

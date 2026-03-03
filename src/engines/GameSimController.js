@@ -1888,16 +1888,22 @@ export class GameSimController {
         const userSeed = champsSorted.findIndex(c => c.team.id === userTeam.id) + 1;
         pd.interactiveResults.userHadBye = userSeed <= 8;
 
+        if (window._reactShowChampionship) {
+            window._reactShowChampionship({
+                mode: 't3-metro-result',
+                result, userTeam, userSeed,
+                hasBye: userSeed <= 8,
+                totalMetroChamps: champsSorted.length,
+            });
+            return;
+        }
         const html = UIRenderer.t3MetroFinalResultPage({
             result, userTeam, userSeed,
             hasBye: userSeed <= 8,
             totalMetroChamps: champsSorted.length,
             formatSeriesResult: (sr) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: true, isFinals: true, seriesKey: 't3-metroFinal' })
         });
-
-        if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html });
-        } else {
+        {
             document.getElementById('championshipPlayoffContent').innerHTML = html;
             document.getElementById('championshipPlayoffModal').classList.remove('hidden');
         }
@@ -2011,15 +2017,20 @@ export class GameSimController {
             r && (r.result.winner.id === userTeam.id || r.result.loser.id === userTeam.id)
         );
 
+        if (window._reactShowChampionship) {
+            window._reactShowChampionship({
+                mode: 't3-regional-result',
+                userTeam, userSeed16,
+                userResult: userRegIdx >= 0 ? pd._pendingRegionalResults[userRegIdx].result : null,
+            });
+            return;
+        }
         const html = UIRenderer.t3RegionalRoundResultPage({
             userTeam, userSeed16,
             userResult: userRegIdx >= 0 ? pd._pendingRegionalResults[userRegIdx].result : null,
             formatSeriesResult: (sr) => UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: true, isFinals: false, seriesKey: userRegIdx >= 0 ? `t3-regional-${userRegIdx}` : undefined })
         });
-
-        if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html });
-        } else {
+        {
             document.getElementById('championshipPlayoffContent').innerHTML = html;
             document.getElementById('championshipPlayoffModal').classList.remove('hidden');
         }
@@ -2133,6 +2144,15 @@ export class GameSimController {
             postseason.t3.runnerUp = roundResults[0].result.loser;
         }
 
+        if (window._reactShowChampionship) {
+            window._reactShowChampionship({
+                mode: 't3-national-result',
+                roundName, stage, roundResults, userTeam,
+                isChampionship,
+                champion: isChampionship ? roundResults[0]?.result.winner : null,
+            });
+            return;
+        }
         const html = UIRenderer.t3NationalRoundPage({
             roundName, stage, roundResults, userTeam,
             isChampionship,
@@ -2144,10 +2164,7 @@ export class GameSimController {
                 return UIRenderer.seriesResultCard({ seriesResult: sr, isUserInvolved: isUser, isFinals: isF, seriesKey: key });
             }
         });
-
-        if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html });
-        } else {
+        {
             document.getElementById('championshipPlayoffContent').innerHTML = html;
             document.getElementById('championshipPlayoffModal').classList.remove('hidden');
         }
@@ -2190,12 +2207,12 @@ export class GameSimController {
     simAllT3Rounds() {
         const { gameState } = this.ctx;
         const postseason = gameState.postseasonResults;
-        const t3CompleteHtml = UIRenderer.t3PlayoffCompleteQuick({ champion: postseason.t3.champion });
         if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html: t3CompleteHtml });
-        } else {
-            document.getElementById('championshipPlayoffContent').innerHTML = t3CompleteHtml;
+            window._reactShowChampionship({ mode: 't3-complete', champion: postseason.t3.champion });
+            return;
         }
+        const t3CompleteHtml = UIRenderer.t3PlayoffCompleteQuick({ champion: postseason.t3.champion });
+        document.getElementById('championshipPlayoffContent').innerHTML = t3CompleteHtml;
     }
 
     _showT3EliminationAndSummary(eliminatedIn) {
@@ -2203,15 +2220,21 @@ export class GameSimController {
         const postseason = gameState.postseasonResults;
         const userTeam = helpers.getUserTeam();
 
+        if (window._reactShowChampionship) {
+            window._reactShowChampionship({
+                mode: 't3-elimination',
+                userTeam,
+                eliminatedIn,
+                champion: postseason.t3.champion,
+            });
+            return;
+        }
         const html = UIRenderer.t3EliminationPage({
             userTeam,
             eliminatedIn,
             champion: postseason.t3.champion
         });
-
-        if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html });
-        } else {
+        {
             document.getElementById('championshipPlayoffContent').innerHTML = html;
             document.getElementById('championshipPlayoffModal').classList.remove('hidden');
         }
@@ -2220,13 +2243,13 @@ export class GameSimController {
     _showT3PostseasonSummary() {
         const { gameState } = this.ctx;
         const postseason = gameState.postseasonResults;
-        const t3SummaryHtml = UIRenderer.t3PlayoffCompleteQuick({ champion: postseason.t3.champion });
         if (window._reactShowChampionship) {
-            window._reactShowChampionship({ mode: 'html', html: t3SummaryHtml });
-        } else {
-            document.getElementById('championshipPlayoffContent').innerHTML = t3SummaryHtml;
-            document.getElementById('championshipPlayoffModal').classList.remove('hidden');
+            window._reactShowChampionship({ mode: 't3-complete', champion: postseason.t3.champion });
+            return;
         }
+        const t3SummaryHtml = UIRenderer.t3PlayoffCompleteQuick({ champion: postseason.t3.champion });
+        document.getElementById('championshipPlayoffContent').innerHTML = t3SummaryHtml;
+        document.getElementById('championshipPlayoffModal').classList.remove('hidden');
     }
 
     _finishT3Playoffs() {

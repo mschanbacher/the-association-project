@@ -15,6 +15,11 @@ export function ChampionshipPlayoffModal({ isOpen, data, onClose }) {
         {mode === 'complete' && <CompleteView data={data} />}
         {mode === 'series' && <SeriesWatchView data={data} />}
         {mode === 'postseason' && <PostseasonView data={data} />}
+        {mode === 't3-metro-result' && <T3MetroResultView data={data} />}
+        {mode === 't3-regional-result' && <T3RegionalResultView data={data} />}
+        {mode === 't3-national-result' && <T3NationalRoundView data={data} />}
+        {mode === 't3-elimination' && <T3EliminationView data={data} />}
+        {mode === 't3-complete' && <T3CompleteView data={data} />}
         {mode === 'html' && <HtmlView data={data} />}
       </ModalBody>
     </Modal>
@@ -239,7 +244,150 @@ function SeriesWatchView({ data }) {
   );
 }
 
-/* ── Generic HTML View (T2/T3 playoff pages with pre-rendered HTML) ── */
+/* ── T3 Metro Final Result ── */
+function T3MetroResultView({ data }) {
+  const { result, userTeam, userSeed, hasBye, totalMetroChamps } = data;
+  return (
+    <div style={{ padding: 'var(--space-4)' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-3)' }}>
+        <div style={{ fontSize: '2.2em', fontWeight: 'var(--weight-bold)' }}>🏀 Metro Finals</div>
+        <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-md)' }}>Best of 3</div>
+      </div>
+      <InlineSeriesCard result={result} userTeamId={userTeam?.id} />
+      <div style={{
+        margin: 'var(--space-5) 0', padding: 'var(--space-5)', textAlign: 'center',
+        background: 'linear-gradient(135deg, rgba(205,127,50,0.25), rgba(205,127,50,0.08))',
+        borderRadius: 'var(--radius-xl)', border: '1px solid rgba(205,127,50,0.4)',
+      }}>
+        <div style={{ fontSize: '1.3em', fontWeight: 'var(--weight-bold)', color: '#cd7f32', marginBottom: 'var(--space-2)' }}>🏆 Metro Champion!</div>
+        <div style={{ fontSize: 'var(--text-md)' }}>Seeded <strong>#{userSeed}</strong> of {totalMetroChamps} metro champions</div>
+        <div style={{ marginTop: 'var(--space-2)', opacity: 0.8 }}>
+          {hasBye ? '✨ You earned a BYE to the Sweet 16!' : '⚡ You will play in the Regional Round to reach the Sweet 16'}
+        </div>
+      </div>
+      <T3ActionBar
+        onContinue={() => window.continueT3AfterMetroFinal?.()}
+        continueLabel={hasBye ? 'Continue to Sweet 16' : 'Continue to Regional Round'}
+      />
+    </div>
+  );
+}
+
+/* ── T3 Regional Round Result ── */
+function T3RegionalResultView({ data }) {
+  const { userTeam, userSeed16, userResult } = data;
+  return (
+    <div style={{ padding: 'var(--space-4)' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-3)' }}>
+        <div style={{ fontSize: '2.2em', fontWeight: 'var(--weight-bold)' }}>🏀 Regional Round</div>
+        <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-md)' }}>Play-In (Best of 3)</div>
+      </div>
+      {userResult && <InlineSeriesCard result={userResult} userTeamId={userTeam?.id} />}
+      <div style={{
+        margin: 'var(--space-5) 0', padding: 'var(--space-4)', textAlign: 'center',
+        background: 'rgba(205,127,50,0.08)', borderRadius: 'var(--radius-lg)',
+        border: '1px solid rgba(205,127,50,0.25)',
+      }}>
+        <div style={{ fontSize: 'var(--text-md)' }}>Advanced to Sweet 16 as <strong>#{userSeed16} seed</strong></div>
+      </div>
+      <T3ActionBar onContinue={() => window.continueT3AfterRegionalRound?.()} continueLabel="Continue to Sweet 16" />
+    </div>
+  );
+}
+
+/* ── T3 National Round Result ── */
+function T3NationalRoundView({ data }) {
+  const { roundName, stage, roundResults, userTeam, isChampionship, champion } = data;
+  const isUserChampion = champion && champion.id === userTeam?.id;
+  return (
+    <div style={{ padding: 'var(--space-4)' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
+        <div style={{ fontSize: '2.2em', fontWeight: 'var(--weight-bold)' }}>{isChampionship ? '🏆 ' : ''}{roundName}</div>
+      </div>
+      {(roundResults || []).filter(Boolean).map((s, i) => {
+        const sr = s.result || s;
+        const isUser = sr.higherSeed?.id === userTeam?.id || sr.lowerSeed?.id === userTeam?.id;
+        return <InlineSeriesCard key={i} result={sr} userTeamId={userTeam?.id} highlight={isUser} />;
+      })}
+      {isChampionship && champion && (
+        <div style={{
+          marginTop: 'var(--space-6)', padding: 'var(--space-6)', textAlign: 'center',
+          background: 'linear-gradient(135deg, rgba(205,127,50,0.35), rgba(205,127,50,0.1))',
+          borderRadius: 'var(--radius-xl)', border: '1px solid rgba(205,127,50,0.5)',
+        }}>
+          <div style={{ fontSize: '3em', marginBottom: 'var(--space-2)' }}>🏆</div>
+          <div style={{ fontSize: '2em', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-2)' }}>{champion.name}</div>
+          <div style={{ fontSize: '1.3em', fontWeight: 'var(--weight-bold)' }}>
+            {isUserChampion ? 'YOU ARE THE METRO LEAGUE CHAMPION!' : 'METRO LEAGUE CHAMPIONS'}
+          </div>
+          {isUserChampion && <div style={{ marginTop: 'var(--space-2)', color: '#cd7f32' }}>🎉 Promoted to Tier 2!</div>}
+        </div>
+      )}
+      <T3ActionBar
+        onContinue={() => window.continueT3AfterNationalRound?.()}
+        continueLabel={isChampionship ? 'Continue to Off-Season' : 'Continue to Next Round'}
+      />
+    </div>
+  );
+}
+
+/* ── T3 Elimination ── */
+function T3EliminationView({ data }) {
+  const { userTeam, eliminatedIn, champion } = data;
+  return (
+    <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
+      <div style={{ fontSize: '2.2em', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-5)' }}>Season Over</div>
+      <div style={{
+        margin: 'var(--space-5) 0', padding: 'var(--space-5)',
+        background: 'rgba(205,127,50,0.08)', borderRadius: 'var(--radius-xl)',
+        border: '1px solid rgba(205,127,50,0.25)',
+      }}>
+        <div style={{ fontSize: '1.3em', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-2)' }}>{userTeam?.name}</div>
+        <div style={{ opacity: 0.9 }}>Eliminated in {eliminatedIn}</div>
+        <div style={{ marginTop: 'var(--space-2)', opacity: 0.7 }}>Final Record: {userTeam?.wins}-{userTeam?.losses}</div>
+      </div>
+      {champion && (
+        <div style={{
+          margin: 'var(--space-5) 0', padding: 'var(--space-5)',
+          background: 'rgba(205,127,50,0.06)', borderRadius: 'var(--radius-xl)',
+          border: '1px solid rgba(205,127,50,0.15)',
+        }}>
+          <div style={{ color: '#cd7f32', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-1)' }}>Metro League Champion</div>
+          <div style={{ fontSize: '1.5em', fontWeight: 'var(--weight-bold)' }}>🏆 {champion.name}</div>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-6)' }}>
+        <Button variant="ghost" onClick={() => window.openBracketViewer?.()} style={{ opacity: 0.6 }}>📊 View Bracket</Button>
+        <Button variant="primary" size="lg" onClick={() => window.skipT3Playoffs?.()}>Continue to Off-Season</Button>
+      </div>
+    </div>
+  );
+}
+
+/* ── T3 Playoff Complete ── */
+function T3CompleteView({ data }) {
+  const { champion } = data;
+  return (
+    <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
+      <div style={{ fontSize: '2.5em', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-5)' }}>🏆 Metro League Playoffs Complete</div>
+      <div style={{
+        marginTop: 'var(--space-5)', padding: 'var(--space-6)',
+        background: 'linear-gradient(135deg, rgba(205,127,50,0.25), rgba(205,127,50,0.08))',
+        borderRadius: 'var(--radius-xl)', border: '1px solid rgba(205,127,50,0.4)',
+      }}>
+        <div style={{ fontSize: '3em', marginBottom: 'var(--space-2)' }}>🏆</div>
+        <div style={{ fontSize: '2em', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-2)' }}>{champion?.name || 'TBD'}</div>
+        <div style={{ fontSize: '1.3em', fontWeight: 'var(--weight-bold)' }}>METRO LEAGUE CHAMPIONS</div>
+      </div>
+      <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-6)' }}>
+        <Button variant="ghost" onClick={() => window.openBracketViewer?.()} style={{ opacity: 0.6 }}>📊 View Bracket</Button>
+        <Button variant="primary" size="lg" onClick={() => window.skipT3Playoffs?.()}>Continue to Off-Season</Button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Generic HTML View (legacy fallback — T2 playoff pages) ── */
 function HtmlView({ data }) {
   return (
     <div dangerouslySetInnerHTML={{ __html: data.html || '' }} />
@@ -256,6 +404,62 @@ function PostseasonView({ data }) {
           Continue to Off-Season {'\u2192'}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/* ── Shared: Inline Series Result Card ── */
+function InlineSeriesCard({ result, userTeamId, highlight }) {
+  if (!result) return null;
+  const isUserInvolved = highlight !== undefined ? highlight : (result.higherSeed?.id === userTeamId || result.lowerSeed?.id === userTeamId);
+  return (
+    <div style={{
+      background: isUserInvolved ? 'var(--color-accent-subtle, rgba(212,168,67,0.15))' : 'var(--color-bg-sunken)',
+      padding: 'var(--space-4)', marginBottom: 'var(--space-4)',
+      borderRadius: 'var(--radius-lg)',
+      border: isUserInvolved ? '2px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
+    }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-3)' }}>
+        <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)' }}>
+          {result.winner?.name} defeat {result.loser?.name}
+        </div>
+        <div style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-secondary)' }}>
+          Series: {result.seriesScore}
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxWidth: 600, margin: '0 auto' }}>
+        {(result.games || []).map((game, idx) => {
+          const homeWon = game.winner?.id === game.homeTeam?.id;
+          return (
+            <div key={idx} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: 'var(--space-2) var(--space-3)',
+              background: 'var(--color-bg-active)', borderRadius: 'var(--radius-sm)',
+              fontSize: 'var(--text-sm)',
+            }}>
+              <span style={{ flex: '0 0 60px' }}>Game {game.gameNumber}</span>
+              <span style={{ flex: 2, textAlign: 'right', fontWeight: homeWon ? 'var(--weight-bold)' : 'var(--weight-normal)', opacity: homeWon ? 1 : 0.6 }}>
+                {game.homeTeam?.name} {game.homeScore}
+              </span>
+              <span style={{ margin: '0 var(--space-3)', color: 'var(--color-text-tertiary)' }}>-</span>
+              <span style={{ flex: 2, textAlign: 'left', fontWeight: !homeWon ? 'var(--weight-bold)' : 'var(--weight-normal)', opacity: !homeWon ? 1 : 0.6 }}>
+                {game.awayScore} {game.awayTeam?.name}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Shared: T3 Action Bar ── */
+function T3ActionBar({ onContinue, continueLabel }) {
+  return (
+    <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-6)' }}>
+      <Button variant="ghost" onClick={() => window.openBracketViewer?.()} style={{ opacity: 0.6 }}>📊 View Bracket</Button>
+      <Button variant="secondary" onClick={() => window.simAllT3Rounds?.()} style={{ opacity: 0.7 }}>Sim All</Button>
+      <Button variant="primary" size="lg" onClick={onContinue}>{continueLabel}</Button>
     </div>
   );
 }

@@ -21,6 +21,8 @@ import { InjuryModal } from './screens/InjuryModal.jsx';
 import { DevelopmentModal } from './screens/DevelopmentModal.jsx';
 import { ComplianceModal } from './screens/ComplianceModal.jsx';
 import { FinancialTransitionModal } from './screens/FinancialTransitionModal.jsx';
+import { AllStarModal } from './screens/AllStarModal.jsx';
+import { ContractDecisionsModal } from './screens/ContractDecisionsModal.jsx';
 
 function AppContent() {
   const { isReady, gameState, refresh } = useGame();
@@ -37,6 +39,8 @@ function AppContent() {
   const [developmentData, setDevelopmentData] = useState(null);
   const [complianceData, setComplianceData] = useState(null);
   const [financialTransitionData, setFinancialTransitionData] = useState(null);
+  const [allStarData, setAllStarData] = useState(null);
+  const [contractDecisionsData, setContractDecisionsData] = useState(null);
 
   // Hide the legacy game container elements once React takes over
   useEffect(() => {
@@ -75,6 +79,8 @@ function AppContent() {
     window._reactShowDevelopment = (data) => setDevelopmentData(data);
     window._reactShowCompliance = (data) => setComplianceData(data);
     window._reactShowFinancialTransition = (data) => setFinancialTransitionData(data);
+    window._reactShowAllStar = (data) => setAllStarData(data);
+    window._reactShowContractDecisions = (data) => setContractDecisionsData(data);
 
     return () => {
       window.removeEventListener('reactShowPostGame', handlePostGame);
@@ -89,6 +95,8 @@ function AppContent() {
       delete window._reactShowDevelopment;
       delete window._reactShowCompliance;
       delete window._reactShowFinancialTransition;
+      delete window._reactShowAllStar;
+      delete window._reactShowContractDecisions;
     };
   }, []);
 
@@ -222,6 +230,22 @@ function AppContent() {
         }}
         onSpendingChange={(pct) => {
           window._financialTransitionSpendingCallback?.(pct);
+        }}
+      />
+      <AllStarModal
+        isOpen={!!allStarData}
+        data={allStarData}
+        onContinue={() => {
+          setAllStarData(null);
+          window._allStarContinueCallback?.();
+        }}
+      />
+      <ContractDecisionsModal
+        isOpen={!!contractDecisionsData}
+        data={contractDecisionsData}
+        onConfirm={(decisions) => {
+          setContractDecisionsData(null);
+          window._contractDecisionsConfirmCallback?.(decisions);
         }}
       />
     </div>

@@ -744,6 +744,23 @@ export class OffseasonController {
         const expiredSalary = expiredContracts.reduce((sum, p) => sum + p.salary, 0);
         const remainingCap = cap - (currentSalary - expiredSalary);
 
+        if (window._reactShowContractDecisions) {
+            const self = this;
+            window._contractDecisionsConfirmCallback = (decisions) => {
+                state.decisions = decisions;
+                self.confirmContractDecisions();
+            };
+            window._reactShowContractDecisions({
+                players: expiredContracts,
+                capSpace: remainingCap,
+                rosterCount: userTeam.roster.length - expiredContracts.length,
+                formatCurrency: helpers.formatCurrency,
+                getRatingColor: helpers.getRatingColor,
+                determineContractLength: helpers.determineContractLength
+            });
+            return;
+        }
+
         document.getElementById('contractDecisionsSummary').innerHTML = UIRenderer.contractDecisionsSummary({
             expiredCount: expiredContracts.length,
             availableCap: remainingCap,

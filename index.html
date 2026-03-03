@@ -2189,6 +2189,11 @@
         }
         
         function showAllStarModal(results) {
+            if (window._reactShowAllStar) {
+                window._allStarContinueCallback = () => {};
+                window._reactShowAllStar({ results, userTeamId: gameState.userTeamId });
+                return;
+            }
             document.getElementById('allStarContent').innerHTML = UIRenderer.allStarModal({
                 results, userTeamId: gameState.userTeamId
             });

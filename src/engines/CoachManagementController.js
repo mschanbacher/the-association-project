@@ -27,7 +27,46 @@ export class CoachManagementController {
         const userTeam = this.getUserTeam();
         if (!userTeam) return;
         const coach = userTeam.coach;
-        const synergy = this.CoachEngine.calculateSynergy(coach, userTeam.roster);
+        const synergy = coach ? this.CoachEngine.calculateSynergy(coach, userTeam.roster) : null;
+
+        if (window._reactShowCoach) {
+            if (this.marketPool.length === 0) {
+                this.marketPool = this.CoachEngine.generateCoachPool(10, userTeam.tier);
+            }
+            const tierTeams = this.gameState.getTeamsByTier(userTeam.tier);
+            const poachable = tierTeams
+                .filter(t => t.id !== userTeam.id && t.coach)
+                .map(t => {
+                    const syn = this.CoachEngine.calculateSynergy(t.coach, userTeam.roster);
+                    const buyout = this.CoachEngine.calculateBuyoutCost(t.coach);
+                    const topTraits = Object.entries(t.coach.traits)
+                        .sort(([,a],[,b]) => b - a).slice(0, 3)
+                        .map(([key, val]) => this.CoachEngine.TRAITS[key].icon + ' ' + this.CoachEngine.TRAITS[key].name + ': ' + val)
+                        .join(' \u00b7 ');
+                    return { ...t.coach, _fromTeam: t.name, _fromTeamId: t.id,
+                        _synergyGrade: syn.grade, _synergyScore: syn.score,
+                        _buyout: buyout, _topTraits: topTraits };
+                })
+                .sort((a, b) => b.overall - a.overall).slice(0, 8);
+            const freeAgents = this.marketPool.map(c => {
+                const syn = this.CoachEngine.calculateSynergy(c, userTeam.roster);
+                const topTraits = Object.entries(c.traits)
+                    .sort(([,a],[,b]) => b - a).slice(0, 3)
+                    .map(([key, val]) => this.CoachEngine.TRAITS[key].icon + ' ' + this.CoachEngine.TRAITS[key].name + ': ' + val)
+                    .join(' \u00b7 ');
+                return { ...c, _synergyGrade: syn.grade, _synergyScore: syn.score, _topTraits: topTraits };
+            });
+            window._reactShowCoach({
+                coach, synergy,
+                traits: this.CoachEngine.TRAITS,
+                freeAgents, poachable,
+                formatCurrency: this.formatCurrency,
+                getOverallColor: (v) => this.CoachEngine.getOverallColor(v),
+                getTraitColor: (v) => this.CoachEngine.getTraitColor(v),
+                getTraitLabel: (k, v) => this.CoachEngine.getTraitLabel(k, v),
+            });
+            return;
+        }
 
         let coachSection = '';
         if (coach) {

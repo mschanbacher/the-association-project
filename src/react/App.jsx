@@ -23,6 +23,7 @@ import { ComplianceModal } from './screens/ComplianceModal.jsx';
 import { FinancialTransitionModal } from './screens/FinancialTransitionModal.jsx';
 import { AllStarModal } from './screens/AllStarModal.jsx';
 import { ContractDecisionsModal } from './screens/ContractDecisionsModal.jsx';
+import { SeasonEndModal } from './screens/SeasonEndModal.jsx';
 
 function AppContent() {
   const { isReady, gameState, refresh } = useGame();
@@ -41,6 +42,7 @@ function AppContent() {
   const [financialTransitionData, setFinancialTransitionData] = useState(null);
   const [allStarData, setAllStarData] = useState(null);
   const [contractDecisionsData, setContractDecisionsData] = useState(null);
+  const [seasonEndData, setSeasonEndData] = useState(null);
 
   // Hide the legacy game container elements once React takes over
   useEffect(() => {
@@ -81,6 +83,7 @@ function AppContent() {
     window._reactShowFinancialTransition = (data) => setFinancialTransitionData(data);
     window._reactShowAllStar = (data) => setAllStarData(data);
     window._reactShowContractDecisions = (data) => setContractDecisionsData(data);
+    window._reactShowSeasonEnd = (data) => setSeasonEndData(data);
 
     return () => {
       window.removeEventListener('reactShowPostGame', handlePostGame);
@@ -97,6 +100,7 @@ function AppContent() {
       delete window._reactShowFinancialTransition;
       delete window._reactShowAllStar;
       delete window._reactShowContractDecisions;
+      delete window._reactShowSeasonEnd;
     };
   }, []);
 
@@ -246,6 +250,22 @@ function AppContent() {
         onConfirm={(decisions) => {
           setContractDecisionsData(null);
           window._contractDecisionsConfirmCallback?.(decisions);
+        }}
+      />
+      <SeasonEndModal
+        isOpen={!!seasonEndData}
+        data={seasonEndData}
+        onAdvance={(action) => {
+          setSeasonEndData(null);
+          window._seasonEndAdvanceCallback?.(action);
+        }}
+        onManageRoster={() => {
+          setSeasonEndData(null);
+          window._seasonEndManageRosterCallback?.();
+        }}
+        onStay={() => {
+          setSeasonEndData(null);
+          window._seasonEndStayCallback?.();
         }}
       />
     </div>

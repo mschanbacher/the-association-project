@@ -14,7 +14,6 @@ import { useGame } from '../hooks/GameBridge.jsx';
    ═══════════════════════════════════════════════════════════════ */
 
 const MODAL_IDS = [
-  { id: 'seasonEndModal',             maxWidth: 1000 },
   { id: 'championshipPlayoffModal',   maxWidth: 1000 },
   { id: 'playoffModal',               maxWidth: 1000 },
   { id: 'draftResultsModal',          maxWidth: 1200 },

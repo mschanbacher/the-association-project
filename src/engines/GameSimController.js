@@ -889,15 +889,32 @@ export class GameSimController {
         const tier2AwardsHTML = engines.StatEngine.generateAwardsHTML(tier2Awards, 'Tier 2 — Regional League');
         const tier3AwardsHTML = engines.StatEngine.generateAwardsHTML(tier3Awards, 'Tier 3 — Metro League');
 
-        document.getElementById('seasonEndContent').innerHTML = UIRenderer.seasonEndModal({
+        const seasonEndPayload = {
             userTeam, rank, tier: gameState.currentTier, status, statusColor, nextAction,
             seasonLabel: `${gameState.currentSeason}-${(gameState.currentSeason + 1) % 100}`,
             awardsHTML: tier1AwardsHTML + tier2AwardsHTML + tier3AwardsHTML,
             t1TopTeam, t2Champion, t3Champion,
             t2Promoted, t1Relegated, t3Promoted, tier2Sorted,
             getRankSuffix: helpers.getRankSuffix
-        });
+        };
 
+        if (window._reactShowSeasonEnd) {
+            const self = this;
+            window._seasonEndAdvanceCallback = (action) => {
+                document.getElementById('seasonEndModal').classList.add('hidden');
+                helpers.getOffseasonController().advanceToNextSeason(action);
+            };
+            window._seasonEndManageRosterCallback = () => {
+                window.openRosterManagement && window.openRosterManagement();
+            };
+            window._seasonEndStayCallback = () => {
+                self.closeSeasonEnd();
+            };
+            window._reactShowSeasonEnd(seasonEndPayload);
+            return;
+        }
+
+        document.getElementById('seasonEndContent').innerHTML = UIRenderer.seasonEndModal(seasonEndPayload);
         document.getElementById('seasonEndModal').classList.remove('hidden');
     }
 

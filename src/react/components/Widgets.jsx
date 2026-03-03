@@ -393,7 +393,7 @@ export function RecentActivityWidget() {
                   {/* Team 1 sends */}
                   <div>
                     <div style={{ color: 'var(--color-text-tertiary)', marginBottom: 2 }}>
-                      {t1Name.split(' ').pop()} sends:
+                      {t1Name.split(' ').pop()} send:
                     </div>
                     {t1Gave.map((p, j) => (
                       <div key={j} style={{ color: 'var(--color-text-secondary)' }}>
@@ -414,7 +414,7 @@ export function RecentActivityWidget() {
                   {/* Team 2 sends */}
                   <div>
                     <div style={{ color: 'var(--color-text-tertiary)', marginBottom: 2 }}>
-                      {t2Name.split(' ').pop()} sends:
+                      {t2Name.split(' ').pop()} send:
                     </div>
                     {t2Gave.map((p, j) => (
                       <div key={j} style={{ color: 'var(--color-text-secondary)' }}>

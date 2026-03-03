@@ -267,6 +267,8 @@ function pct(m, a) {
 }
 
 function teamName(team) {
-  if (team.city) return `${team.city} ${team.name}`;
-  return team.name || '';
+  // boxScore objects use 'teamName', team objects use 'name', some have 'city'
+  const n = team.teamName || team.name || '';
+  if (team.city) return `${team.city} ${n}`;
+  return n;
 }

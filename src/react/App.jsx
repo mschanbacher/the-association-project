@@ -18,6 +18,7 @@ import { GameMenuModal } from './screens/GameMenuModal.jsx';
 import { OffseasonTracker } from './screens/OffseasonTracker.jsx';
 import { OffseasonModals } from './screens/OffseasonModals.jsx';
 import { InjuryModal } from './screens/InjuryModal.jsx';
+import { DevelopmentModal } from './screens/DevelopmentModal.jsx';
 
 function AppContent() {
   const { isReady, gameState, refresh } = useGame();
@@ -31,6 +32,7 @@ function AppContent() {
   const [aiTradeOpen, setAiTradeOpen] = useState(false);
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [injuryData, setInjuryData] = useState(null);
+  const [developmentData, setDevelopmentData] = useState(null);
 
   // Hide the legacy game container elements once React takes over
   useEffect(() => {
@@ -66,6 +68,7 @@ function AppContent() {
     window._reactOpenGameMenu = () => setGameMenuOpen(true);
     window._reactShowInjury = (data) => setInjuryData(data);
     window._reactHideInjury = () => setInjuryData(null);
+    window._reactShowDevelopment = (data) => setDevelopmentData(data);
 
     return () => {
       window.removeEventListener('reactShowPostGame', handlePostGame);
@@ -77,6 +80,7 @@ function AppContent() {
       delete window._reactOpenGameMenu;
       delete window._reactShowInjury;
       delete window._reactHideInjury;
+      delete window._reactShowDevelopment;
     };
   }, []);
 
@@ -179,6 +183,14 @@ function AppContent() {
         onDecision={(decision) => {
           setInjuryData(null);
           window._injuryDecisionCallback?.(decision);
+        }}
+      />
+      <DevelopmentModal
+        isOpen={!!developmentData}
+        data={developmentData}
+        onContinue={() => {
+          setDevelopmentData(null);
+          window._developmentContinueCallback?.();
         }}
       />
     </div>

@@ -597,6 +597,19 @@ export class OffseasonController {
             .sort((a, b) => b.peakRating - a.peakRating)
             .slice(0, 10);
 
+        // Route to React if available
+        if (window._reactShowDevelopment) {
+            window._developmentContinueCallback = () => {
+                this.startFreeAgencyPeriod();
+            };
+            window._reactShowDevelopment({
+                improvements, declines, userRetirements, notableRetirements,
+                allRetirementsCount: allRetirements.length
+            });
+            return;
+        }
+
+        // Legacy fallback
         const html = UIRenderer.developmentSummaryFull({
             improvements, declines, userRetirements, notableRetirements,
             allRetirementsCount: allRetirements.length

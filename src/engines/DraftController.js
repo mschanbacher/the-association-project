@@ -461,10 +461,37 @@ export class DraftController {
     }
 
     showCollegeGradModal(graduates) {
-        const { gameState, helpers } = this.ctx;
+        const { gameState, helpers, engines } = this.ctx;
         const userTeam = helpers.getUserTeam();
         const capSpace = helpers.getRemainingCap(userTeam);
         const season = gameState.currentSeason;
+        const { PlayerAttributes } = engines;
+
+        if (window._reactShowCG) {
+            // Enrich graduates with measurables string
+            graduates.forEach(p => {
+                if (p.measurables && PlayerAttributes) {
+                    p._measurables = `${PlayerAttributes.formatHeight(p.measurables.height)} \u00B7 ${p.measurables.weight}lbs \u00B7 ${PlayerAttributes.formatWingspan(p.measurables.wingspan)} WS`;
+                }
+            });
+
+            // Submit callback
+            window._cgSubmitOffers = (selectedIdStrings) => {
+                const picks = graduates.filter(g => selectedIdStrings.includes(String(g.id)));
+                this._processCollegeGradOffers(picks, graduates);
+            };
+
+            window._reactShowCG({
+                phase: 'select',
+                graduates: [...graduates],
+                capSpace,
+                rosterSize: userTeam.roster.length,
+                season,
+                formatCurrency: helpers.formatCurrency,
+                getRatingColor: helpers.getRatingColor,
+            });
+            return;
+        }
 
         const modal = document.getElementById('collegeGradFAModal');
         if (!document.getElementById('collegeGradSubtitle')) {
@@ -478,6 +505,46 @@ export class DraftController {
         window.cgAllGraduates = graduates;
         this.filterCollegeGrads();
         document.getElementById('collegeGradFAModal').classList.remove('hidden');
+    }
+
+    /**
+     * Process college grad offers (shared by React and legacy paths).
+     */
+    _processCollegeGradOffers(picks, graduates) {
+        const { helpers } = this.ctx;
+        const userTeam = helpers.getUserTeam();
+
+        let signed = 0, lost = 0;
+        const details = [];
+
+        picks.forEach(player => {
+            const signChance = player.rating >= 72 ? 0.75 : player.rating >= 65 ? 0.85 : 0.95;
+            if (Math.random() < signChance) {
+                player.contractYears = helpers.determineContractLength(player.age, player.rating);
+                player.originalContractLength = player.contractYears;
+                player.salary = helpers.generateSalary(player.rating, userTeam.tier);
+                player.tier = userTeam.tier;
+                helpers.initializePlayerChemistry(player);
+                userTeam.roster.push(player);
+                userTeam.gamesSinceRosterChange = 0;
+
+                const idx = graduates.indexOf(player);
+                if (idx !== -1) graduates.splice(idx, 1);
+
+                signed++;
+                details.push({ player, signed: true });
+            } else {
+                lost++;
+                details.push({ player, signed: false });
+            }
+        });
+
+        if (window._reactShowCG) {
+            window._reactShowCG({
+                phase: 'results',
+                results: { signed, lost, details },
+            });
+        }
     }
 
     filterCollegeGrads() {
@@ -615,6 +682,7 @@ export class DraftController {
     closeCollegeGradAndContinue() {
         const { gameState, helpers } = this.ctx;
 
+        if (window._reactCloseCG) window._reactCloseCG();
         document.getElementById('collegeGradFAModal').classList.add('hidden');
 
         const remaining = gameState.collegeGraduates || [];

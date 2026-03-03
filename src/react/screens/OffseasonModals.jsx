@@ -14,7 +14,6 @@ import { useGame } from '../hooks/GameBridge.jsx';
    ═══════════════════════════════════════════════════════════════ */
 
 const MODAL_IDS = [
-  { id: 'collegeGradFAModal',         maxWidth: 1000 },
   { id: 'bracketViewerModal',         maxWidth: 1400 },
 ];
 

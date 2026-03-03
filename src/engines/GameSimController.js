@@ -1080,12 +1080,16 @@ export class GameSimController {
 
         if (!userInPlayoffs) {
             console.log('User team did not make championship playoffs');
-            document.getElementById('championshipPlayoffContent').innerHTML = UIRenderer.championshipPlayoffMissed();
-            document.getElementById('championshipPlayoffModal').classList.remove('hidden');
             gameState.championshipPlayoffData = {
                 eastTeams: eastPlayoffTeams, westTeams: westPlayoffTeams,
                 currentRound: 1, roundResults: [], userInvolved: false
             };
+            if (window._reactShowChampionship) {
+                window._reactShowChampionship({ mode: 'missed' });
+                return;
+            }
+            document.getElementById('championshipPlayoffContent').innerHTML = UIRenderer.championshipPlayoffMissed();
+            document.getElementById('championshipPlayoffModal').classList.remove('hidden');
             return;
         }
 
@@ -1106,12 +1110,19 @@ export class GameSimController {
         const finalRound = gameState.championshipPlayoffData.roundResults[3];
         const champion = finalRound[0].result.winner;
         helpers.applyChampionshipBonus(champion);
+        if (window._reactShowChampionship) {
+            window._reactShowChampionship({ mode: 'complete', championName: champion.name });
+            return;
+        }
         document.getElementById('championshipPlayoffContent').innerHTML =
             UIRenderer.championshipCompleteQuick({ championName: champion.name });
     }
 
     skipChampionshipPlayoffs() {
         const { gameState, helpers } = this.ctx;
+        if (window._reactShowChampionship) {
+            window._reactCloseChampionship?.();
+        }
         document.getElementById('championshipPlayoffModal').classList.add('hidden');
         // Update T1 champion from interactive results if available
         const playoffData = gameState.championshipPlayoffData;
@@ -1263,6 +1274,14 @@ export class GameSimController {
             helpers.applyChampionshipBonus(finalsSeries[0].result.winner);
         }
 
+        if (window._reactShowChampionship) {
+            window._reactShowChampionship({
+                mode: 'round', roundName, roundNumber,
+                eastSeries, westSeries, finalsSeries,
+                userTeamId: userTeam.id,
+            });
+            return;
+        }
         const html = UIRenderer.championshipRoundPage({
             roundName, roundNumber, eastSeries, westSeries, finalsSeries,
             userTeam, roundResults
@@ -1274,6 +1293,9 @@ export class GameSimController {
     continueAfterChampionshipRound() {
         const { gameState, helpers } = this.ctx;
         const playoffData = gameState.championshipPlayoffData;
+        if (window._reactShowChampionship) {
+            window._reactCloseChampionship?.();
+        }
         document.getElementById('championshipPlayoffModal').classList.add('hidden');
 
         if (playoffData.currentRound < 4) {

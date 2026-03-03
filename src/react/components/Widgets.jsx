@@ -40,7 +40,7 @@ export function TeamSummaryWidget() {
           color: 'var(--color-text)',
           letterSpacing: '-0.02em',
         }}>
-          {userTeam.city} {userTeam.teamName || userTeam.name}
+          {userTeam.name}
         </span>
       </div>
 
@@ -132,7 +132,7 @@ export function NextGameWidget() {
             fontWeight: 'var(--weight-bold)',
             marginBottom: 'var(--space-1)',
           }}>
-            {userTeam.city}
+            {userTeam.name}
           </div>
           <div style={{
             fontSize: 'var(--text-sm)',
@@ -208,24 +208,26 @@ export function StandingsWidget() {
   const teams = currentTier === 1 ? gameState.tier1Teams :
                 currentTier === 2 ? gameState.tier2Teams : gameState.tier3Teams;
 
+  // Filter to user's division
+  const divisionTeams = teams.filter(t => t.division === userTeam.division);
+
   // Sort standings
   const sorted = LeagueManager?.sortTeamsByStandings
-    ? LeagueManager.sortTeamsByStandings([...teams], gameState.schedule)
-    : [...teams].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses));
+    ? LeagueManager.sortTeamsByStandings([...divisionTeams], gameState.schedule)
+    : [...divisionTeams].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses));
 
   // Find user's position
   const userIdx = sorted.findIndex(t => t.id === userTeam.id);
 
-  // Show 8 teams around user (or top 8 if user is near top)
-  const startIdx = Math.max(0, Math.min(userIdx - 3, sorted.length - 8));
-  const visible = sorted.slice(startIdx, startIdx + 8);
+  // Show all division teams
+  const visible = sorted;
 
   return (
     <Card padding="none" className="animate-slide-up" style={{ gridColumn: 'span 2' }}>
       <div style={{ padding: 'var(--space-4) var(--space-5) var(--space-3)' }}>
         <CardHeader action={
           <button
-            onClick={() => window.openCalendarView?.()}
+            onClick={() => window._reactNavigate?.('standings')}
             style={{
               border: 'none',
               background: 'none',
@@ -239,7 +241,7 @@ export function StandingsWidget() {
             Full Standings →
           </button>
         }>
-          Standings
+          {userTeam.division} Division
         </CardHeader>
       </div>
 
@@ -268,7 +270,7 @@ export function StandingsWidget() {
           </thead>
           <tbody>
             {visible.map((team, i) => {
-              const rank = startIdx + i + 1;
+              const rank = i + 1;
               const isUser = team.id === userTeam.id;
               const totalPlayed = team.wins + team.losses;
               const pct = totalPlayed > 0 ? (team.wins / totalPlayed).toFixed(3).slice(1) : '.000';
@@ -297,7 +299,7 @@ export function StandingsWidget() {
                     padding: '8px var(--space-3)',
                     color: isUser ? 'var(--color-accent)' : 'var(--color-text)',
                   }}>
-                    {team.city} {team.teamName || team.name}
+                    {team.name}
                   </td>
                   <td style={{ ...tdCenter, color: 'var(--color-win)' }}>{team.wins}</td>
                   <td style={{ ...tdCenter, color: 'var(--color-loss)' }}>{team.losses}</td>

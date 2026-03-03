@@ -1,7 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useGame } from '../hooks/GameBridge.jsx';
 import { Card, CardHeader } from '../components/Card.jsx';
 import { Badge } from '../components/Badge.jsx';
+
+const MONTH_NAMES = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 export function ScheduleScreen() {
   const { gameState, engines, isReady } = useGame();
@@ -17,9 +21,6 @@ export function ScheduleScreen() {
     );
   }
 
-  const { currentDate, currentTier, userTeam } = gameState;
-  const { CalendarEngine } = engines;
-
   return (
     <div style={{
       maxWidth: 'var(--content-max)',
@@ -29,24 +30,17 @@ export function ScheduleScreen() {
       flexDirection: 'column',
       gap: 'var(--space-5)',
     }}>
-      <h2 style={{
-        fontSize: 'var(--text-xl)',
-        fontWeight: 'var(--weight-bold)',
-        margin: 0,
-      }}>
-        Schedule
-      </h2>
+      {/* Calendar at top */}
+      <EmbeddedCalendar gameState={gameState} engines={engines} />
 
+      {/* Today's Games + Upcoming side by side */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         gap: 'var(--space-5)',
         alignItems: 'start',
       }}>
-        {/* Today's Games */}
         <TodaysGames gameState={gameState} engines={engines} />
-
-        {/* Upcoming User Games */}
         <UpcomingGames gameState={gameState} engines={engines} />
       </div>
 
@@ -54,6 +48,367 @@ export function ScheduleScreen() {
       <RecentResults gameState={gameState} engines={engines} />
     </div>
   );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Embedded Calendar
+   ═══════════════════════════════════════════════════════════════ */
+function EmbeddedCalendar({ gameState, engines }) {
+  const [selectedDate, setSelectedDate] = useState(null);
+  const { CalendarEngine } = engines;
+
+  const calData = useMemo(() => {
+    const gs = gameState._raw || gameState;
+    if (!gs?.currentDate || !CalendarEngine?.getSeasonDates) return null;
+
+    const startYear = gs.seasonStartYear || 2025;
+    const seasonDates = CalendarEngine.getSeasonDates(startYear);
+    const months = [];
+    for (let m = 9; m <= 11; m++) months.push({ year: startYear, month: m });
+    for (let m = 0; m <= 3; m++) months.push({ year: startYear + 1, month: m });
+
+    const userTeamId = gs.userTeamId;
+    const userTier = gs.currentTier || 1;
+    const userSchedule = userTier === 1 ? gs.tier1Schedule :
+                         userTier === 2 ? gs.tier2Schedule : gs.tier3Schedule;
+    const allTeams = [...(gs.tier1Teams || []), ...(gs.tier2Teams || []), ...(gs.tier3Teams || [])];
+
+    const userGamesByDate = {};
+    if (userSchedule) {
+      userSchedule.forEach(game => {
+        if (game.date && (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId)) {
+          const isHome = game.homeTeamId === userTeamId;
+          const opponentId = isHome ? game.awayTeamId : game.homeTeamId;
+          const opponent = allTeams.find(t => t.id === opponentId);
+          userGamesByDate[game.date] = { isHome, opponent, played: game.played, game };
+        }
+      });
+    }
+
+    const allGamesByDate = {};
+    [gs.tier1Schedule, gs.tier2Schedule, gs.tier3Schedule].forEach((sched, idx) => {
+      if (!sched) return;
+      sched.forEach(game => {
+        if (game.date) {
+          if (!allGamesByDate[game.date]) allGamesByDate[game.date] = { total: 0, t1: 0, t2: 0, t3: 0 };
+          allGamesByDate[game.date].total++;
+          if (idx === 0) allGamesByDate[game.date].t1++;
+          else if (idx === 1) allGamesByDate[game.date].t2++;
+          else allGamesByDate[game.date].t3++;
+        }
+      });
+    });
+
+    return {
+      months, currentDate: gs.currentDate, userGamesByDate, allGamesByDate,
+      seasonDates: {
+        allStarStart: CalendarEngine.toDateString(seasonDates.allStarStart),
+        allStarEnd: CalendarEngine.toDateString(seasonDates.allStarEnd),
+        tradeDeadline: CalendarEngine.toDateString(seasonDates.tradeDeadline),
+        tier1End: CalendarEngine.toDateString(seasonDates.tier1End),
+      },
+      startYear, allTeams, userTeamId, gameState: gs,
+    };
+  }, [gameState, engines]);
+
+  const dayDetail = useMemo(() => {
+    if (!selectedDate || !calData) return null;
+    return buildDayDetail(selectedDate, calData.gameState, calData.allTeams, calData.userTeamId);
+  }, [selectedDate, calData]);
+
+  if (!calData) return null;
+
+  const { months, currentDate, userGamesByDate, allGamesByDate, seasonDates, startYear } = calData;
+  const { allStarStart, allStarEnd, tradeDeadline, tier1End } = seasonDates;
+
+  return (
+    <Card padding="lg" className="animate-slide-up">
+      <CardHeader>
+        📅 Season {startYear}-{(startYear + 1) % 100} Calendar
+      </CardHeader>
+
+      <div style={{
+        display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap',
+        marginBottom: 'var(--space-4)', fontSize: 'var(--text-xs)',
+        color: 'var(--color-text-secondary)',
+      }}>
+        <LegendItem color="rgba(102,126,234,0.6)" label="Home Game" />
+        <LegendItem color="rgba(234,67,53,0.5)" label="Away Game" />
+        <LegendItem color="var(--color-bg-active)" label="League Games" border />
+        <LegendItem color="rgba(255,215,0,0.3)" label="Special Event" />
+        <LegendItem color="transparent" label="Today" todayBorder />
+      </div>
+
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+        gap: 'var(--space-4)',
+      }}>
+        {months.map(({ year, month }) => (
+          <MonthCard key={`${year}-${month}`}
+            year={year} month={month} currentDate={currentDate}
+            userGamesByDate={userGamesByDate} allGamesByDate={allGamesByDate}
+            allStarStart={allStarStart} allStarEnd={allStarEnd}
+            tradeDeadline={tradeDeadline} tier1End={tier1End}
+            selectedDate={selectedDate} onSelectDate={setSelectedDate}
+          />
+        ))}
+      </div>
+
+      {dayDetail && (
+        <DayDetailPanel
+          detail={dayDetail}
+          userTeamId={calData.userTeamId}
+          onShowBoxScore={(date, homeId, awayId) => window.showBoxScore?.(date, homeId, awayId)}
+        />
+      )}
+    </Card>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Calendar Sub-Components
+   ═══════════════════════════════════════════════════════════════ */
+function LegendItem({ color, label, border, todayBorder }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{
+        width: 14, height: 14, borderRadius: 3, display: 'inline-block',
+        background: color,
+        border: todayBorder ? '2px solid #ffd700' : border ? '1px solid var(--color-border-subtle)' : 'none',
+      }} />
+      {label}
+    </span>
+  );
+}
+
+function MonthCard({
+  year, month, currentDate, userGamesByDate, allGamesByDate,
+  allStarStart, allStarEnd, tradeDeadline, tier1End,
+  selectedDate, onSelectDate,
+}) {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const blanks = Array.from({ length: firstDay });
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  return (
+    <div style={{
+      background: 'var(--color-bg-sunken)', borderRadius: 'var(--radius-lg)',
+      padding: 'var(--space-3)', border: '1px solid var(--color-border-subtle)',
+    }}>
+      <div style={{
+        textAlign: 'center', fontWeight: 'var(--weight-semi)',
+        fontSize: 'var(--text-sm)', color: 'var(--color-warning)',
+        marginBottom: 'var(--space-2)',
+      }}>
+        {MONTH_NAMES[month]} {year}
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
+        gap: 2, textAlign: 'center',
+      }}>
+        {DAY_NAMES.map(d => (
+          <div key={d} style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px 0' }}>{d}</div>
+        ))}
+        {blanks.map((_, i) => <div key={`b${i}`} />)}
+        {days.map(day => {
+          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          return (
+            <DayCell key={day} day={day} dateStr={dateStr}
+              currentDate={currentDate} selectedDate={selectedDate}
+              userGame={userGamesByDate?.[dateStr]}
+              dayGames={allGamesByDate?.[dateStr]}
+              allStarStart={allStarStart} allStarEnd={allStarEnd}
+              tradeDeadline={tradeDeadline} tier1End={tier1End}
+              onClick={onSelectDate}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DayCell({
+  day, dateStr, currentDate, selectedDate, userGame, dayGames,
+  allStarStart, allStarEnd, tradeDeadline, tier1End, onClick,
+}) {
+  const isToday = dateStr === currentDate;
+  const isSelected = dateStr === selectedDate;
+  const isAllStar = dateStr >= allStarStart && dateStr <= allStarEnd;
+  const isTradeDeadline = dateStr === tradeDeadline;
+  const isSeasonEnd = dateStr === tier1End;
+  const isSpecial = isAllStar || isTradeDeadline || isSeasonEnd;
+  const hasContent = userGame || (dayGames && dayGames.total > 0);
+
+  let bg = 'transparent';
+  let textColor = 'var(--color-text-tertiary)';
+  let dotText = '';
+
+  if (userGame) {
+    bg = userGame.isHome
+      ? (userGame.played ? 'rgba(102,126,234,0.35)' : 'rgba(102,126,234,0.6)')
+      : (userGame.played ? 'rgba(234,67,53,0.3)' : 'rgba(234,67,53,0.5)');
+    textColor = 'var(--color-text)';
+    const oppName = userGame.opponent ? userGame.opponent.name.split(' ').pop() : '???';
+    dotText = `${userGame.isHome ? 'vs' : '@'} ${oppName}`;
+  } else if (dayGames && dayGames.total > 0) {
+    bg = 'var(--color-bg-active)';
+    textColor = 'var(--color-text-secondary)';
+    dotText = `${dayGames.total}g`;
+  }
+
+  if (isSpecial) {
+    bg = 'rgba(255,215,0,0.15)';
+    textColor = '#ffd700';
+    dotText = isAllStar ? '⭐' : isTradeDeadline ? 'TDL' : 'END';
+  }
+
+  return (
+    <div
+      onClick={hasContent ? () => onClick(dateStr) : undefined}
+      style={{
+        background: isSelected ? 'var(--color-accent)30' : bg,
+        borderRadius: 4, padding: '3px 1px', minHeight: 36,
+        color: textColor,
+        border: isToday ? '2px solid #ffd700' : isSelected ? '1px solid var(--color-accent)' : 'none',
+        cursor: hasContent ? 'pointer' : 'default',
+        transition: 'background 0.15s',
+      }}
+    >
+      <div style={{ fontSize: '0.8em', fontWeight: isToday ? 'var(--weight-bold)' : 'var(--weight-normal)' }}>{day}</div>
+      {dotText && (
+        <div style={{
+          fontSize: '0.5em', overflow: 'hidden', textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap', opacity: 0.85, marginTop: 1,
+        }}>{dotText}</div>
+      )}
+    </div>
+  );
+}
+
+function DayDetailPanel({ detail, userTeamId, onShowBoxScore }) {
+  const { formattedDate, event, userGame, otherGames, dateStr } = detail;
+
+  return (
+    <div style={{
+      marginTop: 'var(--space-4)', background: 'var(--color-bg-sunken)',
+      borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)',
+      border: '1px solid var(--color-border-subtle)',
+    }}>
+      <div style={{
+        fontWeight: 'var(--weight-semi)', color: 'var(--color-warning)',
+        marginBottom: 'var(--space-3)', fontSize: 'var(--text-sm)',
+      }}>
+        {formattedDate}
+      </div>
+
+      {event && (
+        <div style={{
+          marginBottom: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)',
+          background: 'rgba(255,215,0,0.1)', borderRadius: 'var(--radius-md)',
+          color: '#ffd700', fontSize: 'var(--text-sm)',
+        }}>{event}</div>
+      )}
+
+      {!userGame && otherGames.length === 0 && (
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>No games scheduled</div>
+      )}
+
+      {userGame && (
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
+            🏀 Your Game
+          </div>
+          <CalGameRow game={userGame} userTeamId={userTeamId} dateStr={dateStr} onShowBoxScore={onShowBoxScore} highlight />
+        </div>
+      )}
+
+      {otherGames.length > 0 && (
+        <details style={{ marginTop: 'var(--space-1)' }}>
+          <summary style={{
+            cursor: 'pointer', color: 'var(--color-text-tertiary)',
+            fontSize: 'var(--text-xs)', marginBottom: 'var(--space-2)',
+          }}>
+            {otherGames.length} other game{otherGames.length !== 1 ? 's' : ''} today
+          </summary>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', maxHeight: 300, overflowY: 'auto' }}>
+            {otherGames.map((g, i) => (
+              <CalGameRow key={i} game={g} userTeamId={userTeamId} dateStr={dateStr} onShowBoxScore={onShowBoxScore} />
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function CalGameRow({ game, userTeamId, dateStr, onShowBoxScore, highlight }) {
+  const bg = highlight ? 'rgba(102,126,234,0.12)' : 'var(--color-bg-active)';
+
+  if (!game.played) {
+    return (
+      <div style={{
+        background: bg, padding: 'var(--space-2) var(--space-3)',
+        borderRadius: 'var(--radius-md)', opacity: 0.6, fontSize: 'var(--text-sm)',
+        display: 'flex', justifyContent: 'space-between',
+      }}>
+        <span>{game.homeName} vs {game.awayName}</span>
+        <span style={{ color: 'var(--color-text-tertiary)' }}>Upcoming</span>
+      </div>
+    );
+  }
+
+  const homeWon = game.homeScore > game.awayScore;
+  return (
+    <div
+      onClick={game.played ? () => onShowBoxScore(dateStr, game.homeTeamId, game.awayTeamId) : undefined}
+      style={{
+        background: bg, padding: 'var(--space-2) var(--space-3)',
+        borderRadius: 'var(--radius-md)', cursor: game.played ? 'pointer' : 'default',
+        fontSize: 'var(--text-sm)',
+        border: highlight ? '1px solid rgba(102,126,234,0.25)' : '1px solid var(--color-border-subtle)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+        <span style={{ fontWeight: homeWon ? 'var(--weight-semi)' : 'var(--weight-normal)', opacity: homeWon ? 1 : 0.6 }}>{game.homeName}</span>
+        <span style={{ fontWeight: homeWon ? 'var(--weight-semi)' : 'var(--weight-normal)', opacity: homeWon ? 1 : 0.6 }}>{game.homeScore}</span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontWeight: !homeWon ? 'var(--weight-semi)' : 'var(--weight-normal)', opacity: !homeWon ? 1 : 0.6 }}>{game.awayName}</span>
+        <span style={{ fontWeight: !homeWon ? 'var(--weight-semi)' : 'var(--weight-normal)', opacity: !homeWon ? 1 : 0.6 }}>{game.awayScore}</span>
+      </div>
+    </div>
+  );
+}
+
+function buildDayDetail(dateStr, gameState, allTeams, userTeamId) {
+  const CalendarEngine = window.CalendarEngine;
+  if (!CalendarEngine) return null;
+
+  const games = CalendarEngine.getGamesForDate(dateStr, gameState);
+  const event = CalendarEngine.getCalendarEvent(dateStr, gameState.seasonDates);
+  const formattedDate = CalendarEngine.formatDateDisplay(dateStr);
+
+  const allGames = [];
+  for (const { schedule, tier } of [
+    { schedule: games.tier1, tier: 1 },
+    { schedule: games.tier2, tier: 2 },
+    { schedule: games.tier3, tier: 3 },
+  ]) {
+    if (!schedule) continue;
+    for (const game of schedule) {
+      const home = allTeams.find(t => t.id === game.homeTeamId);
+      const away = allTeams.find(t => t.id === game.awayTeamId);
+      if (!home || !away) continue;
+      allGames.push({ ...game, homeName: home.name, awayName: away.name, tier });
+    }
+  }
+
+  const userGame = allGames.find(g => g.homeTeamId === userTeamId || g.awayTeamId === userTeamId);
+  const otherGames = allGames.filter(g => g.homeTeamId !== userTeamId && g.awayTeamId !== userTeamId);
+
+  return { formattedDate, event, allGames, userGame, otherGames, dateStr };
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -81,7 +436,6 @@ function TodaysGames({ gameState, engines }) {
     ? CalendarEngine.formatDateShort(currentDate)
     : currentDate;
 
-  // Other tier counts
   const otherTiers = [];
   if (currentTier !== 1) {
     const c = (todaysData.tier1 || []).filter(g => !g.played).length;
@@ -117,12 +471,8 @@ function TodaysGames({ gameState, engines }) {
             const home = teams.find(t => t.id === game.homeTeamId);
             const away = teams.find(t => t.id === game.awayTeamId);
             const isUserGame = game.homeTeamId === userTeam.id || game.awayTeamId === userTeam.id;
-
             return (
-              <GameRow key={i}
-                home={home} away={away}
-                isUserGame={isUserGame}
-              />
+              <ScheduleGameRow key={i} home={home} away={away} isUserGame={isUserGame} />
             );
           })}
           {unplayed.length > 8 && (
@@ -141,15 +491,10 @@ function TodaysGames({ gameState, engines }) {
           marginTop: 'var(--space-3)',
           paddingTop: 'var(--space-3)',
           borderTop: '1px solid var(--color-border-subtle)',
-          display: 'flex',
-          gap: 'var(--space-3)',
-          justifyContent: 'center',
+          display: 'flex', gap: 'var(--space-3)', justifyContent: 'center',
         }}>
           {otherTiers.map(({ tier, count }) => (
-            <span key={tier} style={{
-              fontSize: 'var(--text-xs)',
-              color: 'var(--color-text-tertiary)',
-            }}>
+            <span key={tier} style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
               T{tier}: {count} games
             </span>
           ))}
@@ -204,39 +549,25 @@ function UpcomingGames({ gameState, engines }) {
 
             return (
               <div key={i} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-3)',
+                display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
                 padding: 'var(--space-2) var(--space-3)',
                 borderRadius: 'var(--radius-md)',
                 background: i === 0 ? 'var(--color-accent-light)' : 'transparent',
                 border: i === 0 ? '1px solid var(--color-accent-subtle)' : '1px solid transparent',
               }}>
                 <span style={{
-                  fontSize: 'var(--text-xs)',
-                  color: 'var(--color-text-tertiary)',
-                  minWidth: 60,
-                  fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {dateStr}
-                </span>
+                  fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
+                  minWidth: 60, fontVariantNumeric: 'tabular-nums',
+                }}>{dateStr}</span>
                 <span style={{
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: 'var(--weight-semi)',
+                  fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semi)',
                   color: isHome ? 'var(--color-win)' : 'var(--color-info)',
-                  width: 36,
-                  textAlign: 'center',
-                }}>
-                  {isHome ? 'HOME' : 'AWAY'}
-                </span>
+                  width: 36, textAlign: 'center',
+                }}>{isHome ? 'HOME' : 'AWAY'}</span>
                 <span style={{
-                  flex: 1,
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 'var(--weight-medium)',
+                  flex: 1, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)',
                 }}>
-                  vs {isHome
-                    ? (away ? `${away.city} ${away.teamName || away.name}` : '?')
-                    : (home ? `${home.city} ${home.teamName || home.name}` : '?')}
+                  vs {isHome ? (away ? away.name : '?') : (home ? home.name : '?')}
                 </span>
               </div>
             );
@@ -251,7 +582,7 @@ function UpcomingGames({ gameState, engines }) {
    Recent Results
    ═══════════════════════════════════════════════════════════════ */
 function RecentResults({ gameState, engines }) {
-  const { currentTier, userTeam, currentDate } = gameState;
+  const { currentTier, userTeam } = gameState;
   const { CalendarEngine } = engines;
 
   const teams = currentTier === 1 ? gameState.tier1Teams :
@@ -271,12 +602,6 @@ function RecentResults({ gameState, engines }) {
 
   if (recentGames.length === 0) return null;
 
-  const handleClickGame = (game) => {
-    if (!game.played || !game.date) return;
-    // Delegate to the legacy showBoxScore which now routes to React modal
-    window.showBoxScore?.(game.date, game.homeTeamId, game.awayTeamId);
-  };
-
   return (
     <Card padding="lg" className="animate-slide-up">
       <CardHeader>Recent Results</CardHeader>
@@ -295,11 +620,9 @@ function RecentResults({ gameState, engines }) {
 
           return (
             <div key={i}
-              onClick={() => handleClickGame(game)}
+              onClick={() => { if (game.played && game.date) window.showBoxScore?.(game.date, game.homeTeamId, game.awayTeamId); }}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-3)',
+                display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
                 padding: 'var(--space-2) var(--space-3)',
                 borderRadius: 'var(--radius-md)',
                 cursor: game.played ? 'pointer' : 'default',
@@ -308,39 +631,13 @@ function RecentResults({ gameState, engines }) {
               onMouseEnter={e => { if (game.played) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
             >
-              <span style={{
-                fontSize: 'var(--text-xs)',
-                color: 'var(--color-text-tertiary)',
-                minWidth: 60,
-                fontVariantNumeric: 'tabular-nums',
-              }}>
-                {dateStr}
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', minWidth: 60, fontVariantNumeric: 'tabular-nums' }}>{dateStr}</span>
+              <Badge variant={won ? 'win' : 'loss'}>{won ? 'W' : 'L'}</Badge>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semi)', minWidth: 56 }}>{userScore}–{oppScore}</span>
+              <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+                {isHome ? 'vs' : '@'} {opponent ? opponent.name : '?'}
               </span>
-              <Badge variant={won ? 'win' : 'loss'}>
-                {won ? 'W' : 'L'}
-              </Badge>
-              <span style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 'var(--text-sm)',
-                fontWeight: 'var(--weight-semi)',
-                minWidth: 56,
-              }}>
-                {userScore}–{oppScore}
-              </span>
-              <span style={{
-                flex: 1,
-                fontSize: 'var(--text-sm)',
-                color: 'var(--color-text-secondary)',
-              }}>
-                {isHome ? 'vs' : '@'} {opponent ? `${opponent.city} ${opponent.teamName || opponent.name}` : '?'}
-              </span>
-              {hasBox && (
-                <span style={{
-                  fontSize: 'var(--text-xs)',
-                  color: 'var(--color-text-tertiary)',
-                  opacity: 0.6,
-                }}>📊</span>
-              )}
+              {hasBox && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>📊</span>}
             </div>
           );
         })}
@@ -350,45 +647,26 @@ function RecentResults({ gameState, engines }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Game Row
+   Schedule Game Row (for Today's Games)
    ═══════════════════════════════════════════════════════════════ */
-function GameRow({ home, away, isUserGame, score }) {
+function ScheduleGameRow({ home, away, isUserGame }) {
   return (
     <div style={{
-      display: 'flex',
-      alignItems: 'center',
+      display: 'flex', alignItems: 'center',
       padding: 'var(--space-2) var(--space-3)',
       borderRadius: 'var(--radius-md)',
       background: isUserGame ? 'var(--color-accent-light)' : 'var(--color-bg-sunken)',
       border: isUserGame ? '1px solid var(--color-accent-subtle)' : '1px solid var(--color-border-subtle)',
       gap: 'var(--space-3)',
     }}>
-      <span style={{
-        flex: 1,
-        fontSize: 'var(--text-sm)',
-        fontWeight: 'var(--weight-medium)',
-        textAlign: 'right',
-      }}>
-        {away ? `${away.city} ${away.teamName || away.name}` : '?'}
+      <span style={{ flex: 1, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', textAlign: 'right' }}>
+        {away ? away.name : '?'}
       </span>
-      <span style={{
-        fontSize: 'var(--text-xs)',
-        color: 'var(--color-text-tertiary)',
-        fontWeight: 'var(--weight-semi)',
-        padding: '2px 8px',
-      }}>
-        @
+      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', fontWeight: 'var(--weight-semi)', padding: '2px 8px' }}>@</span>
+      <span style={{ flex: 1, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)' }}>
+        {home ? home.name : '?'}
       </span>
-      <span style={{
-        flex: 1,
-        fontSize: 'var(--text-sm)',
-        fontWeight: 'var(--weight-medium)',
-      }}>
-        {home ? `${home.city} ${home.teamName || home.name}` : '?'}
-      </span>
-      {isUserGame && (
-        <Badge variant="accent" style={{ flexShrink: 0 }}>You</Badge>
-      )}
+      {isUserGame && <Badge variant="accent" style={{ flexShrink: 0 }}>You</Badge>}
     </div>
   );
 }

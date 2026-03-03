@@ -153,7 +153,7 @@ function OverallStandings({ teams, tier, gameState, engines }) {
                   </Td>
                   <Td align="left" style={{ color: isUser ? 'var(--color-accent)' : 'var(--color-text)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                      {team.city} {team.teamName || team.name}
+                      {team.name}
                       {zone && !isUser && <ZoneDot zone={zone} />}
                     </div>
                   </Td>
@@ -256,7 +256,7 @@ function DivisionStandings({ teams, tier, gameState, engines }) {
                         {i + 1}
                       </Td>
                       <Td align="left" style={{ color: isUser ? 'var(--color-accent)' : 'var(--color-text)' }}>
-                        {team.city} {team.teamName || team.name}
+                        {team.name}
                       </Td>
                       <Td align="center" mono style={{ color: 'var(--color-win)' }}>{team.wins}</Td>
                       <Td align="center" mono style={{ color: 'var(--color-loss)' }}>{team.losses}</Td>

@@ -140,6 +140,7 @@ function AppContent() {
     window._reactCloseFranchise = () => setFranchiseData(null);
     window._reactShowWatchGame = (data) => setWatchGameData({...data});
     window._reactCloseWatchGame = () => setWatchGameData(null);
+    window._reactNavigate = (screen) => setActiveScreen(screen);
     window._reactShowBreakingNews = (data, resolve) => { setBreakingNewsData({ ...data, _resolve: resolve }); };
 
     return () => {
@@ -184,6 +185,7 @@ function AppContent() {
       delete window._reactCloseFranchise;
       delete window._reactShowWatchGame;
       delete window._reactCloseWatchGame;
+      delete window._reactNavigate;
       delete window._reactShowBreakingNews;
     };
   }, []);

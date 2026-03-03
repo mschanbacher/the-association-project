@@ -49,7 +49,7 @@ export function TopBar() {
           fontWeight: 'var(--weight-medium)',
           color: 'var(--color-text)',
         }}>
-          {userTeam.city} {userTeam.teamName || userTeam.name}
+          {userTeam.name}
         </span>
         <Divider />
         <Stat label="Record" value={`${userTeam.wins}–${userTeam.losses}`}

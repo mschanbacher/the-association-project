@@ -177,6 +177,7 @@ export class OffseasonController {
 
         document.getElementById('seasonEndModal').classList.add('hidden');
         document.getElementById('playoffModal').classList.add('hidden');
+        if (window._reactClosePlayoff) window._reactClosePlayoff();
 
         gameState.userPlayoffResult = action;
 

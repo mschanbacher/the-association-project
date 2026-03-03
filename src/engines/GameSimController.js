@@ -1037,6 +1037,14 @@ export class GameSimController {
         };
 
         const msg = resultMessages[userResult];
+
+        if (window._reactShowPlayoff) {
+            window._reactShowPlayoff({
+                results, isPromotion, isDivisionPlayoff, msg, userResult, userInvolved
+            });
+            return;
+        }
+
         document.getElementById('playoffContent').innerHTML = UIRenderer.playoffResults({
             results, isPromotion, isDivisionPlayoff, msg, userResult, userInvolved
         });
@@ -1047,6 +1055,13 @@ export class GameSimController {
         const { results, isPromotion, isDivisionPlayoff } = window.currentPromRelResults;
         const playoffTitle = isDivisionPlayoff ? '🏀 Division Playoffs' :
                              (isPromotion ? '⬆️ Promotion Playoffs' : '⬇️ Relegation Playoffs');
+        if (window._reactShowPlayoff) {
+            window._reactShowPlayoff({
+                results, isPromotion, isDivisionPlayoff,
+                msg: null, userResult: 'not-involved', userInvolved: false
+            });
+            return;
+        }
         document.getElementById('playoffContent').innerHTML = UIRenderer.promRelPlayoffResults({
             results, isPromotion, isDivisionPlayoff, playoffTitle
         });

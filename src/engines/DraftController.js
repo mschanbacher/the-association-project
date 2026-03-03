@@ -497,7 +497,9 @@ export class DraftController {
         window.cgSelectedIds = new Set();
 
         if (!window._cgModalOriginalHTML) {
-            window._cgModalOriginalHTML = document.getElementById('collegeGradFAModal').querySelector('.modal-content').innerHTML;
+            const cgModal = document.getElementById('collegeGradFAModal');
+            const cgContent = cgModal?.querySelector('.modal-content');
+            if (cgContent) window._cgModalOriginalHTML = cgContent.innerHTML;
         }
 
         this.showCollegeGradModal(graduates);
@@ -537,8 +539,9 @@ export class DraftController {
         }
 
         const modal = document.getElementById('collegeGradFAModal');
-        if (!document.getElementById('collegeGradSubtitle')) {
-            modal.querySelector('.modal-content').innerHTML = window._cgModalOriginalHTML;
+        if (!document.getElementById('collegeGradSubtitle') && modal) {
+            const mc = modal.querySelector('.modal-content');
+            if (mc && window._cgModalOriginalHTML) mc.innerHTML = window._cgModalOriginalHTML;
         }
 
         const info = UIRenderer.collegeGradModalInfo({ graduateCount: graduates.length, season, capSpace, rosterSize: userTeam.roster.length, formatCurrency: helpers.formatCurrency });

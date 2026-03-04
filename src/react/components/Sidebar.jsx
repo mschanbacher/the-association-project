@@ -1,26 +1,18 @@
 import React, { useState } from 'react';
 
 const navItems = [
-  { id: 'dashboard', icon: '🏠', label: 'Dashboard', converted: true },
-  { id: 'roster', icon: '👥', label: 'Roster', converted: true },
-  { id: 'standings', icon: '🏆', label: 'Standings', converted: true },
-  { id: 'schedule', icon: '📅', label: 'Schedule', converted: true },
-  { id: 'finances', icon: '💰', label: 'Finances', converted: true },
-  { id: 'coach', icon: '🎓', label: 'Coach', converted: true },
-  { id: 'history', icon: '📜', label: 'History', converted: true },
-  { id: 'scouting', icon: '🔍', label: 'Scouting', converted: true },
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'roster',    label: 'Roster' },
+  { id: 'standings', label: 'Standings' },
+  { id: 'schedule',  label: 'Schedule' },
+  { id: 'finances',  label: 'Finances' },
+  { id: 'scouting',  label: 'Scouting' },
+  { id: 'coach',     label: 'Coach' },
+  { id: 'history',   label: 'History' },
 ];
 
 export function Sidebar({ activeScreen, onNavigate }) {
   const [hoveredItem, setHoveredItem] = useState(null);
-
-  const handleClick = (item) => {
-    if (item.converted) {
-      onNavigate?.(item.id);
-    } else if (item.action && window[item.action]) {
-      window[item.action]();
-    }
-  };
 
   return (
     <nav style={{
@@ -28,48 +20,40 @@ export function Sidebar({ activeScreen, onNavigate }) {
       minHeight: 'calc(100vh - var(--topbar-height))',
       background: 'var(--color-bg-raised)',
       borderRight: '1px solid var(--color-border-subtle)',
-      padding: 'var(--space-4) var(--space-3)',
+      padding: 'var(--space-4) var(--space-2)',
       display: 'flex',
       flexDirection: 'column',
-      gap: 'var(--space-1)',
+      gap: 1,
     }}>
       {navItems.map(item => {
-        const isActive = item.converted && activeScreen === item.id;
+        const isActive = activeScreen === item.id;
         const isHovered = hoveredItem === item.id;
 
         return (
           <button
             key={item.id}
-            onClick={() => handleClick(item)}
+            onClick={() => onNavigate?.(item.id)}
             onMouseEnter={() => setHoveredItem(item.id)}
             onMouseLeave={() => setHoveredItem(null)}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-3)',
-              padding: 'var(--space-2) var(--space-3)',
-              borderRadius: 'var(--radius-md)',
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
+              padding: '8px 12px',
               border: 'none',
-              background: isActive ? 'var(--color-accent-light)' :
+              background: isActive ? 'var(--color-accent-bg)' :
                           isHovered ? 'var(--color-bg-hover)' :
                           'transparent',
               color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-              fontSize: 'var(--text-base)',
+              fontSize: 'var(--text-sm)',
               fontWeight: isActive ? 'var(--weight-semi)' : 'var(--weight-medium)',
               fontFamily: 'var(--font-body)',
               cursor: 'pointer',
               transition: 'all var(--duration-fast) ease',
-              textAlign: 'left',
-              width: '100%',
+              letterSpacing: '-0.005em',
             }}
           >
-            <span style={{ fontSize: '1.1em', width: 24, textAlign: 'center' }}>
-              {item.icon}
-            </span>
             {item.label}
-            {!item.converted && (
-              <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', opacity: 0.4 }}>↗</span>
-            )}
           </button>
         );
       })}

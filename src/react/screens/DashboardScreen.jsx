@@ -14,14 +14,10 @@ export function DashboardScreen() {
   if (!isReady || !gameState?.userTeam) {
     return (
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '60vh',
-        color: 'var(--color-text-tertiary)',
-        fontSize: 'var(--text-md)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '60vh', color: 'var(--color-text-tertiary)',
       }}>
-        Loading game state…
+        Loading…
       </div>
     );
   }
@@ -33,34 +29,28 @@ export function DashboardScreen() {
       padding: 'var(--space-6)',
       display: 'flex',
       flexDirection: 'column',
-      gap: 'var(--space-5)',
+      gap: 'var(--gap)',
     }}>
-      {/* Top row: Team Summary + Next Game */}
+      {/* Row 1: Team Summary (metrics) */}
+      <TeamSummaryWidget />
+
+      {/* Row 2: Next Game + Division Standings */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '2fr 1fr',
-        gap: 'var(--space-5)',
+        gridTemplateColumns: '340px 1fr',
+        gap: 'var(--gap)',
       }}>
-        <TeamSummaryWidget />
         <NextGameWidget />
-      </div>
-
-      {/* Middle row: Standings (wide) + Roster Quick */}
-      <div className="stagger" style={{
-        display: 'grid',
-        gridTemplateColumns: '2fr 1fr',
-        gap: 'var(--space-5)',
-      }}>
         <StandingsWidget />
-        <RosterQuickWidget />
       </div>
 
-      {/* Bottom row: Recent Activity */}
-      <div className="stagger" style={{
+      {/* Row 3: Roster + Recent Activity */}
+      <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr',
-        gap: 'var(--space-5)',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 'var(--gap)',
       }}>
+        <RosterQuickWidget />
         <RecentActivityWidget />
       </div>
     </div>

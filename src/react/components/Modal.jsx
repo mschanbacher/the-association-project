@@ -1,9 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
 
-/**
- * Modal — reusable overlay + content container.
- * Renders into the React tree (no portal) since we control the full layout.
- */
 export function Modal({ isOpen, onClose, maxWidth = 700, children, zIndex = 1100, noBg = false }) {
   const handleEsc = useCallback((e) => {
     if (e.key === 'Escape' && onClose) onClose();
@@ -34,39 +30,33 @@ export function Modal({ isOpen, onClose, maxWidth = 700, children, zIndex = 1100
         padding: 'var(--space-6)',
       }}
     >
-      <div
-        style={{
-          background: noBg ? 'transparent' : 'var(--color-bg-raised)',
-          borderRadius: 'var(--radius-xl)',
-          boxShadow: 'var(--shadow-lg)',
-          maxWidth,
-          width: '100%',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          animation: 'slideUp var(--duration-normal) var(--ease-out)',
-          position: 'relative',
-        }}
-      >
+      <div style={{
+        background: noBg ? 'transparent' : 'var(--color-bg-raised)',
+        boxShadow: 'var(--shadow-lg)',
+        maxWidth,
+        width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        animation: 'slideUp var(--duration-normal) var(--ease-out)',
+        position: 'relative',
+      }}>
         {children}
       </div>
     </div>
   );
 }
 
-/**
- * ModalHeader — title bar with optional close button.
- */
 export function ModalHeader({ children, onClose }) {
   return (
     <div style={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: 'var(--space-5) var(--space-6)',
-      borderBottom: '1px solid var(--color-border-subtle)',
+      padding: 'var(--space-4) var(--space-5)',
+      borderBottom: '1px solid var(--color-border)',
     }}>
       <div style={{
-        fontSize: 'var(--text-lg)',
+        fontSize: 'var(--text-md)',
         fontWeight: 'var(--weight-bold)',
       }}>
         {children}
@@ -75,15 +65,14 @@ export function ModalHeader({ children, onClose }) {
         <button onClick={onClose} style={{
           background: 'var(--color-bg-sunken)',
           border: 'none',
-          borderRadius: 'var(--radius-sm)',
-          width: 32,
-          height: 32,
+          width: 28,
+          height: 28,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
           color: 'var(--color-text-tertiary)',
-          fontSize: 'var(--text-base)',
+          fontSize: 'var(--text-sm)',
           transition: 'background var(--duration-fast) ease',
         }}
           onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'}
@@ -96,28 +85,22 @@ export function ModalHeader({ children, onClose }) {
   );
 }
 
-/**
- * ModalBody — padded content area.
- */
 export function ModalBody({ children, style }) {
   return (
-    <div style={{ padding: 'var(--space-6)', ...style }}>
+    <div style={{ padding: 'var(--space-5)', ...style }}>
       {children}
     </div>
   );
 }
 
-/**
- * ModalFooter — bottom bar, typically for action buttons.
- */
 export function ModalFooter({ children }) {
   return (
     <div style={{
-      padding: 'var(--space-4) var(--space-6)',
-      borderTop: '1px solid var(--color-border-subtle)',
+      padding: 'var(--space-3) var(--space-5)',
+      borderTop: '1px solid var(--color-border)',
       display: 'flex',
       justifyContent: 'center',
-      gap: 'var(--space-3)',
+      gap: 'var(--space-2)',
     }}>
       {children}
     </div>

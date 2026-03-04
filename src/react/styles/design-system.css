@@ -1,47 +1,51 @@
 /* ═══════════════════════════════════════════════════════════════
    The Association Project — Design System
-   Clean, minimal aesthetic with Apple-like warmth.
+   Dieter Rams: Less But Better
+   Sharp geometry · Tight spacing · Team identity through color
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Google Fonts ── */
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* ── Color Palette ── */
-  --color-bg:             #faf9f7;
-  --color-bg-raised:      #ffffff;
-  --color-bg-sunken:      #f2f0ed;
-  --color-bg-hover:       #f5f3f0;
-  --color-bg-active:      #edeae6;
+  /* ── Surfaces ── */
+  --color-bg:             #F7F6F3;
+  --color-bg-raised:      #FFFFFF;
+  --color-bg-sunken:      #F0EFEC;
+  --color-bg-hover:       #F5F3F0;
+  --color-bg-active:      #EDEAE6;
   --color-bg-overlay:     rgba(0, 0, 0, 0.4);
 
-  --color-border:         #e8e5e0;
-  --color-border-subtle:  #f0ede8;
-  --color-divider:        #e8e5e0;
+  /* ── Borders ── */
+  --color-border:         #E8E7E3;
+  --color-border-subtle:  #F0EFEC;
+  --color-divider:        #E8E7E3;
 
-  /* Text */
-  --color-text:           #1a1a1a;
-  --color-text-secondary: #6b6560;
-  --color-text-tertiary:  #9a9590;
-  --color-text-inverse:   #ffffff;
+  /* ── Text — three levels only ── */
+  --color-text:           #1C1C1C;
+  --color-text-secondary: #6B6B65;
+  --color-text-tertiary:  #A0A09A;
+  --color-text-inverse:   #FFFFFF;
 
-  /* Accent — warm amber/orange for interactive elements */
-  --color-accent:         #e07a3a;
-  --color-accent-hover:   #cc6a2e;
-  --color-accent-light:   #fdf0e8;
-  --color-accent-subtle:  #f9e4d4;
+  /* ── Team Accent ──
+     These are set dynamically via JS when a team is selected.
+     Defaults are a neutral warm tone for pre-game-load states. */
+  --color-accent:         #1B4D3E;
+  --color-accent-hover:   #164035;
+  --color-accent-bg:      rgba(27, 77, 62, 0.07);
+  --color-accent-border:  rgba(27, 77, 62, 0.15);
+  --color-accent-secondary: #C4915C;
 
-  /* Semantic */
-  --color-win:            #2d8a56;
+  /* ── Semantic ── */
+  --color-win:            #2D7A4F;
   --color-win-bg:         #e8f5ee;
-  --color-loss:           #c43e3e;
+  --color-loss:           #B5403A;
   --color-loss-bg:        #fde8e8;
   --color-info:           #3574c4;
   --color-info-bg:        #e8f0fa;
   --color-warning:        #c48a18;
   --color-warning-bg:     #fdf5e4;
 
-  /* Tier Colors */
+  /* ── Tier Colors ── */
   --color-tier1:          #d4a843;
   --color-tier1-bg:       #fdf8ec;
   --color-tier2:          #8a8a8a;
@@ -49,32 +53,38 @@
   --color-tier3:          #b37340;
   --color-tier3-bg:       #faf2ea;
 
-  /* Watch Game */
+  /* ── Watch Game ── */
   --color-home:           #4ecdc4;
   --color-away:           #ff6b6b;
   --color-highlight-bg:   rgba(255, 215, 0, 0.08);
 
-  /* Rating Colors */
-  --color-rating-elite:   #2d8a56;
-  --color-rating-good:    #3574c4;
-  --color-rating-avg:     #c48a18;
-  --color-rating-below:   #c46030;
-  --color-rating-poor:    #c43e3e;
+  /* ── Data Viz (revenue charts, brackets) ── */
+  --color-chart-1:        #5a7be8;
+  --color-chart-2:        #d97a2e;
+  --color-chart-3:        #9060b8;
+  --color-chart-4:        #c4a42a;
+
+  /* ── Rating Colors ── */
+  --color-rating-elite:   #1B4D3E;
+  --color-rating-good:    #4A7A6A;
+  --color-rating-avg:     #8A8A7E;
+  --color-rating-below:   #B5403A;
+  --color-rating-poor:    #B5403A;
 
   /* ── Typography ── */
   --font-body:            'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono:            'JetBrains Mono', 'SF Mono', monospace;
 
-  --text-xs:    0.75rem;    /* 12px */
+  --text-xs:    0.6875rem;  /* 11px */
   --text-sm:    0.8125rem;  /* 13px */
   --text-base:  0.875rem;   /* 14px */
   --text-md:    1rem;       /* 16px */
   --text-lg:    1.125rem;   /* 18px */
   --text-xl:    1.375rem;   /* 22px */
-  --text-2xl:   1.75rem;    /* 28px */
-  --text-3xl:   2.25rem;    /* 36px */
+  --text-2xl:   1.5rem;     /* 24px */
+  --text-3xl:   1.625rem;   /* 26px */
 
-  --leading-tight:  1.25;
+  --leading-tight:  1.2;
   --leading-normal: 1.5;
   --leading-relaxed: 1.625;
 
@@ -83,48 +93,50 @@
   --weight-semi:    600;
   --weight-bold:    700;
 
-  /* ── Spacing ── */
-  --space-1:  0.25rem;   /* 4px */
-  --space-2:  0.5rem;    /* 8px */
-  --space-3:  0.75rem;   /* 12px */
-  --space-4:  1rem;      /* 16px */
-  --space-5:  1.25rem;   /* 20px */
-  --space-6:  1.5rem;    /* 24px */
-  --space-8:  2rem;      /* 32px */
-  --space-10: 2.5rem;    /* 40px */
-  --space-12: 3rem;      /* 48px */
-  --space-16: 4rem;      /* 64px */
+  /* ── Spacing — tight 8px rhythm ── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
 
-  /* ── Radius ── */
-  --radius-sm:  6px;
-  --radius-md:  10px;
-  --radius-lg:  14px;
-  --radius-xl:  20px;
-  --radius-full: 9999px;
+  --gap:      8px;  /* standard inter-card gap */
 
-  /* ── Shadows ── */
-  --shadow-xs:  0 1px 2px rgba(0,0,0,0.04);
-  --shadow-sm:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:  0 4px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
-  --shadow-lg:  0 8px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-xl:  0 16px 48px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06);
+  /* ── Radius — zero. Sharp geometry. ── */
+  --radius-sm:  0;
+  --radius-md:  0;
+  --radius-lg:  0;
+  --radius-xl:  0;
+  --radius-full: 0;
+
+  /* ── Shadows — barely visible ── */
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.03);
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md:  0 2px 8px rgba(0,0,0,0.05);
+  --shadow-lg:  0 4px 16px rgba(0,0,0,0.06);
+  --shadow-xl:  0 8px 32px rgba(0,0,0,0.08);
 
   /* ── Transitions ── */
-  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
-  --duration-fast:   120ms;
-  --duration-normal: 200ms;
-  --duration-slow:   350ms;
+  --duration-fast:   100ms;
+  --duration-normal: 160ms;
+  --duration-slow:   280ms;
 
   /* ── Layout ── */
-  --sidebar-width:   260px;
-  --topbar-height:   56px;
-  --content-max:     1320px;
+  --sidebar-width:   200px;
+  --topbar-height:   52px;
+  --content-max:     1080px;
 }
 
 
 /* ═══════════════════════════════════════════════════════════════
-   Base Styles (scoped to React root)
+   Base Styles
    ═══════════════════════════════════════════════════════════════ */
 
 #react-root {
@@ -144,7 +156,6 @@
   box-sizing: border-box;
 }
 
-/* Tabular figures for stats/numbers */
 .tabular {
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
@@ -156,7 +167,7 @@
 
 
 /* ═══════════════════════════════════════════════════════════════
-   Animations
+   Animations — restrained
    ═══════════════════════════════════════════════════════════════ */
 
 @keyframes fadeIn {
@@ -165,23 +176,18 @@
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-8px); }
+  from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.96); }
+  from { opacity: 0; transform: scale(0.98); }
   to   { opacity: 1; transform: scale(1); }
-}
-
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
 }
 
 .animate-fade-in   { animation: fadeIn var(--duration-normal) var(--ease-out) both; }
@@ -189,12 +195,11 @@
 .animate-slide-down { animation: slideDown var(--duration-slow) var(--ease-out) both; }
 .animate-scale-in  { animation: scaleIn var(--duration-slow) var(--ease-out) both; }
 
-/* Staggered children */
-.stagger > *:nth-child(1)  { animation-delay: 0ms; }
-.stagger > *:nth-child(2)  { animation-delay: 40ms; }
-.stagger > *:nth-child(3)  { animation-delay: 80ms; }
-.stagger > *:nth-child(4)  { animation-delay: 120ms; }
-.stagger > *:nth-child(5)  { animation-delay: 160ms; }
-.stagger > *:nth-child(6)  { animation-delay: 200ms; }
-.stagger > *:nth-child(7)  { animation-delay: 240ms; }
-.stagger > *:nth-child(8)  { animation-delay: 280ms; }
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 30ms; }
+.stagger > *:nth-child(3) { animation-delay: 60ms; }
+.stagger > *:nth-child(4) { animation-delay: 90ms; }
+.stagger > *:nth-child(5) { animation-delay: 120ms; }
+.stagger > *:nth-child(6) { animation-delay: 150ms; }
+.stagger > *:nth-child(7) { animation-delay: 180ms; }
+.stagger > *:nth-child(8) { animation-delay: 210ms; }

@@ -11,6 +11,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { applyTeamColors } from '../styles/TeamColors.js';
 
 // ── Context ──
 const GameContext = createContext(null);
@@ -121,6 +122,10 @@ export function GameProvider({ children }) {
     if (snap) {
       setSnapshot(snap);
       if (!isReady) setIsReady(true);
+      // Apply team identity colors to CSS custom properties
+      if (snap.userTeam?.name) {
+        applyTeamColors(snap.userTeam.name);
+      }
     }
   }, [isReady]);
 

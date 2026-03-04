@@ -1,26 +1,5 @@
 import React from 'react';
 
-const cardStyles = {
-  base: {
-    background: 'var(--color-bg-raised)',
-    borderRadius: 'var(--radius-lg)',
-    border: '1px solid var(--color-border-subtle)',
-    boxShadow: 'var(--shadow-sm)',
-    overflow: 'hidden',
-    transition: `box-shadow var(--duration-normal) var(--ease-out),
-                 transform var(--duration-normal) var(--ease-out)`,
-  },
-  interactive: {
-    cursor: 'pointer',
-  },
-  padding: {
-    none: {},
-    sm: { padding: 'var(--space-3) var(--space-4)' },
-    md: { padding: 'var(--space-4) var(--space-5)' },
-    lg: { padding: 'var(--space-6)' },
-  },
-};
-
 export function Card({
   children,
   padding = 'md',
@@ -30,28 +9,33 @@ export function Card({
   className = '',
   ...props
 }) {
-  const handleHover = interactive ? {
-    onMouseEnter: (e) => {
-      e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-      e.currentTarget.style.transform = 'translateY(-1px)';
-    },
-    onMouseLeave: (e) => {
-      e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-      e.currentTarget.style.transform = 'translateY(0)';
-    },
-  } : {};
+  const paddings = {
+    none: {},
+    sm: { padding: '10px 12px' },
+    md: { padding: '14px 16px' },
+    lg: { padding: '16px 20px' },
+  };
 
   return (
     <div
       className={`card ${className}`}
       style={{
-        ...cardStyles.base,
-        ...(interactive ? cardStyles.interactive : {}),
-        ...(cardStyles.padding[padding] || {}),
+        background: 'var(--color-bg-raised)',
+        border: '1px solid var(--color-border)',
+        boxShadow: 'var(--shadow-sm)',
+        overflow: 'hidden',
+        transition: 'box-shadow var(--duration-fast) ease',
+        ...(interactive ? { cursor: 'pointer' } : {}),
+        ...(paddings[padding] || {}),
         ...style,
       }}
       onClick={onClick}
-      {...handleHover}
+      onMouseEnter={interactive ? (e) => {
+        e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+      } : undefined}
+      onMouseLeave={interactive ? (e) => {
+        e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+      } : undefined}
       {...props}
     >
       {children}
@@ -65,15 +49,15 @@ export function CardHeader({ children, style, action }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 'var(--space-3)',
+      marginBottom: 'var(--space-2)',
       ...style,
     }}>
       <div style={{
-        fontSize: 'var(--text-sm)',
+        fontSize: 'var(--text-xs)',
         fontWeight: 'var(--weight-semi)',
-        color: 'var(--color-text-secondary)',
+        color: 'var(--color-text-tertiary)',
         textTransform: 'uppercase',
-        letterSpacing: '0.04em',
+        letterSpacing: '0.06em',
       }}>
         {children}
       </div>
@@ -86,8 +70,8 @@ export function CardValue({ children, style, color, size = 'lg' }) {
   const sizes = {
     sm: 'var(--text-md)',
     md: 'var(--text-lg)',
-    lg: 'var(--text-xl)',
-    xl: 'var(--text-2xl)',
+    lg: 'var(--text-2xl)',
+    xl: 'var(--text-3xl)',
   };
   return (
     <div style={{
@@ -96,6 +80,7 @@ export function CardValue({ children, style, color, size = 'lg' }) {
       color: color || 'var(--color-text)',
       fontVariantNumeric: 'tabular-nums',
       lineHeight: 'var(--leading-tight)',
+      letterSpacing: '-0.02em',
       ...style,
     }}>
       {children}

@@ -136,7 +136,7 @@ function EmbeddedCalendar({ gameState, engines }) {
       </div>
 
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))',
         gap: 'var(--gap)',
       }}>
         {months.map(({ year, month }) => (
@@ -250,7 +250,7 @@ function DayCell({
   return (
     <div onClick={hasContent ? () => onClick(dateStr) : undefined} style={{
       background: isSelected ? 'var(--color-accent-bg)' : bg,
-      padding: '4px 3px', minHeight: 40,
+      padding: '4px 3px', minHeight: 44,
       borderLeft: isToday ? '3px solid var(--color-accent)' : undefined,
       cursor: hasContent ? 'pointer' : 'default',
       transition: 'all 100ms ease',
@@ -261,7 +261,7 @@ function DayCell({
       }}>{day}</div>
       {sub && (
         <div style={{
-          fontSize: 7, color: textColor, opacity: 0.75,
+          fontSize: 9, color: textColor, opacity: 0.75,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
         }}>{sub}</div>
       )}

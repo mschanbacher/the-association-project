@@ -407,9 +407,9 @@ export class LeagueManager {
         const t2Dupes = t2Ids.filter((id, idx) => t2Ids.indexOf(id) !== idx);
         const t3Dupes = t3Ids.filter((id, idx) => t3Ids.indexOf(id) !== idx);
 
-        if (t1Dupes.length) console.error('⚠️ DUPLICATE TEAMS IN TIER 1:', t1Dupes);
-        if (t2Dupes.length) console.error('⚠️ DUPLICATE TEAMS IN TIER 2:', t2Dupes);
-        if (t3Dupes.length) console.error('⚠️ DUPLICATE TEAMS IN TIER 3:', t3Dupes);
+ if (t1Dupes.length) console.error('DUPLICATE TEAMS IN TIER 1:', t1Dupes);
+ if (t2Dupes.length) console.error('DUPLICATE TEAMS IN TIER 2:', t2Dupes);
+ if (t3Dupes.length) console.error('DUPLICATE TEAMS IN TIER 3:', t3Dupes);
 
         console.log('T1 after:', gameState.tier1Teams.length, '(30)');
         console.log('T2 after:', gameState.tier2Teams.length, '(86)');

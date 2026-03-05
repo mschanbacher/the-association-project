@@ -260,7 +260,7 @@ export class GameSimController {
                 homeScore: result.homeScore,
             });
         } else {
-            const text = `<span style="color: ${userWon ? '#4ecdc4' : '#ff6b6b'};">${userWon ? '🎉 VICTORY' : '😤 DEFEAT'}</span> — FINAL${result.isOvertime ? ' (OT)' : ''}: ${result.awayScore} - ${result.homeScore}`;
+ const text = `<span style="color: ${userWon ? '#4ecdc4' : '#ff6b6b'};">${userWon ? 'VICTORY' : 'DEFEAT'}</span> — FINAL${result.isOvertime ? ' (OT)' : ''}: ${result.awayScore} - ${result.homeScore}`;
             const finalEl = document.getElementById('wg-final-text');
             if (finalEl) finalEl.innerHTML = text;
             const goEl = document.getElementById('wg-gameover');
@@ -884,8 +884,8 @@ export class GameSimController {
         let status, statusColor, nextAction;
 
         if (gameState.currentTier === 1) {
-            if (rank === totalTeams) { status = '⚠️ AUTO-RELEGATED TO TIER 2'; statusColor = '#ea4335'; nextAction = 'relegate'; }
-            else if (rank >= totalTeams - 2 && rank <= totalTeams - 1) { status = '⚠️ RELEGATION PLAYOFF'; statusColor = '#ffa500'; nextAction = 'relegation-playoff'; }
+ if (rank === totalTeams) { status = 'AUTO-RELEGATED TO TIER 2'; statusColor = '#ea4335'; nextAction = 'relegate'; }
+ else if (rank >= totalTeams - 2 && rank <= totalTeams - 1) { status = 'RELEGATION PLAYOFF'; statusColor = '#ffa500'; nextAction = 'relegation-playoff'; }
             else {
                 // Check if user is in the top 8 of their conference (championship playoff eligible)
                 const t1Sorted = helpers.sortTeamsByStandings(gameState.tier1Teams, gameState.tier1Schedule);
@@ -901,10 +901,10 @@ export class GameSimController {
                     const conf = inEastPlayoffs ? 'Eastern' : 'Western';
                     const confTeams = inEastPlayoffs ? eastTeams.slice(0, 8) : westTeams.slice(0, 8);
                     const seed = confTeams.findIndex(t => t.id === userTeam.id) + 1;
-                    status = `🏆 #${seed} SEED — ${conf} Conference Playoffs!`;
+ status = `#${seed} SEED — ${conf} Conference Playoffs!`;
                     statusColor = '#ffd700'; nextAction = 'championship';
                 } else {
-                    status = '✅ Safe in Tier 1'; statusColor = '#34a853'; nextAction = 'stay';
+ status = 'Safe in Tier 1'; statusColor = '#34a853'; nextAction = 'stay';
                 }
             }
         } else if (gameState.currentTier === 2) {
@@ -913,10 +913,10 @@ export class GameSimController {
             const divSorted = helpers.sortTeamsByStandings(divTeams, gameState.schedule);
             const divRank = divSorted.findIndex(t => t.id === userTeam.id) + 1;
 
-            if (rank === totalTeams) { status = '⚠️ AUTO-RELEGATED TO TIER 3'; statusColor = '#ea4335'; nextAction = 'relegate'; }
-            else if (rank >= totalTeams - 2 && rank <= totalTeams - 1) { status = '⚠️ RELEGATION PLAYOFF'; statusColor = '#ffa500'; nextAction = 'relegation-playoff'; }
+ if (rank === totalTeams) { status = 'AUTO-RELEGATED TO TIER 3'; statusColor = '#ea4335'; nextAction = 'relegate'; }
+ else if (rank >= totalTeams - 2 && rank <= totalTeams - 1) { status = 'RELEGATION PLAYOFF'; statusColor = '#ffa500'; nextAction = 'relegation-playoff'; }
             else if (divRank <= 4) {
-                status = `🏆 #${divRank} SEED — ${userTeam.division} Division Playoffs!`;
+ status = `#${divRank} SEED — ${userTeam.division} Division Playoffs!`;
                 statusColor = '#ffd700'; nextAction = 't2-championship';
             }
             else { status = 'Season Over — Staying in Tier 2'; statusColor = '#667eea'; nextAction = 'stay'; }
@@ -926,7 +926,7 @@ export class GameSimController {
             const divisionRank = divisionSorted.findIndex(t => t.id === userTeam.id) + 1;
 
             if (divisionRank <= 2) {
-                status = divisionRank === 1 ? '🏆 #1 SEED — Metro League Playoffs!' : '⚡ #2 SEED — Metro League Playoffs!';
+ status = divisionRank === 1 ? '#1 SEED — Metro League Playoffs!' : '#2 SEED — Metro League Playoffs!';
                 statusColor = '#cd7f32'; nextAction = 't3-championship';
             } else { status = 'Season Over — Staying in Tier 3'; statusColor = '#667eea'; nextAction = 'stay'; }
         }
@@ -1109,12 +1109,12 @@ export class GameSimController {
         }
 
         const resultMessages = {
-            'promoted': { text: '🎉 PROMOTED TO TIER 1!', color: '#34a853' },
-            'survived': { text: '✅ SURVIVED - STAYING IN TIER 1', color: '#34a853' },
-            'relegated': { text: '⚠️ RELEGATED TO TIER 2', color: '#ea4335' },
+ 'promoted': { text: 'PROMOTED TO TIER 1!', color: '#34a853' },
+ 'survived': { text: 'SURVIVED - STAYING IN TIER 1', color: '#34a853' },
+ 'relegated': { text: 'RELEGATED TO TIER 2', color: '#ea4335' },
             'eliminated-promotion': { text: 'Eliminated - Staying in Tier 2', color: '#667eea' },
-            'division-champion': { text: '🏆 DIVISION CHAMPION!', color: '#ffa500' },
-            'runner-up-division': { text: '🥈 Division Runner-Up', color: '#c0c0c0' },
+ 'division-champion': { text: 'DIVISION CHAMPION!', color: '#ffa500' },
+ 'runner-up-division': { text: 'Division Runner-Up', color: '#c0c0c0' },
             'eliminated-division': { text: 'Eliminated from Division Playoffs', color: '#667eea' }
         };
 
@@ -1135,8 +1135,8 @@ export class GameSimController {
 
     viewPromRelPlayoffResults() {
         const { results, isPromotion, isDivisionPlayoff } = window.currentPromRelResults;
-        const playoffTitle = isDivisionPlayoff ? '🏀 Division Playoffs' :
-                             (isPromotion ? '⬆️ Promotion Playoffs' : '⬇️ Relegation Playoffs');
+ const playoffTitle = isDivisionPlayoff ? 'Division Playoffs' :
+ (isPromotion ? 'Promotion Playoffs' : 'Relegation Playoffs');
         if (window._reactShowPlayoff) {
             window._reactShowPlayoff({
                 results, isPromotion, isDivisionPlayoff,
@@ -1648,7 +1648,7 @@ export class GameSimController {
             seriesMatchups.push({ higher: prevWinners[0], lower: prevWinners[3] });
             seriesMatchups.push({ higher: prevWinners[1], lower: prevWinners[2] });
         } else if (roundNumber === 4) {
-            roundName = '🏆 NARBL Championship';
+ roundName = 'NARBL Championship';
             bestOf = 5;
             const prevResults = pd.interactiveResults.nationalRounds[2];
             seriesMatchups.push({ higher: prevResults[0].result.winner, lower: prevResults[1].result.winner });
@@ -2108,7 +2108,7 @@ export class GameSimController {
             matchups.push({ higher: prevWinners[0], lower: prevWinners[3] });
             matchups.push({ higher: prevWinners[1], lower: prevWinners[2] });
         } else if (stage === 'championship') {
-            roundName = '🏆 Metro League Championship';
+ roundName = 'Metro League Championship';
             pd.stage = 'championship';
             const sfResults = pd.interactiveResults.semifinals;
             matchups.push({ higher: sfResults[0].result.winner, lower: sfResults[1].result.winner });

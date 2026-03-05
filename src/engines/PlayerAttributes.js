@@ -59,18 +59,18 @@ export class PlayerAttributes {
     // ─────────────────────────────────────────────────────────────────────────
 
     static PHYSICAL_ATTRS = {
-        speed:       { name: 'Speed',       icon: '💨', desc: 'Fast break, transition, blow-by scoring' },
-        strength:    { name: 'Strength',    icon: '💪', desc: 'Post play, rebounding, finishing through contact' },
-        verticality: { name: 'Verticality', icon: '⬆️', desc: 'Blocks, dunks, shot contest, rebounding' },
-        endurance:   { name: 'Endurance',   icon: '🫁', desc: 'Fatigue resistance, minutes capacity' }
+        speed:       { name: 'Speed',       icon: null, desc: 'Fast break, transition, blow-by scoring' },
+        strength:    { name: 'Strength',    icon: null, desc: 'Post play, rebounding, finishing through contact' },
+        verticality: { name: 'Verticality', icon: null, desc: 'Blocks, dunks, shot contest, rebounding' },
+        endurance:   { name: 'Endurance',   icon: null, desc: 'Fatigue resistance, minutes capacity' }
     };
 
     static MENTAL_ATTRS = {
-        basketballIQ:  { name: 'Basketball IQ',  icon: '🧠', desc: 'Decision-making, assists, turnovers, positioning' },
-        clutch:        { name: 'Clutch',          icon: '❄️', desc: 'Playoff performance, close game composure' },
-        workEthic:     { name: 'Work Ethic',      icon: '🔨', desc: 'Offseason development rate' },
-        coachability:  { name: 'Coachability',    icon: '📋', desc: 'System absorption, coach modifier effectiveness' },
-        collaboration: { name: 'Collaboration',   icon: '🤝', desc: 'Locker room impact, team chemistry effect' }
+        basketballIQ:  { name: 'Basketball IQ',  icon: null, desc: 'Decision-making, assists, turnovers, positioning' },
+        clutch:        { name: 'Clutch',          icon: null, desc: 'Playoff performance, close game composure' },
+        workEthic:     { name: 'Work Ethic',      icon: null, desc: 'Offseason development rate' },
+        coachability:  { name: 'Coachability',    icon: null, desc: 'System absorption, coach modifier effectiveness' },
+        collaboration: { name: 'Collaboration',   icon: null, desc: 'Locker room impact, team chemistry effect' }
     };
 
     static ALL_ATTR_KEYS = ['speed', 'strength', 'verticality', 'endurance', 'basketballIQ', 'clutch', 'workEthic', 'coachability', 'collaboration'];

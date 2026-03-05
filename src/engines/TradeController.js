@@ -123,17 +123,17 @@ export class TradeController {
 
         document.getElementById('yourTradeRoster').innerHTML = userTeam.roster
             .sort((a, b) => b.rating - a.rating)
-            .map(player => UIRenderer.tradeRosterRow({
-                player, isSelected: this.currentTrade.userGives.includes(player.id),
-                side: 'user', ratingColor: helpers.getRatingColor(player.rating), formatCurrency: helpers.formatCurrency
-            })).join('');
+            // [LEGACY REMOVED] .map(player => UIRenderer.tradeRosterRow({
+                // player, isSelected: this.currentTrade.userGives.includes(player.id),
+                // side: 'user', ratingColor: helpers.getRatingColor(player.rating), formatCurrency: helpers.formatCurrency
+            // })).join('');
 
         document.getElementById('aiTradeRoster').innerHTML = aiTeam.roster
             .sort((a, b) => b.rating - a.rating)
-            .map(player => UIRenderer.tradeRosterRow({
-                player, isSelected: this.currentTrade.userReceives.includes(player.id),
-                side: 'ai', ratingColor: helpers.getRatingColor(player.rating), formatCurrency: helpers.formatCurrency
-            })).join('');
+            // [LEGACY REMOVED] .map(player => UIRenderer.tradeRosterRow({
+                // player, isSelected: this.currentTrade.userReceives.includes(player.id),
+                // side: 'ai', ratingColor: helpers.getRatingColor(player.rating), formatCurrency: helpers.formatCurrency
+            // })).join('');
     }
 
     displayTradePicks() {
@@ -167,13 +167,13 @@ export class TradeController {
                     if (owner === teamId) {
                         const isSelected = selectedPicks.some(p => p.originalTeamId === teamId && p.year === year && p.round === round);
                         const violatesRule = helpers.violatesStepienRule(teamId, year, round);
-                        html += UIRenderer.tradePickRow({
-                            teamId, year, round, isSelected, side,
-                            pickValue: helpers.calculatePickValue(year, round), violatesRule
-                        });
+                        // [LEGACY REMOVED] html += UIRenderer.tradePickRow({
+                            // teamId, year, round, isSelected, side,
+                            // pickValue: helpers.calculatePickValue(year, round), violatesRule
+                        // });
                     } else {
                         const ownerTeam = helpers.getTeamById(owner);
-                        html += UIRenderer.tradePickOwedRow({ year, round, ownerName: ownerTeam ? ownerTeam.name : 'Unknown' });
+                        // [LEGACY REMOVED] html += UIRenderer.tradePickOwedRow({ year, round, ownerName: ownerTeam ? ownerTeam.name : 'Unknown' });
                     }
                 });
             }
@@ -313,9 +313,9 @@ export class TradeController {
         if (existingSalaryInfo) existingSalaryInfo.remove();
 
         if (this.currentTrade.userGives.length > 0 && this.currentTrade.userReceives.length > 0) {
-            summaryDiv.insertAdjacentHTML('beforeend', UIRenderer.tradeSalarySummary({
-                userGivesSalary, userReceivesSalary, salaryDiff, salaryMatch, formatCurrency: helpers.formatCurrency
-            }));
+            // [LEGACY REMOVED] summaryDiv.insertAdjacentHTML('beforeend', UIRenderer.tradeSalarySummary({
+                // userGivesSalary, userReceivesSalary, salaryDiff, salaryMatch, formatCurrency: helpers.formatCurrency
+            // }));
         }
     }
 
@@ -391,10 +391,10 @@ export class TradeController {
 
         if (result.accepted) {
             this.executeTrade();
-            alert(`✅ Trade Accepted!\n\n${result.reason}`);
+ alert(`Trade Accepted!\n\n${result.reason}`);
             this.closeTradeScreen();
         } else {
-            alert(`❌ Trade Declined\n\n${aiTeam.name} says: "${result.reason}"`);
+ alert(`Trade Declined\n\n${aiTeam.name} says: "${result.reason}"`);
         }
     }
 
@@ -509,20 +509,20 @@ export class TradeController {
         const proposal = gameState.pendingTradeProposal;
         if (!proposal) return;
 
-        document.getElementById('aiProposalTeam').innerHTML = UIRenderer.aiTradeProposalHeader(proposal.aiTeamName);
+        // [LEGACY REMOVED] document.getElementById('aiProposalTeam').innerHTML = UIRenderer.aiTradeProposalHeader(proposal.aiTeamName);
 
-        document.getElementById('aiProposalYouGive').innerHTML = proposal.userGives.map(player =>
-            UIRenderer.aiTradeProposalPlayerCard({ player, getRatingColor: helpers.getRatingColor, formatCurrency: helpers.formatCurrency })
-        ).join('');
+        // [LEGACY REMOVED] document.getElementById('aiProposalYouGive').innerHTML = proposal.userGives.map(player =>
+            // [LEGACY REMOVED] UIRenderer.aiTradeProposalPlayerCard({ player, getRatingColor: helpers.getRatingColor, formatCurrency: helpers.formatCurrency })
+        // ).join('');
 
-        let youReceiveHtml = proposal.aiGives.map(player =>
-            UIRenderer.aiTradeProposalPlayerCard({ player, getRatingColor: helpers.getRatingColor, formatCurrency: helpers.formatCurrency })
-        ).join('');
+        // [LEGACY REMOVED] let youReceiveHtml = proposal.aiGives.map(player =>
+            // [LEGACY REMOVED] UIRenderer.aiTradeProposalPlayerCard({ player, getRatingColor: helpers.getRatingColor, formatCurrency: helpers.formatCurrency })
+        // ).join('');
 
         if (proposal.aiGivesPicks && proposal.aiGivesPicks.length > 0) {
-            youReceiveHtml += proposal.aiGivesPicks.map(pick =>
-                UIRenderer.aiTradeProposalPickCard({ pick, pickValue: helpers.calculatePickValue(pick.year, pick.round) })
-            ).join('');
+            // [LEGACY REMOVED] youReceiveHtml += proposal.aiGivesPicks.map(pick =>
+                // [LEGACY REMOVED] UIRenderer.aiTradeProposalPickCard({ pick, pickValue: helpers.calculatePickValue(pick.year, pick.round) })
+            // ).join('');
         }
         document.getElementById('aiProposalYouReceive').innerHTML = youReceiveHtml;
 
@@ -534,7 +534,7 @@ export class TradeController {
             });
         }
 
-        document.getElementById('aiProposalSummary').innerHTML = UIRenderer.aiTradeProposalSummary({ userGivesValue, aiGivesValue });
+        // [LEGACY REMOVED] document.getElementById('aiProposalSummary').innerHTML = UIRenderer.aiTradeProposalSummary({ userGivesValue, aiGivesValue });
         if (window._reactOpenAiTrade) {
             window._reactOpenAiTrade();
         } else {
@@ -604,14 +604,14 @@ export class TradeController {
         const seasonComplete = gameState.schedule && gameState.schedule.every(g => g.played);
         if (seasonComplete) {
             console.log('Season complete after accepting trade, showing season end...');
-            alert(`✅ Trade Complete!\n\nYou traded with ${proposal.aiTeamName}.`);
+ alert(`Trade Complete!\n\nYou traded with ${proposal.aiTeamName}.`);
             setTimeout(() => { this.ctx.simulationController.showSeasonEnd(); }, 100);
         } else {
             const gamesRemaining = gameState.schedule.filter(g => !g.played).length;
             if (gamesRemaining > 0) {
-                alert(`✅ Trade Complete!\n\nYou traded with ${proposal.aiTeamName}.\n\n${gamesRemaining} games remaining. Click "Finish Season" to continue simulating.`);
+ alert(`Trade Complete!\n\nYou traded with ${proposal.aiTeamName}.\n\n${gamesRemaining} games remaining. Click "Finish Season" to continue simulating.`);
             } else {
-                alert(`✅ Trade Complete!\n\nYou traded with ${proposal.aiTeamName}.`);
+ alert(`Trade Complete!\n\nYou traded with ${proposal.aiTeamName}.`);
             }
         }
     }

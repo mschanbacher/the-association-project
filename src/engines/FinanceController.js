@@ -26,16 +26,16 @@ export class FinanceController {
         const totalRev = summary.totalRevenue;
 
         const stabilityColors = { stable: '#34a853', caution: '#fbbc04', danger: '#ea4335' };
-        const stabilityLabels = { stable: '✅ Stable', caution: '⚠️ Caution', danger: '🔴 At Risk' };
+ const stabilityLabels = { stable: 'Stable', caution: 'Caution', danger: 'At Risk' };
         const stabilityColor = stabilityColors[summary.stability] || '#34a853';
-        const stabilityLabel = stabilityLabels[summary.stability] || '✅ Stable';
+ const stabilityLabel = stabilityLabels[summary.stability] || 'Stable';
 
         const barPct = (val) => Math.max(3, (val / totalRev) * 100);
 
         const ratioWarning = summary.spendingRatio >= 0.85
-            ? '<span style="color: #ea4335; font-size: 0.85em;"> ⚠️ High risk — limited financial cushion</span>'
+ ? '<span style="color: #ea4335; font-size: 0.85em;"> High risk — limited financial cushion</span>'
             : summary.spendingRatio >= 0.80
-                ? '<span style="color: #fbbc04; font-size: 0.85em;"> ⚡ Aggressive spending</span>'
+ ? '<span style="color: #fbbc04; font-size: 0.85em;"> Aggressive spending</span>'
                 : '';
 
         const isHardCap = summary.isHardCap;
@@ -50,17 +50,17 @@ export class FinanceController {
             const prevRev = history[history.length - 2].totalRevenue;
             const change = totalRev - prevRev;
             const changePct = ((change / prevRev) * 100).toFixed(1);
-            const arrow = change > 0 ? '📈' : change < 0 ? '📉' : '➡️';
+ const arrow = change > 0 ? '' : change < 0 ? '' : '️';
             const color = change > 0 ? '#34a853' : change < 0 ? '#ea4335' : '#aaa';
             trendHtml = `<span style="color: ${color}; margin-left: 10px;">${arrow} ${change > 0 ? '+' : ''}${changePct}% vs last season</span>`;
         }
 
         const fanTierBaseline = engines.FinanceEngine.FANBASE_BASELINES[team.tier] || 15000;
         const fanMultiple = (summary.fanbase / fanTierBaseline).toFixed(1);
-        const fanLabel = parseFloat(fanMultiple) > 1.5 ? '🌟 Well above average'
-                       : parseFloat(fanMultiple) > 1.0 ? '👍 Above average'
-                       : parseFloat(fanMultiple) > 0.7 ? '📊 Average'
-                       : '⚠️ Below average';
+ const fanLabel = parseFloat(fanMultiple) > 1.5 ? 'Well above average'
+ : parseFloat(fanMultiple) > 1.0 ? 'Above average'
+ : parseFloat(fanMultiple) > 0.7 ? 'Average'
+ : 'Below average';
 
         const lp = summary.legacyProfile;
 
@@ -104,26 +104,26 @@ export class FinanceController {
             return;
         }
 
-        content.innerHTML = UIRenderer.financeDashboard({
-            formatCurrency: helpers.formatCurrency, totalRev, trendHtml, capLabel,
-            spendingLimit: summary.spendingLimit, capSpace: summary.capSpace,
-            stabilityColor, stabilityLabel, usagePct: summary.usagePct,
-            currentSalary: summary.currentSalary, salaryFloor: summary.salaryFloor,
-            capExplain, rev: r, barPct, tier: team.tier,
-            fanbase: summary.fanbase, fanLabel, fanMultiple, tierAvgFanbase,
-            revVsAvgColor, revVsAvgLabel, tierAvgRevenue,
-            marketLabel: summary.marketSize >= 1.2 ? '🏙️ Major' : summary.marketSize >= 1.0 ? '🏘️ Mid-size' : summary.marketSize >= 0.8 ? '🏡 Small' : '🏚️ Tiny',
-            marketSize: summary.marketSize,
-            metroPopStr: summary.metroPopulation ? ` · ${summary.metroPopulation >= 1 ? summary.metroPopulation.toFixed(1) + 'M' : Math.round(summary.metroPopulation * 1000) + 'K'} metro pop.` : '',
-            isHardCap, spendingRatio: summary.spendingRatio, ratioWarning,
-            lp, seasonsInCurrentTier: team.finances.seasonsInCurrentTier || 0,
-            ownerMode: team.finances.ownerMode,
-            arenaCapacity: team.finances.arena.capacity, arenaCondition: team.finances.arena.condition,
-            sponsorCount: team.finances.sponsorships.length,
-            sponsorRevenue: team.finances.sponsorships.reduce((s, d) => s + d.annualValue, 0),
-            ticketPct: Math.round((team.finances.ticketPriceMultiplier || 1.0) * 100),
-            marketingBudget: team.finances.marketingBudget
-        });
+        // [LEGACY REMOVED] content.innerHTML = UIRenderer.financeDashboard({
+            // formatCurrency: helpers.formatCurrency, totalRev, trendHtml, capLabel,
+            // spendingLimit: summary.spendingLimit, capSpace: summary.capSpace,
+            // stabilityColor, stabilityLabel, usagePct: summary.usagePct,
+            // currentSalary: summary.currentSalary, salaryFloor: summary.salaryFloor,
+            // capExplain, rev: r, barPct, tier: team.tier,
+            // fanbase: summary.fanbase, fanLabel, fanMultiple, tierAvgFanbase,
+            // revVsAvgColor, revVsAvgLabel, tierAvgRevenue,
+ // marketLabel: summary.marketSize >= 1.2 ? '️ Major' : summary.marketSize >= 1.0 ? '️ Mid-size' : summary.marketSize >= 0.8 ? ' Small' : '️ Tiny',
+            // marketSize: summary.marketSize,
+            // metroPopStr: summary.metroPopulation ? ` · ${summary.metroPopulation >= 1 ? summary.metroPopulation.toFixed(1) + 'M' : Math.round(summary.metroPopulation * 1000) + 'K'} metro pop.` : '',
+            // isHardCap, spendingRatio: summary.spendingRatio, ratioWarning,
+            // lp, seasonsInCurrentTier: team.finances.seasonsInCurrentTier || 0,
+            // ownerMode: team.finances.ownerMode,
+            // arenaCapacity: team.finances.arena.capacity, arenaCondition: team.finances.arena.condition,
+            // sponsorCount: team.finances.sponsorships.length,
+            // sponsorRevenue: team.finances.sponsorships.reduce((s, d) => s + d.annualValue, 0),
+            // ticketPct: Math.round((team.finances.ticketPriceMultiplier || 1.0) * 100),
+            // marketingBudget: team.finances.marketingBudget
+        // });
 
         modal.classList.remove('hidden');
         const closeBtn = document.getElementById('financeDashboardCloseBtn');

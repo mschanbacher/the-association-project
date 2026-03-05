@@ -10,13 +10,13 @@ export class CoachEngine {
     // 7 core traits, each on a 1-100 scale (50 = league average).
     
     static TRAITS = {
-        pace: { name: 'Pace', description: 'Tempo of play — high pace pushes more possessions', icon: '⚡', lowLabel: 'Slow & Methodical', highLabel: 'Run & Gun' },
-        threePointTendency: { name: '3PT Tendency', description: 'Emphasis on three-point shooting', icon: '🎯', lowLabel: 'Paint-Focused', highLabel: 'Three-Point Heavy' },
-        defensiveIntensity: { name: 'Defensive Intensity', description: 'Aggressive defense creates turnovers but more fouls', icon: '🛡️', lowLabel: 'Conservative', highLabel: 'Aggressive Pressure' },
-        ballMovement: { name: 'Ball Movement', description: 'Team passing vs isolation plays', icon: '🔄', lowLabel: 'Star Isolation', highLabel: 'Motion Offense' },
+ pace: { name: 'Pace', description: 'Tempo of play — high pace pushes more possessions', icon: null, lowLabel: 'Slow & Methodical', highLabel: 'Run & Gun' },
+ threePointTendency: { name: '3PT Tendency', description: 'Emphasis on three-point shooting', icon: null, lowLabel: 'Paint-Focused', highLabel: 'Three-Point Heavy' },
+ defensiveIntensity: { name: 'Defensive Intensity', description: 'Aggressive defense creates turnovers but more fouls', icon: null, lowLabel: 'Conservative', highLabel: 'Aggressive Pressure' },
+ ballMovement: { name: 'Ball Movement', description: 'Team passing vs isolation plays', icon: null, lowLabel: 'Star Isolation', highLabel: 'Motion Offense' },
         benchUsage: { name: 'Bench Usage', description: 'How deep the rotation goes', icon: '🪑', lowLabel: 'Tight 7-Man', highLabel: 'Deep 11-Man' },
-        playerDevelopment: { name: 'Player Development', description: 'Ability to improve young players', icon: '📈', lowLabel: 'Win-Now Focus', highLabel: 'Development Guru' },
-        adaptability: { name: 'Adaptability', description: 'Adjusts strategy to exploit opponent weaknesses', icon: '🧠', lowLabel: 'Rigid System', highLabel: 'Highly Adaptive' }
+ playerDevelopment: { name: 'Player Development', description: 'Ability to improve young players', icon: null, lowLabel: 'Win-Now Focus', highLabel: 'Development Guru' },
+ adaptability: { name: 'Adaptability', description: 'Adjusts strategy to exploit opponent weaknesses', icon: '', lowLabel: 'Rigid System', highLabel: 'Highly Adaptive' }
     };
 
     static ARCHETYPES = {

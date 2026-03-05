@@ -243,7 +243,7 @@ export class GMMode {
             if (calEvent) {
                 this._showDayMessage(calEvent, currentDate);
             } else {
-                this._showDayMessage('📭 No games today', currentDate);
+ this._showDayMessage('No games today', currentDate);
             }
         }
         
@@ -625,13 +625,9 @@ export class GMMode {
             quarterScores: userGame.boxScore.quarterScores || null,
         };
 
-        // Dispatch to React modal if available, otherwise fall back to legacy
+        // Dispatch to React modal
         if (window._reactShowPostGame) {
             window._reactShowPostGame(postGamePayload);
-        } else {
-            const html = UIRenderer.postGameSummary(postGamePayload);
-            document.getElementById('postGameContent').innerHTML = html;
-            document.getElementById('postGameModal').classList.remove('hidden');
         }
     }
     
@@ -980,7 +976,7 @@ export class GMMode {
         // Finish Season stays enabled during offseason — routes to resumeOffseason()
         if (finishBtn) {
             finishBtn.disabled = seasonComplete && !inOffseason;
-            finishBtn.textContent = inOffseason ? '📋 Continue Offseason' : '⏭️ Finish Season';
+ finishBtn.textContent = inOffseason ? 'Continue Offseason' : 'Finish Season';
         }
         const watchBtn = document.getElementById('watchNextBtn');
         if (watchBtn) watchBtn.disabled = seasonComplete;
@@ -1171,7 +1167,7 @@ export class GMMode {
                             border-radius: 16px; padding: 30px 40px; max-width: 550px; width: 90%;
                             box-shadow: 0 0 40px rgba(234,67,53,0.3); text-align: center;">
                     <div style="color: #ea4335; font-size: 0.85em; font-weight: bold; letter-spacing: 3px; margin-bottom: 8px;">
-                        ⚡ BREAKING NEWS ⚡
+ BREAKING NEWS 
                     </div>
                     <div style="font-size: 1.4em; font-weight: bold; margin-bottom: 20px; line-height: 1.3;">
                         ${tierLabel} Trade Alert
@@ -1182,7 +1178,7 @@ export class GMMode {
                             <div style="font-size: 0.85em; opacity: 0.7; margin-bottom: 6px;">Sends:</div>
                             <div style="font-size: 0.95em;">${t1Gave}</div>
                         </div>
-                        <div style="display: flex; align-items: center; font-size: 1.5em; opacity: 0.5;">⇄</div>
+ <div style="display: flex; align-items: center; font-size: 1.5em; opacity: 0.5;"></div>
                         <div style="flex: 1; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 15px;">
                             <div style="font-weight: bold; color: #fbbc04; margin-bottom: 8px;">${trade.team2.name}</div>
                             <div style="font-size: 0.85em; opacity: 0.7; margin-bottom: 6px;">Sends:</div>
@@ -1235,7 +1231,7 @@ export class GMMode {
             z-index: 10000;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         `;
-        notification.textContent = '✅ Game Saved!';
+ notification.textContent = 'Game Saved!';
         document.body.appendChild(notification);
         
         setTimeout(() => notification.remove(), 2000);

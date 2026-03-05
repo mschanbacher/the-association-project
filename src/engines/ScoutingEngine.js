@@ -27,15 +27,15 @@ export class ScoutingEngine {
             const speedFit = (player.attributes.speed - 50) * 0.4;
             const enduranceFit = (player.attributes.endurance - 50) * 0.2;
             fitScore += speedFit + enduranceFit;
-            if (player.attributes.speed >= 65) details.push('⚡ Speed fits uptempo system');
-            else if (player.attributes.speed <= 40) details.push('🐢 Too slow for uptempo pace');
+            if (player.attributes.speed >= 65) details.push('Speed fits uptempo system');
+            else if (player.attributes.speed <= 40) details.push('Too slow for uptempo pace');
         } else if (paceCoach <= 35) {
             // Slow system values strength and IQ
             const strengthFit = (player.attributes.strength - 50) * 0.3;
             const iqFit = (player.attributes.basketballIQ - 50) * 0.3;
             fitScore += strengthFit + iqFit;
-            if (player.attributes.strength >= 60) details.push('💪 Physical style fits half-court game');
-            if (player.attributes.basketballIQ >= 65) details.push('🧠 High IQ suits methodical play');
+            if (player.attributes.strength >= 60) details.push('Physical style fits half-court game');
+            if (player.attributes.basketballIQ >= 65) details.push('High IQ suits methodical play');
         }
         
         // Ball movement fit
@@ -45,13 +45,13 @@ export class ScoutingEngine {
             const iqFit = (player.attributes.basketballIQ - 50) * 0.3;
             const collabFit = (player.attributes.collaboration - 50) * 0.25;
             fitScore += iqFit + collabFit;
-            if (player.attributes.collaboration >= 60) details.push('🤝 Unselfish player fits motion offense');
-            if (player.attributes.basketballIQ >= 65) details.push('🧠 Smart passer for ball movement');
+            if (player.attributes.collaboration >= 60) details.push('Unselfish player fits motion offense');
+            if (player.attributes.basketballIQ >= 65) details.push('Smart passer for ball movement');
         } else if (bmCoach <= 35) {
             // ISO system values clutch
             const clutchFit = (player.attributes.clutch - 50) * 0.35;
             fitScore += clutchFit;
-            if (player.attributes.clutch >= 65) details.push('❄️ Clutch scorer suits isolation system');
+            if (player.attributes.clutch >= 65) details.push('Clutch scorer suits isolation system');
         }
         
         // 3PT tendency fit
@@ -61,7 +61,7 @@ export class ScoutingEngine {
             const iqBonus = (player.attributes.basketballIQ - 50) * 0.2;
             fitScore += iqBonus;
             if (player.attributes.speed >= 55 && player.attributes.basketballIQ >= 55) {
-                details.push('🎯 Profile fits modern 3PT offense');
+                details.push('Profile fits modern 3PT offense');
             }
         }
         
@@ -72,7 +72,7 @@ export class ScoutingEngine {
             const speedFit = (player.attributes.speed - 50) * 0.2;
             fitScore += endFit + speedFit;
             if (player.attributes.endurance >= 60 && player.attributes.speed >= 55) {
-                details.push('🛡️ Stamina and quickness suit aggressive D');
+                details.push('Stamina and quickness suit aggressive D');
             }
         }
         
@@ -80,10 +80,10 @@ export class ScoutingEngine {
         const coachability = player.attributes.coachability || 50;
         if (coachability >= 65) {
             fitScore = 50 + (fitScore - 50) * 1.2; // Amplify positive fit
-            details.push('📋 Highly coachable — adapts to any system');
+            details.push('Highly coachable — adapts to any system');
         } else if (coachability <= 35) {
             fitScore = 50 + (fitScore - 50) * 0.7; // Dampen fit
-            details.push('📋 Low coachability — slow to learn system');
+            details.push('Low coachability — slow to learn system');
         }
         
         // Clamp 0-100
@@ -120,15 +120,15 @@ export class ScoutingEngine {
         let label = 'Depth Piece';
         
         if (samePos.length === 0) {
-            score = 95; label = '🔥 Critical Need';
+            score = 95; label = 'Critical Need';
         } else if (samePos.length === 1) {
-            score = 80; label = '📢 Strong Need';
+            score = 80; label = 'Strong Need';
         } else if (samePos.length === 2) {
             score = 60; label = 'Solid Addition';
         } else if (samePos.length === 3) {
             score = 35; label = 'Low Priority';
         } else {
-            score = 15; label = '⚠️ Position Full';
+            score = 15; label = 'Position Full';
         }
         
         // Upgrade potential: if this player is better than the worst at position
@@ -136,7 +136,7 @@ export class ScoutingEngine {
             const worstAtPos = Math.min(...samePos.map(p => p.rating));
             if (player.rating > worstAtPos + 5) {
                 score = Math.min(95, score + 15);
-                label = score >= 75 ? '⬆️ Clear Upgrade' : label;
+                label = score >= 75 ? 'Clear Upgrade' : label;
             }
         }
         
@@ -149,7 +149,7 @@ export class ScoutingEngine {
         // Roster almost full
         if (rosterSize >= 14 && score < 70) {
             score = Math.max(10, score - 10);
-            if (label !== '🔥 Critical Need' && label !== '📢 Strong Need') label = 'Roster Nearly Full';
+            if (label !== 'Critical Need' && label !== 'Strong Need') label = 'Roster Nearly Full';
         }
         
         return { score: Math.round(score), label };
@@ -165,26 +165,26 @@ export class ScoutingEngine {
         // Collaboration attribute directly affects team chemistry
         const collab = (player.attributes && player.attributes.collaboration) || 50;
         score += (collab - 50) * 0.4;
-        if (collab >= 65) details.push('🤝 Great teammate');
-        else if (collab <= 35) details.push('⚠️ Potential locker room risk');
+        if (collab >= 65) details.push('Great teammate');
+        else if (collab <= 35) details.push('Potential locker room risk');
         
         // Work ethic impacts team culture
         const workEthic = (player.attributes && player.attributes.workEthic) || 50;
-        if (workEthic >= 65) { score += 5; details.push('🔨 Hard worker'); }
+        if (workEthic >= 65) { score += 5; details.push('Hard worker'); }
         
         // Age gap: big age gaps can cause friction
         const avgAge = userTeam.roster.reduce((s, p) => s + p.age, 0) / userTeam.roster.length;
         const ageDiff = Math.abs(player.age - avgAge);
         if (ageDiff <= 3) { score += 5; }
-        else if (ageDiff >= 8) { score -= 8; details.push('👴 Big age gap with core'); }
+        else if (ageDiff >= 8) { score -= 8; details.push('Big age gap with core'); }
         
         score = Math.max(0, Math.min(100, Math.round(score)));
         
         let label;
-        if (score >= 75) label = '🟢 Great Fit';
-        else if (score >= 60) label = '🟡 Good Fit';
-        else if (score >= 45) label = '🟠 Neutral';
-        else label = '🔴 Risky Fit';
+        if (score >= 75) label = 'Great Fit';
+        else if (score >= 60) label = 'Good Fit';
+        else if (score >= 45) label = 'Neutral';
+        else label = 'Risky Fit';
         
         return { score, label, details };
     }

@@ -91,7 +91,7 @@ export class FreeAgencyController {
                     badgeColor: natTierColors[natTier] || '#95afc0',
                     crossTierValue: (natTier < userTeam.tier && TF) ? formatCurrency(TF.getNaturalMarketValue(p)) : null,
                 };
-                p._fromTeamName = isFormer ? userTeam.name : (previousTeam ? previousTeam.name : (p.isCollegeGrad ? '🎓 ' + p.college : 'N/A'));
+ p._fromTeamName = isFormer ? userTeam.name : (previousTeam ? previousTeam.name : (p.isCollegeGrad ? '' + p.college : 'N/A'));
                 return p;
             };
 
@@ -223,7 +223,7 @@ export class FreeAgencyController {
 
         if (watchedFAs.length > 0) {
             // [LEGACY REMOVED] html += UIRenderer.faSectionDivider({
-                // label: '🔍 WATCHED PLAYERS', count: watchedFAs.length,
+ // label: 'WATCHED PLAYERS', count: watchedFAs.length,
                 // color: '#bb86fc', borderColor: 'rgba(155,89,182,0.4)'
             // });
 
@@ -233,7 +233,7 @@ export class FreeAgencyController {
             filteredWatched.forEach(player => {
                 const previousTeam = player.previousTeamId ? helpers.getTeamById(player.previousTeamId) : null;
                 const previousTeamName = previousTeam ? previousTeam.name
-                    : (player.isCollegeGrad ? `🎓 ${player.college}` : 'N/A');
+ : (player.isCollegeGrad ? `${player.college}` : 'N/A');
                 const fit = ScoutingEngine.calculateTeamFit(player, userTeam, userTeam.coach);
                 // [LEGACY REMOVED] html += UIRenderer.faPlayerRow({
                     // player, isChecked: selected.has(String(player.id)),
@@ -263,7 +263,7 @@ export class FreeAgencyController {
         filteredUnwatched.forEach(player => {
             const previousTeam = player.previousTeamId ? helpers.getTeamById(player.previousTeamId) : null;
             const previousTeamName = previousTeam ? previousTeam.name
-                : (player.isCollegeGrad ? `🎓 ${player.college}` : 'N/A');
+ : (player.isCollegeGrad ? `${player.college}` : 'N/A');
             const fit = ScoutingEngine.calculateTeamFit(player, userTeam, userTeam.coach);
             // [DEAD] player._marketDisplay = UIRenderer.formatMarketDisplay(player, userTeam.tier);
             // [LEGACY REMOVED] html += UIRenderer.faPlayerRow({

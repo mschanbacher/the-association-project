@@ -37,9 +37,9 @@ export class RosterController {
 
         let boostLabel = '';
         if (isRevenueBasedCap && salaryCap > baseCap * 1.2) {
-            boostLabel = '📈 Revenue exceeds tier baseline';
+ boostLabel = 'Revenue exceeds tier baseline';
         } else if (userTeam.finances && userTeam.finances.previousTier && userTeam.finances.previousTier < userTeam.tier) {
-            boostLabel = `🏛️ Retained revenue from Tier ${userTeam.finances.previousTier}`;
+ boostLabel = `Retained revenue from Tier ${userTeam.finances.previousTier}`;
         }
 
         document.getElementById('rosterCount').textContent = roster.length;
@@ -50,11 +50,11 @@ export class RosterController {
 
         const capDisplay = document.getElementById('capStatus');
         if (capDisplay) {
-            capDisplay.innerHTML = UIRenderer.rosterCapStatus({
-                totalSalary, salaryCap, salaryFloor, remainingCap, isOverCap, isUnderFloor,
-                isRevenueBasedCap, hasCapBoost, boostLabel, boostAmount: salaryCap - baseCap,
-                teamChemistry, chemistryColor, chemistryDesc, formatCurrency: helpers.formatCurrency
-            });
+            // [LEGACY REMOVED] capDisplay.innerHTML = UIRenderer.rosterCapStatus({
+                // totalSalary, salaryCap, salaryFloor, remainingCap, isOverCap, isUnderFloor,
+                // isRevenueBasedCap, hasCapBoost, boostLabel, boostAmount: salaryCap - baseCap,
+                // teamChemistry, chemistryColor, chemistryDesc, formatCurrency: helpers.formatCurrency
+            // });
         }
 
         const rosterHtml = roster
@@ -67,7 +67,7 @@ export class RosterController {
                 let injuryDisplay = '';
                 if (player.injuryStatus === 'out') {
                     const gamesOut = player.injury?.gamesRemaining || '?';
-                    injuryDisplay = `<span style="color: #ea4335; margin-left: 10px; font-weight: bold;">🏥 OUT (${gamesOut} games)</span>`;
+ injuryDisplay = `<span style="color: #ea4335; margin-left: 10px; font-weight: bold;">OUT (${gamesOut} games)</span>`;
                 } else if (player.injuryStatus === 'day-to-day') {
                     injuryDisplay = `<span style="color: #fbbc04; margin-left: 10px; font-weight: bold;">🩹 Day-to-Day</span>`;
                 }
@@ -75,17 +75,17 @@ export class RosterController {
                 const fatigue = player.fatigue || 0;
                 const fatigueColor = helpers.getFatigueColor(fatigue);
                 const fatigueDesc = helpers.getFatigueDescription(fatigue);
-                const fatigueDisplay = `<span style="color: ${fatigueColor}; margin-left: 10px; font-weight: bold;">😴 ${Math.round(fatigue)}% (${fatigueDesc})</span>`;
+ const fatigueDisplay = `<span style="color: ${fatigueColor}; margin-left: 10px; font-weight: bold;">${Math.round(fatigue)}% (${fatigueDesc})</span>`;
 
                 const releaseClauseDisplay = player.relegationRelease ?
-                    `<span style="color: #e67e22; margin-left: 10px; font-size: 0.85em;" title="This player has a relegation release clause">🚪 Release Clause</span>` : '';
+ `<span style="color: #e67e22; margin-left: 10px; font-size: 0.85em;" title="This player has a relegation release clause">Release Clause</span>` : '';
 
                 const m = player.measurables;
                 const measurablesDisplay = m ?
                     `<span style="opacity: 0.7; margin-left: 10px;">${engines.PlayerAttributes.formatHeight(m.height)} · ${m.weight}lbs · ${engines.PlayerAttributes.formatWingspan(m.wingspan)} WS</span>` : '';
 
                 const collab = player.attributes ? player.attributes.collaboration : 50;
-                const collabIcon = collab >= 75 ? '🤝' : collab >= 50 ? '' : collab >= 35 ? '⚠️' : '💢';
+ const collabIcon = collab >= 75 ? '' : collab >= 50 ? '' : collab >= 35 ? '️' : '';
                 const collabDisplay = collabIcon ? `<span style="margin-left: 6px;" title="Collaboration: ${collab}">${collabIcon}</span>` : '';
 
                 let attrPreview = '';
@@ -98,11 +98,11 @@ export class RosterController {
                     }).join(' ');
                 }
 
-                return UIRenderer.rosterPlayerCard({
-                    player, canDrop, contractYears, contractColor, injuryDisplay,
-                    fatigueDisplay, releaseClauseDisplay, measurablesDisplay,
-                    collabDisplay, attrPreview, ratingColor: helpers.getRatingColor(player.rating), formatCurrency: helpers.formatCurrency
-                });
+                // [LEGACY REMOVED] return UIRenderer.rosterPlayerCard({
+                    // player, canDrop, contractYears, contractColor, injuryDisplay,
+                    // fatigueDisplay, releaseClauseDisplay, measurablesDisplay,
+                    // collabDisplay, attrPreview, ratingColor: helpers.getRatingColor(player.rating), formatCurrency: helpers.formatCurrency
+                // });
             }).join('');
 
         document.getElementById('currentRoster').innerHTML = rosterHtml || '<p style="text-align: center; opacity: 0.7;">No players on roster</p>';
@@ -212,7 +212,7 @@ export class RosterController {
 
     _renderScannerTab() {
         const f = window._scoutFilters;
-        document.getElementById('scoutTabContent').innerHTML = UIRenderer.scannerFilters({ f });
+        // [LEGACY REMOVED] document.getElementById('scoutTabContent').innerHTML = UIRenderer.scannerFilters({ f });
         this.applyScoutFilter();
     }
 
@@ -253,10 +253,10 @@ export class RosterController {
         else if (f.sort === 'salary') filtered.sort((a, b) => a.salary - b.salary);
 
         const display = filtered.slice(0, 100);
-        let html = UIRenderer.scoutResultsTableHeader({ count: filtered.length, truncated: filtered.length > 100 });
+        // [LEGACY REMOVED] let html = UIRenderer.scoutResultsTableHeader({ count: filtered.length, truncated: filtered.length > 100 });
         display.forEach(p => {
             const watched = this._isOnWatchList(p.id);
-            html += UIRenderer.scoutResultRow({ p, fit: p._fit, watched, getRatingColor: helpers.getRatingColor, gradeColor: helpers.gradeColor, formatCurrency: helpers.formatCurrency });
+            // [LEGACY REMOVED] html += UIRenderer.scoutResultRow({ p, fit: p._fit, watched, getRatingColor: helpers.getRatingColor, gradeColor: helpers.gradeColor, formatCurrency: helpers.formatCurrency });
         });
         html += '</tbody></table>';
         document.getElementById('scoutResults').innerHTML = html;
@@ -272,13 +272,13 @@ export class RosterController {
         const fit = helpers.calculateTeamFit(player, userTeam, userTeam.coach);
         const watched = this._isOnWatchList(playerId);
 
-        document.getElementById('scoutTabContent').innerHTML = UIRenderer.scoutPlayerDetail({
-            player, fit, watched,
-            attrKeys: engines.PlayerAttributes.ALL_ATTR_KEYS || [],
-            attrs: player.attributes || {},
-            getRatingColor: helpers.getRatingColor, formatCurrency: helpers.formatCurrency,
-            gradeColor: helpers.gradeColor, PlayerAttributes: engines.PlayerAttributes
-        });
+        // [LEGACY REMOVED] document.getElementById('scoutTabContent').innerHTML = UIRenderer.scoutPlayerDetail({
+            // player, fit, watched,
+            // attrKeys: engines.PlayerAttributes.ALL_ATTR_KEYS || [],
+            // attrs: player.attributes || {},
+            // getRatingColor: helpers.getRatingColor, formatCurrency: helpers.formatCurrency,
+            // gradeColor: helpers.gradeColor, PlayerAttributes: engines.PlayerAttributes
+        // });
     }
 
     renderPipelineTab() {
@@ -319,9 +319,9 @@ export class RosterController {
             gameState._pipelinePreviewSeason = gameState.currentSeason;
         }
 
-        content.innerHTML = UIRenderer.pipelineTabContainer({
-            currentSeason: gameState.currentSeason, previewCount: gameState._pipelinePreview.length
-        });
+        // [LEGACY REMOVED] content.innerHTML = UIRenderer.pipelineTabContainer({
+            // currentSeason: gameState.currentSeason, previewCount: gameState._pipelinePreview.length
+        // });
         this.filterPipeline();
     }
 
@@ -330,7 +330,7 @@ export class RosterController {
         const pos = document.getElementById('pipelinePos')?.value || 'ALL';
         const preview = gameState._pipelinePreview || [];
         const filtered = pos === 'ALL' ? preview : preview.filter(p => p.position === pos);
-        document.getElementById('pipelineResults').innerHTML = UIRenderer.pipelineTable({ filtered });
+        // [LEGACY REMOVED] document.getElementById('pipelineResults').innerHTML = UIRenderer.pipelineTable({ filtered });
     }
 
     renderWatchListTab() {
@@ -341,15 +341,15 @@ export class RosterController {
         const userTeam = helpers.getUserTeam();
         const coach = userTeam.coach;
 
-        if (watchList.length === 0) { content.innerHTML = UIRenderer.watchListEmpty(); return; }
+        // [LEGACY REMOVED] if (watchList.length === 0) { content.innerHTML = UIRenderer.watchListEmpty(); return; }
 
-        let html = UIRenderer.watchListTableHeader();
+        // [LEGACY REMOVED] let html = UIRenderer.watchListTableHeader();
         watchList.forEach(w => {
             const p = allPlayers.find(pl => pl.id === w.id);
-            if (!p) { html += UIRenderer.watchListGoneRow({ w }); return; }
+            // [LEGACY REMOVED] if (!p) { html += UIRenderer.watchListGoneRow({ w }); return; }
             const fit = helpers.calculateTeamFit(p, userTeam, coach);
-            const contractLabel = p.contractYears <= 1 ? `<span style="color: #fbbc04;">${p.contractYears}yr ⚠️</span>` : `${p.contractYears}yr`;
-            html += UIRenderer.watchListRow({ p, fit, contractLabel, getRatingColor: helpers.getRatingColor, gradeColor: helpers.gradeColor, formatCurrency: helpers.formatCurrency });
+ const contractLabel = p.contractYears <= 1 ? `<span style="color: #fbbc04;">${p.contractYears}yr ️</span>` : `${p.contractYears}yr`;
+            // [LEGACY REMOVED] html += UIRenderer.watchListRow({ p, fit, contractLabel, getRatingColor: helpers.getRatingColor, gradeColor: helpers.gradeColor, formatCurrency: helpers.formatCurrency });
         });
         html += '</tbody></table>';
         content.innerHTML = html;
@@ -380,11 +380,11 @@ export class RosterController {
         const weakestAttrs = [...attrKeys].sort((a, b) => attrAvgs[a] - attrAvgs[b]).slice(0, 3);
         const strongestAttrs = [...attrKeys].sort((a, b) => attrAvgs[b] - attrAvgs[a]).slice(0, 3);
 
-        content.innerHTML = UIRenderer.needsTab({
-            positionCounts, expiring, expiringNext, avgAge, young, prime, veteran,
-            rosterLength: userTeam.roster.length, weakestAttrs, strongestAttrs, attrAvgs,
-            formatCurrency: helpers.formatCurrency, PlayerAttributes: engines.PlayerAttributes
-        });
+        // [LEGACY REMOVED] content.innerHTML = UIRenderer.needsTab({
+            // positionCounts, expiring, expiringNext, avgAge, young, prime, veteran,
+            // rosterLength: userTeam.roster.length, weakestAttrs, strongestAttrs, attrAvgs,
+            // formatCurrency: helpers.formatCurrency, PlayerAttributes: engines.PlayerAttributes
+        // });
     }
 
     // ═══════════════════════════════════════════════════════════════════

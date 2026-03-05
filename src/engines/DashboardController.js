@@ -87,7 +87,7 @@ export class DashboardController {
         const rosterStrength = LeagueManager.calculateTeamStrength(userTeam);
         const strengthDisplay = document.getElementById('rosterStrength');
         if (strengthDisplay) {
-            strengthDisplay.textContent = `⭐ ${Math.round(rosterStrength)}`;
+ strengthDisplay.textContent = `${Math.round(rosterStrength)}`;
             strengthDisplay.style.color = UIHelpers.getRatingColor(Math.round(rosterStrength));
         }
 
@@ -113,7 +113,7 @@ export class DashboardController {
                 coachOvrEl.textContent = `${userTeam.coach.overall} OVR · ${userTeam.coach.archetype}`;
                 coachOvrEl.style.color = CoachEngine.getOverallColor(userTeam.coach.overall);
             } else {
-                coachNameEl.textContent = '⚠️ No Coach';
+ coachNameEl.textContent = 'No Coach';
                 coachNameEl.style.color = '#ea4335';
                 coachOvrEl.textContent = 'Click to hire';
                 coachOvrEl.style.color = '#ffa07a';
@@ -242,8 +242,8 @@ export class DashboardController {
 
         const sortedTeams = LeagueManager.sortTeamsByStandings(teams, gameState.schedule);
 
-        document.getElementById('standingsBody').innerHTML =
-            UIRenderer.standingsRows({ sortedTeams, tier, userTeamId: gameState.userTeamId });
+        // [LEGACY DOM] document.getElementById('standingsBody').innerHTML =
+            // [LEGACY REMOVED] UIRenderer.standingsRows({ sortedTeams, tier, userTeamId: gameState.userTeamId });
     }
 
     /**
@@ -268,9 +268,9 @@ export class DashboardController {
 
         const sortedDivisions = Object.keys(divisions).sort();
 
-        document.getElementById('standingsBody').innerHTML = UIRenderer.divisionStandingsRows({
-            sortedDivisions, divisions, userTeamId: gameState.userTeamId
-        });
+        // [LEGACY REMOVED] document.getElementById('standingsBody').innerHTML = UIRenderer.divisionStandingsRows({
+            // sortedDivisions, divisions, userTeamId: gameState.userTeamId
+        // });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -304,10 +304,10 @@ export class DashboardController {
                 let userTierTeams = userTier === 1 ? gameState.tier1Teams
                     : userTier === 2 ? gameState.tier2Teams : gameState.tier3Teams;
 
-                todaysContainer.innerHTML = UIRenderer.todaysGamesPanel({
-                    todaysGames, userTier, userTeams: userTierTeams,
-                    userTeamId: gameState.userTeamId, currentDate, CalendarEngine
-                });
+                // [LEGACY REMOVED] todaysContainer.innerHTML = UIRenderer.todaysGamesPanel({
+                    // todaysGames, userTier, userTeams: userTierTeams,
+                    // userTeamId: gameState.userTeamId, currentDate, CalendarEngine
+                // });
             } else {
                 todaysContainer.innerHTML = '';
             }
@@ -340,9 +340,9 @@ export class DashboardController {
             return;
         }
 
-        container.innerHTML = UIRenderer.upcomingGamesPanel({
-            upcomingGames, userTeams, userTeamId, CalendarEngine
-        });
+        // [LEGACY REMOVED] container.innerHTML = UIRenderer.upcomingGamesPanel({
+            // upcomingGames, userTeams, userTeamId, CalendarEngine
+        // });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -388,10 +388,10 @@ export class DashboardController {
             return;
         }
 
-        document.getElementById('franchiseHistoryContent').innerHTML = UIRenderer.franchiseHistory({
-            history,
-            getRankSuffix: helpers.getRankSuffix
-        });
+        // [LEGACY REMOVED] document.getElementById('franchiseHistoryContent').innerHTML = UIRenderer.franchiseHistory({
+            // history,
+            // getRankSuffix: helpers.getRankSuffix
+        // });
         document.getElementById('franchiseHistoryModal').classList.remove('hidden');
     }
 }

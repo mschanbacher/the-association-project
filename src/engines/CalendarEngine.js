@@ -1005,15 +1005,15 @@ export class CalendarEngine {
         const allStarStart = CalendarEngine.toDateString(seasonDates.allStarStart);
         const allStarEnd = CalendarEngine.toDateString(seasonDates.allStarEnd);
         
-        if (dateStr === tradeDeadline) return '🚨 Trade Deadline';
-        if (dateStr === allStarStart) return '⭐ All-Star Weekend Begins';
-        if (dateStr > allStarStart && dateStr < allStarEnd) return '⭐ All-Star Break';
-        if (dateStr === allStarEnd) return '⭐ All-Star Break (Final Day)';
+ if (dateStr === tradeDeadline) return 'Trade Deadline';
+ if (dateStr === allStarStart) return 'All-Star Weekend Begins';
+ if (dateStr > allStarStart && dateStr < allStarEnd) return 'All-Star Break';
+ if (dateStr === allStarEnd) return 'All-Star Break (Final Day)';
         
         // Check for special off-season dates
-        if (seasonDates.draftLottery && dateStr === CalendarEngine.toDateString(seasonDates.draftLottery)) return '🎰 Draft Lottery';
-        if (seasonDates.draftDay && dateStr === CalendarEngine.toDateString(seasonDates.draftDay)) return '📋 Draft Day';
-        if (seasonDates.freeAgencyStart && dateStr === CalendarEngine.toDateString(seasonDates.freeAgencyStart)) return '✍️ Free Agency Opens';
+ if (seasonDates.draftLottery && dateStr === CalendarEngine.toDateString(seasonDates.draftLottery)) return ' Draft Lottery';
+ if (seasonDates.draftDay && dateStr === CalendarEngine.toDateString(seasonDates.draftDay)) return 'Draft Day';
+ if (seasonDates.freeAgencyStart && dateStr === CalendarEngine.toDateString(seasonDates.freeAgencyStart)) return '️ Free Agency Opens';
         
         return null;
     }

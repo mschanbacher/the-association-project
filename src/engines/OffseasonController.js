@@ -393,7 +393,7 @@ export class OffseasonController {
             return;
         }
 
-        document.getElementById('financialTransitionContent').innerHTML = UIRenderer.financialTransitionBriefing(briefingData);
+        // [LEGACY REMOVED] document.getElementById('financialTransitionContent').innerHTML = UIRenderer.financialTransitionBriefing(briefingData);
 
         document.getElementById('financialTransitionModal').classList.remove('hidden');
     }
@@ -518,7 +518,7 @@ export class OffseasonController {
         if (userTeamLog.length > 0) {
             console.log(`📊 ${userTeam.name} Player Development:`);
             userTeamLog.forEach(log => {
-                const arrow = log.change > 0 ? '⬆️' : '⬇️';
+ const arrow = log.change > 0 ? '️' : '️';
                 console.log(`  ${arrow} ${log.name} (${log.age}yo): ${log.oldRating} → ${log.newRating} (${log.change > 0 ? '+' : ''}${log.change})`);
             });
         }
@@ -564,7 +564,7 @@ export class OffseasonController {
                 return true;
             });
             const faRetired = faBefore - gameState.freeAgents.length;
-            if (faRetired > 0) console.log(`👴 ${faRetired} free agents retired`);
+ if (faRetired > 0) console.log(`${faRetired} free agents retired`);
         }
 
         // Heal injuries and reset fatigue
@@ -598,11 +598,11 @@ export class OffseasonController {
 
         let improvementsHTML = '';
         if (improvements.length > 0) {
-            improvementsHTML = `<div style="margin-bottom: 30px;"><h2 style="color: #34a853; margin-bottom: 15px;">⬆️ Player Improvements (${improvements.length})</h2>${improvements.map((log, i) => UIRenderer.ratingChangeRow(log, i)).join('')}</div>`;
+            // [LEGACY REMOVED] improvementsHTML = `<div style="margin-bottom: 30px;"><h2 style="color: #34a853; margin-bottom: 15px;">⬆️ Player Improvements (${improvements.length})</h2>${improvements.map((log, i) => UIRenderer.ratingChangeRow(log, i)).join('')}</div>`;
         }
         let declinesHTML = '';
         if (declines.length > 0) {
-            declinesHTML = `<div><h2 style="color: #ea4335; margin-bottom: 15px;">⬇️ Player Declines (${declines.length})</h2>${declines.map((log, i) => UIRenderer.ratingChangeRow(log, i)).join('')}</div>`;
+            // [LEGACY REMOVED] declinesHTML = `<div><h2 style="color: #ea4335; margin-bottom: 15px;">⬇️ Player Declines (${declines.length})</h2>${declines.map((log, i) => UIRenderer.ratingChangeRow(log, i)).join('')}</div>`;
         }
 
         const hasContent = improvements.length > 0 || declines.length > 0 || (expiredContracts && expiredContracts.length > 0);
@@ -737,7 +737,7 @@ export class OffseasonController {
             console.log('✅ All expired contract decisions made!');
             const statusDiv = document.getElementById('expiredContractsStatus');
             if (statusDiv) {
-                statusDiv.innerHTML = '<strong style="color: #34a853;">✅ All decisions made! Close this window to continue.</strong>';
+ statusDiv.innerHTML = '<strong style="color: #34a853;">All decisions made! Close this window to continue.</strong>';
             }
         }
     }
@@ -810,13 +810,13 @@ export class OffseasonController {
             card.style.border = '2px solid #34a853';
             resignBtn.style.background = 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)';
             releaseBtn.style.background = '';
-            status.textContent = '✅ Re-signing';
+ status.textContent = 'Re-signing';
             status.style.color = '#34a853';
         } else {
             card.style.border = '2px solid #ea4335';
             releaseBtn.style.background = 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)';
             resignBtn.style.background = '';
-            status.textContent = '❌ Releasing';
+ status.textContent = 'Releasing';
             status.style.color = '#ea4335';
         }
 
@@ -859,7 +859,7 @@ export class OffseasonController {
             btn.disabled = decidedPlayers < totalPlayers;
             btn.textContent = decidedPlayers < totalPlayers
                 ? `Decide on all players (${decidedPlayers}/${totalPlayers})`
-                : '✅ Confirm All Decisions';
+ : 'Confirm All Decisions';
         }
     }
 

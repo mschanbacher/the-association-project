@@ -223,7 +223,7 @@ export const GameEngine = {
                         reason: 'losing_streak'
                     });
                 });
-                changes.messages.push(`💔 ${team.name}: 5-game losing streak! Chemistry dropped by 3.`);
+ changes.messages.push(`${team.name}: 5-game losing streak! Chemistry dropped by 3.`);
             }
             
             changes.losingStreak = newStreak;
@@ -256,7 +256,7 @@ export const GameEngine = {
                     });
                 }
             });
-            changes.messages.push(`🤝 ${team.name}: 10 games of roster stability! Chemistry +5.`);
+ changes.messages.push(`${team.name}: 10 games of roster stability! Chemistry +5.`);
         }
         
         changes.gamesSinceRosterChange = gamesSinceChange;

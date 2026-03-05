@@ -42,7 +42,7 @@ export function SimControls() {
       <SimButton icon="▶" onClick={simNext} disabled={disabled}>
         Next Game
       </SimButton>
-      <SimButton icon="👁" onClick={watchGame} disabled={disabled}
+      <SimButton icon="▶" onClick={watchGame} disabled={disabled}
         variant="primary">
         Watch
       </SimButton>
@@ -53,13 +53,13 @@ export function SimControls() {
         margin: '0 var(--space-1)',
       }} />
 
-      <SimButton icon="📅" onClick={simDay} disabled={disabled}>
+      <SimButton icon="1" onClick={simDay} disabled={disabled}>
         Day
       </SimButton>
-      <SimButton icon="⏩" onClick={simWeek} disabled={disabled}>
+      <SimButton icon="7" onClick={simWeek} disabled={disabled}>
         Week
       </SimButton>
-      <SimButton icon="⏭" onClick={finish} disabled={disabled && !inOffseason}>
+      <SimButton icon="»" onClick={finish} disabled={disabled && !inOffseason}>
         Finish
       </SimButton>
     </div>

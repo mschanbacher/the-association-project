@@ -555,7 +555,7 @@ function WatchListTab({ gameState, engines }) {
                     <Td align="left">{w.name}</Td>
                     <Td colSpan={6} style={{ color: 'var(--color-text-tertiary)' }}>No longer in the league</Td>
                     <Td>
-                      <span onClick={() => removeWatch(w.id)} style={{ cursor: 'pointer' }}>❌</span>
+                      <span onClick={() => removeWatch(w.id)} style={{ cursor: 'pointer' }}>×</span>
                     </Td>
                   </tr>
                 );
@@ -586,7 +586,7 @@ function WatchListTab({ gameState, engines }) {
                     T{p._teamTier} {p._teamName}
                   </Td>
                   <Td>
-                    <span onClick={() => removeWatch(p.id)} style={{ cursor: 'pointer' }}>❌</span>
+                    <span onClick={() => removeWatch(p.id)} style={{ cursor: 'pointer' }}>×</span>
                   </Td>
                 </tr>
               );

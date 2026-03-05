@@ -163,7 +163,7 @@ export function TradeScreen({ isOpen, onClose }) {
           <div style={{
             textAlign: 'center', padding: 'var(--space-8) 0',
             color: 'var(--color-text-tertiary)' }}>
-            <div style={{ fontSize: '2em', marginBottom: 'var(--space-3)' }}>🚫</div>
+            
             <div style={{ fontSize: 'var(--text-md)', fontWeight: 'var(--weight-semi)' }}>
               Trade deadline has passed
             </div>
@@ -254,7 +254,7 @@ export function TradeScreen({ isOpen, onClose }) {
               tradeResult?.accepted
             }
           >
-            {tradeResult?.accepted ? '✅ Trade Accepted!' : 'Propose Trade'}
+            {tradeResult?.accepted ? 'Trade Accepted!' : 'Propose Trade'}
           </Button>
         </ModalFooter>
       )}
@@ -572,7 +572,7 @@ function TradeSummary({ userTeam, partnerTeam, userGives, userReceives, userGive
             fontSize: 'var(--text-md)', fontWeight: 'var(--weight-bold)',
             color: tradeResult.accepted ? 'var(--color-win)' : 'var(--color-loss)',
             marginBottom: 4 }}>
-            {tradeResult.accepted ? '✅ Trade Accepted!' : '❌ Trade Declined'}
+            {tradeResult.accepted ? 'Trade Accepted!' : 'Trade Declined'}
           </div>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
             {tradeResult.reason}
@@ -618,7 +618,7 @@ export function AiTradeProposalModal({ isOpen, onClose }) {
   return (
     <Modal isOpen={isOpen} onClose={handleReject} maxWidth={600}>
       <ModalHeader onClose={handleReject}>
-        📨 Trade Proposal from {proposal.aiTeamName}
+        Trade Proposal from {proposal.aiTeamName}
       </ModalHeader>
       <ModalBody>
         <div style={{
@@ -655,7 +655,7 @@ export function AiTradeProposalModal({ isOpen, onClose }) {
                 background: 'rgba(212, 168, 67, 0.06)',
                 fontSize: 'var(--text-sm)',
                 marginBottom: 'var(--space-1)' }}>
-                📋 {pick.year} Round {pick.round} Pick
+                {pick.year} Round {pick.round} Pick
               </div>
             ))}
           </div>

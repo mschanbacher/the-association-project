@@ -164,12 +164,12 @@ export function FinancesScreen() {
           display: 'grid',
           gridTemplateColumns: 'repeat(5, 1fr)',
           gap: 'var(--space-3)' }}>
-          <LegacyStat label="Championships" value={lp.championships || 0} icon="🏆" />
-          <LegacyStat label="Seasons in T1" value={lp.seasonsInT1 || 0} icon="⭐" />
-          <LegacyStat label="Playoff Apps" value={lp.playoffAppearances || 0} icon="🏀" />
-          <LegacyStat label="Iconic Players" value={lp.iconicPlayers || 0} icon="👤" />
+          <LegacyStat label="Championships" value={lp.championships || 0} icon={null} />
+          <LegacyStat label="Seasons in T1" value={lp.seasonsInT1 || 0} icon={null} />
+          <LegacyStat label="Playoff Apps" value={lp.playoffAppearances || 0} icon={null} />
+          <LegacyStat label="Iconic Players" value={lp.iconicPlayers || 0} icon={null} />
           <LegacyStat label={`Yrs in Tier ${currentTier}`}
-            value={userTeam.finances?.seasonsInCurrentTier || 0} icon="📅" />
+            value={userTeam.finances?.seasonsInCurrentTier || 0} icon={null} />
         </div>
       </Card>
 
@@ -314,8 +314,8 @@ function formatCurrency(amount) {
 
 function fanRating(fanbase, tierAvg) {
   const ratio = fanbase / tierAvg;
-  if (ratio > 1.5) return '🌟 Well above average';
-  if (ratio > 1.0) return '👍 Above average';
-  if (ratio > 0.7) return '📊 Average';
-  return '⚠️ Below average';
+  if (ratio > 1.5) return 'Well above average';
+  if (ratio > 1.0) return 'Above average';
+  if (ratio > 0.7) return 'Average';
+  return 'Below average';
 }

@@ -161,8 +161,8 @@ function SeasonCard({ season }) {
             {tierLabels[ut.tier] || `Tier ${ut.tier}`}
           </span>
           {isChampion && <Badge variant="warning" style={{ fontWeight: 'var(--weight-bold)' }}>Champion</Badge>}
-          {promoRelStatus === 'promoted' && <Badge variant="win">⬆️ Promoted</Badge>}
-          {promoRelStatus === 'relegated' && <Badge variant="loss">⬇️ Relegated</Badge>}
+          {promoRelStatus === 'promoted' && <Badge variant="win">Promoted</Badge>}
+          {promoRelStatus === 'relegated' && <Badge variant="loss">Relegated</Badge>}
         </div>
         <span style={{
           fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)',

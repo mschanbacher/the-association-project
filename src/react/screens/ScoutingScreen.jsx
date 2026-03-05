@@ -25,27 +25,23 @@ export function ScoutingScreen() {
   return (
     <div style={{
       maxWidth: 'var(--content-max)', margin: '0 auto', padding: 'var(--space-6)',
-      display: 'flex', flexDirection: 'column', gap: 'var(--space-5)',
-    }}>
+      display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
       <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--weight-bold)', margin: 0 }}>
         Scouting
       </h2>
 
       {/* Tab bar */}
       <div style={{
-        display: 'flex', gap: 2, background: 'var(--color-bg-sunken)',
-        borderRadius: 'var(--radius-md)', padding: 2,
-      }}>
+        display: 'flex', gap: 2, background: 'var(--color-bg-sunken)', padding: 2 }}>
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-            flex: 1, padding: '8px 12px', borderRadius: 'calc(var(--radius-md) - 2px)',
+            flex: 1, padding: '8px 12px',
             border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)',
             fontSize: 'var(--text-sm)', fontWeight: activeTab === tab.id ? 'var(--weight-semi)' : 'var(--weight-normal)',
             background: activeTab === tab.id ? 'var(--color-bg-raised)' : 'transparent',
             color: activeTab === tab.id ? 'var(--color-text)' : 'var(--color-text-tertiary)',
             boxShadow: activeTab === tab.id ? 'var(--shadow-xs)' : 'none',
-            transition: 'all var(--duration-fast) ease',
-          }}>
+            transition: 'all var(--duration-fast) ease' }}>
             {tab.icon} {tab.label}
           </button>
         ))}
@@ -97,8 +93,7 @@ function calculateTeamFit(player, userTeam, coach, engines) {
     combined, grade,
     systemFit: { score: 50, grade: 'C', details: [] },
     roleFit: { score: 50, label: '—' },
-    chemFit: { score: 50, label: '—', details: [] },
-  };
+    chemFit: { score: 50, label: '—', details: [] } };
 }
 
 function gradeColor(grade) {
@@ -106,7 +101,7 @@ function gradeColor(grade) {
   if (grade.startsWith('A')) return 'var(--color-win)';
   if (grade.startsWith('B')) return 'var(--color-info)';
   if (grade.startsWith('C')) return 'var(--color-warning)';
-  if (grade.startsWith('D')) return '#f28b82';
+  if (grade.startsWith('D')) return 'var(--color-loss)';
   return 'var(--color-loss)';
 }
 
@@ -139,8 +134,7 @@ function isOnWatchList(gameState, playerId) {
 function ScannerTab({ gameState, engines }) {
   const [filters, setFilters] = useState({
     pos: 'ALL', tier: 'ALL', minAge: '', maxAge: '',
-    minRating: '', maxRating: '', contractStatus: 'ALL', sort: 'fit',
-  });
+    minRating: '', maxRating: '', contractStatus: 'ALL', sort: 'fit' });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [watchVersion, setWatchVersion] = useState(0);
 
@@ -223,8 +217,7 @@ function ScannerTab({ gameState, engines }) {
       {/* Results count */}
       <div style={{
         fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
-        marginBottom: 'var(--space-2)',
-      }}>
+        marginBottom: 'var(--space-2)' }}>
         {filtered.length >= 100 ? '100+ players found (showing top 100)' : `${filtered.length} players found`}
       </div>
 
@@ -257,8 +250,7 @@ function ScannerTab({ gameState, engines }) {
                     style={{
                       ...trowStyle,
                       background: watched ? 'rgba(212, 168, 67, 0.06)' : 'transparent',
-                      cursor: 'pointer',
-                    }}
+                      cursor: 'pointer' }}
                     onMouseEnter={e => { if (!watched) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
                     onMouseLeave={e => { if (!watched) e.currentTarget.style.background = 'transparent'; }}
                   >
@@ -347,8 +339,7 @@ function PlayerDetail({ player, fit, gameState, onBack, onToggleWatch, watchVers
         {m && PA?.formatHeight && (
           <div style={{
             display: 'flex', gap: 'var(--space-5)', marginBottom: 'var(--space-4)',
-            fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)',
-          }}>
+            fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
             <span>{PA.formatHeight(m.height)}</span>
             <span>{m.weight}lbs</span>
             <span>{PA.formatWingspan(m.wingspan)} wingspan</span>
@@ -361,27 +352,22 @@ function PlayerDetail({ player, fit, gameState, onBack, onToggleWatch, watchVers
             <div style={{
               fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
               textTransform: 'uppercase', letterSpacing: '0.05em',
-              fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-2)',
-            }}>Attributes</div>
+              fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-2)' }}>Attributes</div>
             <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)',
-            }}>
+              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
               {attrEntries.map(([key, val]) => {
                 const def = allAttrDefs[key];
                 return (
                   <div key={key} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     padding: '4px var(--space-2)', fontSize: 'var(--text-sm)',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'var(--color-bg-sunken)',
-                  }}>
+                    background: 'var(--color-bg-sunken)' }}>
                     <span style={{ color: 'var(--color-text-secondary)' }}>
                       {def?.icon || ''} {def?.name || key}
                     </span>
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontWeight: 'var(--weight-semi)',
-                      color: attrColor(val),
-                    }}>{val}</span>
+                      color: attrColor(val) }}>{val}</span>
                   </div>
                 );
               })}
@@ -461,8 +447,7 @@ function PipelineTab({ gameState, engines }) {
     <div className="animate-fade-in">
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        marginBottom: 'var(--space-4)',
-      }}>
+        marginBottom: 'var(--space-4)' }}>
         <div>
           <div style={{ fontWeight: 'var(--weight-semi)' }}>
             Class of {(season || 0) + 2} · {preview.length} Prospects
@@ -655,8 +640,7 @@ function NeedsTab({ gameState, engines }) {
     const sorted = [...attrKeys].sort((a, b) => avgs[a] - avgs[b]);
     return {
       weakest: sorted.slice(0, 3).map(k => ({ key: k, avg: avgs[k], def: allAttrDefs[k] })),
-      strongest: sorted.slice(-3).reverse().map(k => ({ key: k, avg: avgs[k], def: allAttrDefs[k] })),
-    };
+      strongest: sorted.slice(-3).reverse().map(k => ({ key: k, avg: avgs[k], def: allAttrDefs[k] })) };
   }, [roster, attrKeys, allAttrDefs]);
 
   return (
@@ -673,8 +657,7 @@ function NeedsTab({ gameState, engines }) {
             return (
               <div key={pos} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: 'var(--space-2) 0', borderBottom: '1px solid var(--color-border-subtle)',
-              }}>
+                padding: 'var(--space-2) 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
                 <div>
                   <span style={{ fontWeight: 'var(--weight-semi)', marginRight: 'var(--space-2)' }}>{pos}</span>
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
@@ -748,10 +731,9 @@ function NeedsTab({ gameState, engines }) {
             </div>
             {weakest.map(a => (
               <div key={a.key} style={{
-                display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 'var(--text-sm)',
-              }}>
+                display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 'var(--text-sm)' }}>
                 <span style={{ color: 'var(--color-text-secondary)' }}>{a.def?.icon || ''} {a.def?.name || a.key}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 'var(--weight-semi)', color: '#f28b82' }}>{a.avg}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 'var(--weight-semi)', color: 'var(--color-loss)' }}>{a.avg}</span>
               </div>
             ))}
           </div>
@@ -763,8 +745,7 @@ function NeedsTab({ gameState, engines }) {
             </div>
             {strongest.map(a => (
               <div key={a.key} style={{
-                display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 'var(--text-sm)',
-              }}>
+                display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 'var(--text-sm)' }}>
                 <span style={{ color: 'var(--color-text-secondary)' }}>{a.def?.icon || ''} {a.def?.name || a.key}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 'var(--weight-semi)', color: 'var(--color-win)' }}>{a.avg}</span>
               </div>
@@ -783,11 +764,10 @@ function NeedsTab({ gameState, engines }) {
 function FilterSelect({ value, onChange, options }) {
   return (
     <select value={value} onChange={e => onChange(e.target.value)} style={{
-      padding: '6px 10px', borderRadius: 'var(--radius-sm)',
+      padding: '6px 10px',
       border: '1px solid var(--color-border)', background: 'var(--color-bg-raised)',
       color: 'var(--color-text)', fontSize: 'var(--text-sm)',
-      fontFamily: 'var(--font-body)', cursor: 'pointer',
-    }}>
+      fontFamily: 'var(--font-body)', cursor: 'pointer' }}>
       {options.map(([val, label]) => (
         <option key={val} value={val}>{label}</option>
       ))}
@@ -800,11 +780,10 @@ function FilterInput({ value, onChange, placeholder, width = 70 }) {
     <input type="number" value={value} onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       style={{
-        width, padding: '6px 8px', borderRadius: 'var(--radius-sm)',
+        width, padding: '6px 8px',
         border: '1px solid var(--color-border)', background: 'var(--color-bg-raised)',
         color: 'var(--color-text)', fontSize: 'var(--text-sm)',
-        fontFamily: 'var(--font-body)',
-      }} />
+        fontFamily: 'var(--font-body)' }} />
   );
 }
 
@@ -812,13 +791,11 @@ function FitCard({ label, value, color }) {
   return (
     <div style={{
       textAlign: 'center', padding: 'var(--space-3)',
-      background: 'var(--color-bg-sunken)', borderRadius: 'var(--radius-md)',
-    }}>
+      background: 'var(--color-bg-sunken)' }}>
       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>{label}</div>
       <div style={{
         fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)',
-        color: color || 'var(--color-text)',
-      }}>{value}</div>
+        color: color || 'var(--color-text)' }}>{value}</div>
     </div>
   );
 }
@@ -844,8 +821,7 @@ function Loader({ text }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '60vh', color: 'var(--color-text-tertiary)',
-    }}>{text}</div>
+      minHeight: '60vh', color: 'var(--color-text-tertiary)' }}>{text}</div>
   );
 }
 
@@ -862,8 +838,7 @@ function Td({ children, align = 'center', mono = false, style, colSpan }) {
       fontVariantNumeric: mono ? 'tabular-nums' : undefined,
       fontFamily: mono ? 'var(--font-mono)' : undefined,
       fontSize: mono ? 'var(--text-sm)' : undefined,
-      ...style,
-    }}>{children}</td>
+      ...style }}>{children}</td>
   );
 }
 
@@ -872,6 +847,5 @@ const theadRowStyle = {
   borderBottom: '2px solid var(--color-border)',
   fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
   textTransform: 'uppercase', letterSpacing: '0.05em',
-  position: 'sticky', top: 0, background: 'var(--color-bg-raised)', zIndex: 1,
-};
+  position: 'sticky', top: 0, background: 'var(--color-bg-raised)', zIndex: 1 };
 const trowStyle = { borderBottom: '1px solid var(--color-border-subtle)', transition: 'background var(--duration-fast) ease' };

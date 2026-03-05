@@ -130,8 +130,7 @@ export function TradeScreen({ isOpen, onClose }) {
       calculatePickValue: window.calculatePickValue || ((y, r) => r === 1 ? 30 : 15),
       getEffectiveCap: window.getEffectiveCap || (() => 100000000),
       calculateTeamSalary: window.calculateTeamSalary || (() => 0),
-      formatCurrency: window.formatCurrency || fmtCurrency,
-    });
+      formatCurrency: window.formatCurrency || fmtCurrency });
 
     setTradeResult(result);
 
@@ -163,8 +162,7 @@ export function TradeScreen({ isOpen, onClose }) {
         {pastDeadline ? (
           <div style={{
             textAlign: 'center', padding: 'var(--space-8) 0',
-            color: 'var(--color-text-tertiary)',
-          }}>
+            color: 'var(--color-text-tertiary)' }}>
             <div style={{ fontSize: '2em', marginBottom: 'var(--space-3)' }}>🚫</div>
             <div style={{ fontSize: 'var(--text-md)', fontWeight: 'var(--weight-semi)' }}>
               Trade deadline has passed
@@ -188,8 +186,7 @@ export function TradeScreen({ isOpen, onClose }) {
                 {/* Two-column: Your roster | Their roster */}
                 <div style={{
                   display: 'grid', gridTemplateColumns: '1fr 1fr',
-                  gap: 'var(--space-4)', marginTop: 'var(--space-4)',
-                }}>
+                  gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
                   <RosterColumn
                     title={`Your Team — ${userTeam.name}`}
                     team={userTeam}
@@ -210,8 +207,7 @@ export function TradeScreen({ isOpen, onClose }) {
                 {currentTier === 1 && (
                   <div style={{
                     display: 'grid', gridTemplateColumns: '1fr 1fr',
-                    gap: 'var(--space-4)', marginTop: 'var(--space-4)',
-                  }}>
+                    gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
                     <PicksColumn
                       title="Your Picks"
                       teamId={userTeam.id}
@@ -277,8 +273,7 @@ function TeamSelector({ teams, userTeamId, selectedId, onSelect }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
       <span style={{
         fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semi)',
-        color: 'var(--color-text-secondary)', whiteSpace: 'nowrap',
-      }}>Trade with:</span>
+        color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>Trade with:</span>
       <select
         value={selectedId || ''}
         onChange={(e) => onSelect(parseInt(e.target.value) || null)}
@@ -286,13 +281,11 @@ function TeamSelector({ teams, userTeamId, selectedId, onSelect }) {
           flex: 1,
           maxWidth: 300,
           padding: '8px 12px',
-          borderRadius: 'var(--radius-md)',
           border: '1px solid var(--color-border)',
           background: 'var(--color-bg-sunken)',
           color: 'var(--color-text)',
           fontFamily: 'var(--font-body)',
-          fontSize: 'var(--text-sm)',
-        }}
+          fontSize: 'var(--text-sm)' }}
       >
         <option value="">— Select a team —</option>
         {options.map(t => (
@@ -320,8 +313,7 @@ function RosterColumn({ title, team, selectedIds, onToggle, side }) {
       <div style={{
         fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semi)',
         marginBottom: 'var(--space-2)',
-        display: 'flex', justifyContent: 'space-between',
-      }}>
+        display: 'flex', justifyContent: 'space-between' }}>
         <span>{title}</span>
         <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 'var(--weight-normal)' }}>
           {team.roster?.length || 0} players
@@ -329,9 +321,7 @@ function RosterColumn({ title, team, selectedIds, onToggle, side }) {
       </div>
       <div style={{
         maxHeight: 320, overflowY: 'auto',
-        border: '1px solid var(--color-border-subtle)',
-        borderRadius: 'var(--radius-md)',
-      }}>
+        border: '1px solid var(--color-border-subtle)' }}>
         {sorted.map(player => {
           const selected = selectedIds.includes(player.id);
           return (
@@ -365,42 +355,36 @@ function PlayerRow({ player, selected, onClick, side }) {
           ? side === 'user' ? 'rgba(234, 67, 53, 0.08)' : 'rgba(52, 168, 83, 0.08)'
           : 'transparent',
         borderBottom: '1px solid var(--color-border-subtle)',
-        transition: 'background var(--duration-fast) ease',
-      }}
+        transition: 'background var(--duration-fast) ease' }}
       onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
       onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
     >
       {/* Selection indicator */}
       <div style={{
-        width: 18, height: 18, borderRadius: 'var(--radius-sm)',
+        width: 18, height: 18,
         border: `2px solid ${selected ? (side === 'user' ? 'var(--color-loss)' : 'var(--color-win)') : 'var(--color-border)'}`,
         background: selected ? (side === 'user' ? 'var(--color-loss)' : 'var(--color-win)') : 'transparent',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
         transition: 'all var(--duration-fast) ease',
-        fontSize: '10px', color: '#fff',
-      }}>
+        fontSize: '10px', color: '#fff' }}>
         {selected && '✓'}
       </div>
 
       {/* Player info */}
       <span style={{
         fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
-        width: 24, textAlign: 'center', flexShrink: 0,
-      }}>{player.position}</span>
+        width: 24, textAlign: 'center', flexShrink: 0 }}>{player.position}</span>
       <span style={{
         flex: 1, fontSize: 'var(--text-sm)',
-        fontWeight: selected ? 'var(--weight-semi)' : 'var(--weight-normal)',
-      }}>{player.name}</span>
+        fontWeight: selected ? 'var(--weight-semi)' : 'var(--weight-normal)' }}>{player.name}</span>
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
         fontWeight: 'var(--weight-semi)', color: rColor,
-        width: 28, textAlign: 'right',
-      }}>{r}</span>
+        width: 28, textAlign: 'right' }}>{r}</span>
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
-        color: 'var(--color-text-tertiary)', width: 48, textAlign: 'right',
-      }}>{sal}</span>
+        color: 'var(--color-text-tertiary)', width: 48, textAlign: 'right' }}>{sal}</span>
     </div>
   );
 }
@@ -427,20 +411,16 @@ function PicksColumn({ title, teamId, selectedPicks, onToggle, gameState }) {
     <div>
       <div style={{
         fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semi)',
-        marginBottom: 'var(--space-2)',
-      }}>{title}</div>
+        marginBottom: 'var(--space-2)' }}>{title}</div>
       <div style={{
-        border: '1px solid var(--color-border-subtle)',
-        borderRadius: 'var(--radius-md)',
-      }}>
+        border: '1px solid var(--color-border-subtle)' }}>
         {picks.map((pick, i) => {
           if (!pick.owned) {
             return (
               <div key={i} style={{
                 padding: '5px 10px', fontSize: 'var(--text-xs)',
                 color: 'var(--color-text-tertiary)', opacity: 0.5,
-                borderBottom: '1px solid var(--color-border-subtle)',
-              }}>
+                borderBottom: '1px solid var(--color-border-subtle)' }}>
                 {pick.year} Rd {pick.round} — traded away
               </div>
             );
@@ -459,19 +439,17 @@ function PicksColumn({ title, teamId, selectedPicks, onToggle, gameState }) {
                 background: selected ? 'rgba(212, 168, 67, 0.08)' : 'transparent',
                 borderBottom: '1px solid var(--color-border-subtle)',
                 fontSize: 'var(--text-xs)',
-                transition: 'background var(--duration-fast) ease',
-              }}
+                transition: 'background var(--duration-fast) ease' }}
               onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
               onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
             >
               <div style={{
-                width: 14, height: 14, borderRadius: 3,
+                width: 14, height: 14,
                 border: `2px solid ${selected ? 'var(--color-accent)' : 'var(--color-border)'}`,
                 background: selected ? 'var(--color-accent)' : 'transparent',
                 flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '8px', color: '#1a1a2e',
-              }}>
+                fontSize: '8px', color: 'var(--color-text)' }}>
                 {selected && '✓'}
               </div>
               <span style={{ fontWeight: 'var(--weight-medium)' }}>
@@ -525,15 +503,12 @@ function TradeSummary({ userTeam, partnerTeam, userGives, userReceives, userGive
       marginTop: 'var(--space-4)',
       padding: 'var(--space-4)',
       background: 'var(--color-bg-sunken)',
-      borderRadius: 'var(--radius-lg)',
-      border: '1px solid var(--color-border-subtle)',
-    }}>
+      border: '1px solid var(--color-border-subtle)' }}>
       {/* Summary header */}
       <div style={{
         display: 'grid', gridTemplateColumns: '1fr auto 1fr',
         gap: 'var(--space-3)', alignItems: 'center',
-        marginBottom: 'var(--space-3)',
-      }}>
+        marginBottom: 'var(--space-3)' }}>
         {/* You give */}
         <div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>
@@ -546,8 +521,7 @@ function TradeSummary({ userTeam, partnerTeam, userGives, userReceives, userGive
 
         {/* Arrow */}
         <div style={{
-          fontSize: 'var(--text-lg)', color: 'var(--color-text-tertiary)', opacity: 0.4,
-        }}>⇄</div>
+          fontSize: 'var(--text-lg)', color: 'var(--color-text-tertiary)', opacity: 0.4 }}>⇄</div>
 
         {/* You receive */}
         <div style={{ textAlign: 'right' }}>
@@ -566,8 +540,7 @@ function TradeSummary({ userTeam, partnerTeam, userGives, userReceives, userGive
         padding: 'var(--space-2) 0',
         fontSize: 'var(--text-xs)',
         borderTop: '1px solid var(--color-border-subtle)',
-        paddingTop: 'var(--space-3)',
-      }}>
+        paddingTop: 'var(--space-3)' }}>
         <span>Your value: <strong>{Math.round(givesVal)}</strong></span>
         <span>Their value: <strong>{Math.round(receivesVal)}</strong></span>
         <span>
@@ -592,16 +565,13 @@ function TradeSummary({ userTeam, partnerTeam, userGives, userReceives, userGive
         <div style={{
           marginTop: 'var(--space-3)',
           padding: 'var(--space-3)',
-          borderRadius: 'var(--radius-md)',
           background: tradeResult.accepted ? 'rgba(52, 168, 83, 0.08)' : 'rgba(234, 67, 53, 0.08)',
           border: `1px solid ${tradeResult.accepted ? 'rgba(52, 168, 83, 0.2)' : 'rgba(234, 67, 53, 0.2)'}`,
-          textAlign: 'center',
-        }}>
+          textAlign: 'center' }}>
           <div style={{
             fontSize: 'var(--text-md)', fontWeight: 'var(--weight-bold)',
             color: tradeResult.accepted ? 'var(--color-win)' : 'var(--color-loss)',
-            marginBottom: 4,
-          }}>
+            marginBottom: 4 }}>
             {tradeResult.accepted ? '✅ Trade Accepted!' : '❌ Trade Declined'}
           </div>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
@@ -653,15 +623,13 @@ export function AiTradeProposalModal({ isOpen, onClose }) {
       <ModalBody>
         <div style={{
           display: 'grid', gridTemplateColumns: '1fr auto 1fr',
-          gap: 'var(--space-4)', alignItems: 'start',
-        }}>
+          gap: 'var(--space-4)', alignItems: 'start' }}>
           {/* They want */}
           <div>
             <div style={{
               fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
               textTransform: 'uppercase', marginBottom: 'var(--space-2)',
-              fontWeight: 'var(--weight-semi)',
-            }}>They want</div>
+              fontWeight: 'var(--weight-semi)' }}>They want</div>
             {proposal.userGives.map((p, i) => (
               <ProposalPlayerCard key={i} player={p} />
             ))}
@@ -670,16 +638,14 @@ export function AiTradeProposalModal({ isOpen, onClose }) {
           {/* Arrow */}
           <div style={{
             fontSize: '1.5em', color: 'var(--color-text-tertiary)', opacity: 0.3,
-            paddingTop: 'var(--space-6)',
-          }}>⇄</div>
+            paddingTop: 'var(--space-6)' }}>⇄</div>
 
           {/* You receive */}
           <div>
             <div style={{
               fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
               textTransform: 'uppercase', marginBottom: 'var(--space-2)',
-              fontWeight: 'var(--weight-semi)',
-            }}>You receive</div>
+              fontWeight: 'var(--weight-semi)' }}>You receive</div>
             {proposal.aiGives.map((p, i) => (
               <ProposalPlayerCard key={i} player={p} />
             ))}
@@ -687,10 +653,8 @@ export function AiTradeProposalModal({ isOpen, onClose }) {
               <div key={`pk${i}`} style={{
                 padding: 'var(--space-2)',
                 background: 'rgba(212, 168, 67, 0.06)',
-                borderRadius: 'var(--radius-sm)',
                 fontSize: 'var(--text-sm)',
-                marginBottom: 'var(--space-1)',
-              }}>
+                marginBottom: 'var(--space-1)' }}>
                 📋 {pick.year} Round {pick.round} Pick
               </div>
             ))}
@@ -700,8 +664,7 @@ export function AiTradeProposalModal({ isOpen, onClose }) {
         {/* Value summary */}
         <div style={{
           marginTop: 'var(--space-4)', textAlign: 'center',
-          fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)',
-        }}>
+          fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
           Value: You give <strong>{Math.round(userGivesVal)}</strong> — You receive <strong>{Math.round(aiGivesVal)}</strong>
           {' '}
           <span style={{ color: net > 0 ? 'var(--color-win)' : net < 0 ? 'var(--color-loss)' : 'var(--color-text)' }}>
@@ -724,24 +687,19 @@ function ProposalPlayerCard({ player }) {
       display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
       padding: 'var(--space-2)',
       background: 'var(--color-bg-sunken)',
-      borderRadius: 'var(--radius-sm)',
-      marginBottom: 'var(--space-1)',
-    }}>
+      marginBottom: 'var(--space-1)' }}>
       <span style={{
         fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
-        width: 24, textAlign: 'center',
-      }}>{player.position}</span>
+        width: 24, textAlign: 'center' }}>{player.position}</span>
       <span style={{ flex: 1, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)' }}>
         {player.name}
       </span>
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
-        fontWeight: 'var(--weight-bold)', color: ratingColor(r),
-      }}>{r}</span>
+        fontWeight: 'var(--weight-bold)', color: ratingColor(r) }}>{r}</span>
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
-        color: 'var(--color-text-tertiary)',
-      }}>{fmtCurrency(player.salary || 0)}</span>
+        color: 'var(--color-text-tertiary)' }}>{fmtCurrency(player.salary || 0)}</span>
     </div>
   );
 }
@@ -780,8 +738,7 @@ function executeTradeDirect(userTeam, aiTeam, userGiveIds, aiGiveIds, userGivesP
       team2GivesPicks: aiGivesPicks,
       applyTradePenalty: window.applyTradePenalty || (() => {}),
       initializePlayerChemistry: window.initializePlayerChemistry || (() => {}),
-      tradeDraftPick: window.tradeDraftPick || (() => {}),
-    });
+      tradeDraftPick: window.tradeDraftPick || (() => {}) });
   }
 
   // Log to history

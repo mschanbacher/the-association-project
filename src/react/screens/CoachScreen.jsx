@@ -19,13 +19,11 @@ export function CoachScreen() {
     return (
       <div style={{
         maxWidth: 'var(--content-max)', margin: '0 auto', padding: 'var(--space-6)',
-        display: 'flex', flexDirection: 'column', gap: 'var(--space-5)',
-      }}>
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
         <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Coach</h2>
         <Card padding="lg">
           <div style={{
-            textAlign: 'center', padding: 'var(--space-10) 0',
-          }}>
+            textAlign: 'center', padding: 'var(--space-10) 0' }}>
             <div style={{ fontSize: '3em', marginBottom: 'var(--space-4)' }}>⚠️</div>
             <p style={{ fontSize: 'var(--text-md)', fontWeight: 'var(--weight-semi)', color: 'var(--color-loss)', marginBottom: 'var(--space-2)' }}>
               No Head Coach
@@ -63,8 +61,7 @@ export function CoachScreen() {
   return (
     <div style={{
       maxWidth: 'var(--content-max)', margin: '0 auto', padding: 'var(--space-6)',
-      display: 'flex', flexDirection: 'column', gap: 'var(--space-5)',
-    }}>
+      display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Coach</h2>
@@ -76,15 +73,13 @@ export function CoachScreen() {
       {/* Coach Profile Card */}
       <Card padding="lg" className="animate-slide-up">
         <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: 'var(--space-6)',
-        }}>
+          display: 'flex', alignItems: 'flex-start', gap: 'var(--space-6)' }}>
           {/* Avatar placeholder */}
           <div style={{
-            width: 80, height: 80, borderRadius: 'var(--radius-lg)',
+            width: 80, height: 80,
             background: 'var(--color-bg-sunken)', display: 'flex',
             alignItems: 'center', justifyContent: 'center',
-            fontSize: '2em', flexShrink: 0,
-          }}>
+            fontSize: '2em', flexShrink: 0 }}>
             🎓
           </div>
 
@@ -92,19 +87,16 @@ export function CoachScreen() {
           <div style={{ flex: 1 }}>
             <div style={{
               fontSize: 'var(--text-2xl)', fontWeight: 'var(--weight-bold)',
-              marginBottom: 'var(--space-1)',
-            }}>
+              marginBottom: 'var(--space-1)' }}>
               {coach.name}
             </div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-              marginBottom: 'var(--space-3)',
-            }}>
+              marginBottom: 'var(--space-3)' }}>
               <Badge variant="accent">{coach.archetype}</Badge>
               <span style={{
                 fontFamily: 'var(--font-mono)', fontSize: 'var(--text-md)',
-                fontWeight: 'var(--weight-bold)', color: ovrColor,
-              }}>
+                fontWeight: 'var(--weight-bold)', color: ovrColor }}>
                 {coach.overall} OVR
               </span>
               {coach.salary && (
@@ -123,16 +115,14 @@ export function CoachScreen() {
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                marginBottom: 'var(--space-1)',
-              }}>
+                marginBottom: 'var(--space-1)' }}>
                 <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
                   Roster Synergy
                 </span>
                 <span style={{
                   fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)',
                   fontWeight: 'var(--weight-semi)',
-                  color: synergy >= 70 ? 'var(--color-win)' : synergy >= 40 ? 'var(--color-warning)' : 'var(--color-loss)',
-                }}>
+                  color: synergy >= 70 ? 'var(--color-win)' : synergy >= 40 ? 'var(--color-warning)' : 'var(--color-loss)' }}>
                   {Math.round(synergy)}%
                 </span>
               </div>
@@ -148,8 +138,7 @@ export function CoachScreen() {
           <CardHeader>Coaching Traits</CardHeader>
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: 'var(--space-4)',
-          }}>
+            gap: 'var(--space-4)' }}>
             {traits.map(trait => (
               <TraitBar key={trait.key} trait={trait} />
             ))}
@@ -162,8 +151,7 @@ export function CoachScreen() {
         <CardHeader>System</CardHeader>
         <div style={{
           fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)',
-          lineHeight: 'var(--leading-relaxed)',
-        }}>
+          lineHeight: 'var(--leading-relaxed)' }}>
           {getArchetypeDescription(coach.archetype)}
         </div>
       </Card>
@@ -185,25 +173,20 @@ function TraitBar({ trait }) {
     <div>
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        marginBottom: 4,
-      }}>
+        marginBottom: 4 }}>
         <span style={{ fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
           <span>{trait.icon}</span> {trait.name}
         </span>
         <span style={{
           fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)',
-          fontWeight: 'var(--weight-semi)', color,
-        }}>
+          fontWeight: 'var(--weight-semi)', color }}>
           {trait.value}
         </span>
       </div>
       <div style={{
-        background: 'var(--color-bg-sunken)', borderRadius: 3, height: 6, overflow: 'hidden',
-      }}>
+        background: 'var(--color-bg-sunken)', height: 6, overflow: 'hidden' }}>
         <div style={{
-          height: '100%', width: `${pct}%`, background: color,
-          borderRadius: 3, transition: 'width 0.4s var(--ease-out)',
-        }} />
+          height: '100%', width: `${pct}%`, background: color, transition: 'width 0.4s var(--ease-out)' }} />
       </div>
     </div>
   );
@@ -214,12 +197,9 @@ function ProgressBar({ value }) {
   const color = pct >= 0.7 ? 'var(--color-win)' : pct >= 0.4 ? 'var(--color-warning)' : 'var(--color-loss)';
   return (
     <div style={{
-      background: 'var(--color-bg-sunken)', borderRadius: 3, height: 6, overflow: 'hidden',
-    }}>
+      background: 'var(--color-bg-sunken)', height: 6, overflow: 'hidden' }}>
       <div style={{
-        height: '100%', width: `${pct * 100}%`, background: color,
-        borderRadius: 3, transition: 'width 0.4s var(--ease-out)',
-      }} />
+        height: '100%', width: `${pct * 100}%`, background: color, transition: 'width 0.4s var(--ease-out)' }} />
     </div>
   );
 }
@@ -233,8 +213,7 @@ function getArchetypeDescription(archetype) {
     'Tempo Pusher': 'Runs an extremely fast-paced system. Teams play more possessions per game, favoring athletic lineups and transition offense.',
     'Three-Point Specialist': 'Designs systems around perimeter shooting. Expect a high volume of three-point attempts and floor spacing.',
     'Post-Up Heavy': 'Emphasizes interior scoring and traditional big men. The offense runs through the paint with strong rebounding.',
-    'Motion Offense': 'Uses constant movement and passing to create open shots. Players need high basketball IQ to thrive in this system.',
-  };
+    'Motion Offense': 'Uses constant movement and passing to create open shots. Players need high basketball IQ to thrive in this system.' };
   return descriptions[archetype] || `Runs a ${archetype} system that shapes how the team plays on both ends of the floor.`;
 }
 
@@ -256,7 +235,6 @@ function Loader({ text }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '60vh', color: 'var(--color-text-tertiary)',
-    }}>{text}</div>
+      minHeight: '60vh', color: 'var(--color-text-tertiary)' }}>{text}</div>
   );
 }

@@ -21,8 +21,7 @@ export function StandingsScreen() {
   const leagueNames = {
     1: 'North American Premier League',
     2: 'North American Regional Basketball League',
-    3: 'Metro Basketball League',
-  };
+    3: 'Metro Basketball League' };
 
   return (
     <div style={{
@@ -31,22 +30,19 @@ export function StandingsScreen() {
       padding: 'var(--space-6)',
       display: 'flex',
       flexDirection: 'column',
-      gap: 'var(--space-5)',
-    }}>
+      gap: 'var(--space-5)' }}>
       {/* Header Bar */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: 'var(--space-3)',
-      }}>
+        gap: 'var(--space-3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <h2 style={{
             fontSize: 'var(--text-xl)',
             fontWeight: 'var(--weight-bold)',
-            margin: 0,
-          }}>
+            margin: 0 }}>
             Standings
           </h2>
           <TierBadge tier={activeTier} />
@@ -140,14 +136,13 @@ function OverallStandings({ teams, tier, gameState, engines }) {
               return (
                 <tr key={team.id} style={{
                   ...trowStyle,
-                  background: isUser ? 'var(--color-accent-light)' :
+                  background: isUser ? 'var(--color-accent-bg)' :
                               zone === 'promotion' ? 'rgba(45, 138, 86, 0.06)' :
                               zone === 'playoff' ? 'rgba(196, 138, 24, 0.06)' :
                               zone === 'relegation-playoff' ? 'rgba(196, 138, 24, 0.06)' :
                               zone === 'auto-relegate' ? 'rgba(196, 62, 62, 0.06)' :
                               'transparent',
-                  fontWeight: isUser ? 'var(--weight-semi)' : 'var(--weight-normal)',
-                }}>
+                  fontWeight: isUser ? 'var(--weight-semi)' : 'var(--weight-normal)' }}>
                   <Td align="center" style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
                     {rank}
                   </Td>
@@ -165,8 +160,7 @@ function OverallStandings({ teams, tier, gameState, engines }) {
                   <Td align="center" mono>{pct}</Td>
                   <Td align="center" mono style={{ color: 'var(--color-text-tertiary)' }}>{gbStr}</Td>
                   <Td align="center" mono style={{
-                    color: diff > 0 ? 'var(--color-win)' : diff < 0 ? 'var(--color-loss)' : 'var(--color-text-tertiary)',
-                  }}>
+                    color: diff > 0 ? 'var(--color-win)' : diff < 0 ? 'var(--color-loss)' : 'var(--color-text-tertiary)' }}>
                     {diff > 0 ? '+' : ''}{diff}
                   </Td>
                 </tr>
@@ -210,20 +204,17 @@ function DivisionStandings({ teams, tier, gameState, engines }) {
           <div style={{
             padding: 'var(--space-3) var(--space-5)',
             background: 'var(--color-bg-sunken)',
-            borderBottom: '1px solid var(--color-border)',
-          }}>
+            borderBottom: '1px solid var(--color-border)' }}>
             <span style={{
               fontSize: 'var(--text-base)',
               fontWeight: 'var(--weight-semi)',
-              color: 'var(--color-text)',
-            }}>
+              color: 'var(--color-text)' }}>
               {divName}
             </span>
             <span style={{
               fontSize: 'var(--text-sm)',
               color: 'var(--color-text-tertiary)',
-              marginLeft: 'var(--space-2)',
-            }}>
+              marginLeft: 'var(--space-2)' }}>
               {divisions[divName].length} teams
             </span>
           </div>
@@ -249,9 +240,8 @@ function DivisionStandings({ teams, tier, gameState, engines }) {
                   return (
                     <tr key={team.id} style={{
                       ...trowStyle,
-                      background: isUser ? 'var(--color-accent-light)' : 'transparent',
-                      fontWeight: isUser ? 'var(--weight-semi)' : 'var(--weight-normal)',
-                    }}>
+                      background: isUser ? 'var(--color-accent-bg)' : 'transparent',
+                      fontWeight: isUser ? 'var(--weight-semi)' : 'var(--weight-normal)' }}>
                       <Td align="center" style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
                         {i + 1}
                       </Td>
@@ -262,8 +252,7 @@ function DivisionStandings({ teams, tier, gameState, engines }) {
                       <Td align="center" mono style={{ color: 'var(--color-loss)' }}>{team.losses}</Td>
                       <Td align="center" mono>{pct}</Td>
                       <Td align="center" mono style={{
-                        color: diff > 0 ? 'var(--color-win)' : diff < 0 ? 'var(--color-loss)' : 'var(--color-text-tertiary)',
-                      }}>
+                        color: diff > 0 ? 'var(--color-win)' : diff < 0 ? 'var(--color-loss)' : 'var(--color-text-tertiary)' }}>
                         {diff > 0 ? '+' : ''}{diff}
                       </Td>
                     </tr>
@@ -295,25 +284,21 @@ function ZoneLegend({ tier }) {
       display: 'flex',
       gap: 'var(--space-4)',
       alignItems: 'center',
-      padding: 'var(--space-3) 0',
-    }}>
+      padding: 'var(--space-3) 0' }}>
       <span style={{
         fontSize: 'var(--text-xs)',
         color: 'var(--color-text-tertiary)',
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
-        fontWeight: 'var(--weight-semi)',
-      }}>
+        fontWeight: 'var(--weight-semi)' }}>
         Zones
       </span>
       {items.map(item => (
         <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <div style={{
             width: 12, height: 12,
-            borderRadius: 'var(--radius-sm)',
             background: item.color,
-            border: `1px solid ${item.color.replace('0.25', '0.5')}`,
-          }} />
+            border: `1px solid ${item.color.replace('0.25', '0.5')}` }} />
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
             {item.label}
           </span>
@@ -322,10 +307,8 @@ function ZoneLegend({ tier }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
         <div style={{
           width: 12, height: 12,
-          borderRadius: 'var(--radius-sm)',
-          background: 'var(--color-accent-light)',
-          border: '1px solid var(--color-accent-subtle)',
-        }} />
+          background: 'var(--color-accent-bg)',
+          border: '1px solid var(--color-accent-border)' }} />
         <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
           Your Team
         </span>
@@ -342,16 +325,13 @@ function ToggleGroup({ options, value, onChange, activeVariant = 'accent' }) {
     <div style={{
       display: 'flex',
       background: 'var(--color-bg-sunken)',
-      borderRadius: 'var(--radius-md)',
       padding: 2,
-      gap: 2,
-    }}>
+      gap: 2 }}>
       {options.map(opt => {
         const isActive = opt.value === value;
         return (
           <button key={opt.value} onClick={() => onChange(opt.value)} style={{
             padding: '5px 12px',
-            borderRadius: 'calc(var(--radius-md) - 2px)',
             border: 'none',
             background: isActive ? 'var(--color-bg-raised)' : 'transparent',
             color: isActive ? 'var(--color-text)' : 'var(--color-text-tertiary)',
@@ -360,8 +340,7 @@ function ToggleGroup({ options, value, onChange, activeVariant = 'accent' }) {
             fontFamily: 'var(--font-body)',
             cursor: 'pointer',
             transition: 'all var(--duration-fast) ease',
-            boxShadow: isActive ? 'var(--shadow-xs)' : 'none',
-          }}>
+            boxShadow: isActive ? 'var(--shadow-xs)' : 'none' }}>
             {opt.label}
           </button>
         );
@@ -375,16 +354,13 @@ function ZoneDot({ zone }) {
     promotion: 'var(--color-win)',
     playoff: 'var(--color-warning)',
     'relegation-playoff': 'var(--color-warning)',
-    'auto-relegate': 'var(--color-loss)',
-  };
+    'auto-relegate': 'var(--color-loss)' };
   return (
     <span style={{
       width: 6, height: 6,
-      borderRadius: '50%',
       background: colors[zone] || 'transparent',
       display: 'inline-block',
-      flexShrink: 0,
-    }} />
+      flexShrink: 0 }} />
   );
 }
 
@@ -403,8 +379,7 @@ function ScreenLoader({ text }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '60vh', color: 'var(--color-text-tertiary)',
-    }}>
+      minHeight: '60vh', color: 'var(--color-text-tertiary)' }}>
       {text}
     </div>
   );
@@ -417,8 +392,7 @@ function Th({ children, align = 'left', width, style }) {
       textAlign: align,
       fontWeight: 600,
       width,
-      ...style,
-    }}>
+      ...style }}>
       {children}
     </th>
   );
@@ -432,8 +406,7 @@ function Td({ children, align = 'left', mono = false, style }) {
       fontVariantNumeric: mono ? 'tabular-nums' : undefined,
       fontFamily: mono ? 'var(--font-mono)' : undefined,
       fontSize: mono ? 'var(--text-sm)' : undefined,
-      ...style,
-    }}>
+      ...style }}>
       {children}
     </td>
   );
@@ -442,18 +415,15 @@ function Td({ children, align = 'left', mono = false, style }) {
 const tableStyle = {
   width: '100%',
   borderCollapse: 'collapse',
-  fontSize: 'var(--text-base)',
-};
+  fontSize: 'var(--text-base)' };
 
 const theadRowStyle = {
   borderBottom: '2px solid var(--color-border)',
   fontSize: 'var(--text-xs)',
   color: 'var(--color-text-tertiary)',
   textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-};
+  letterSpacing: '0.05em' };
 
 const trowStyle = {
   borderBottom: '1px solid var(--color-border-subtle)',
-  transition: 'background var(--duration-fast) ease',
-};
+  transition: 'background var(--duration-fast) ease' };

@@ -42,8 +42,7 @@ export function FinancesScreen() {
     });
     return {
       revenue: count > 0 ? Math.round(totalR / count) : totalRev,
-      fanbase: count > 0 ? Math.round(totalF / count) : summary.fanbase,
-    };
+      fanbase: count > 0 ? Math.round(totalF / count) : summary.fanbase };
   }, [allTeams, FinanceEngine, totalRev, summary.fanbase]);
 
   const revVsAvgPct = ((totalRev / tierAvg.revenue - 1) * 100).toFixed(0);
@@ -62,8 +61,7 @@ export function FinancesScreen() {
       padding: 'var(--space-6)',
       display: 'flex',
       flexDirection: 'column',
-      gap: 'var(--space-5)',
-    }}>
+      gap: 'var(--space-5)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--weight-bold)', margin: 0 }}>
@@ -114,17 +112,16 @@ export function FinancesScreen() {
             fontSize: 'var(--text-xs)',
             color: 'var(--color-text-tertiary)',
             marginBottom: 'var(--space-4)',
-            lineHeight: 'var(--leading-relaxed)',
-          }}>
+            lineHeight: 'var(--leading-relaxed)' }}>
             {isHardCap
               ? 'Tier 1 uses a shared TV revenue model with a fixed salary cap.'
               : `Spending limit is ${Math.round((summary.spendingRatio || 0.8) * 100)}% of total revenue.`}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            <RevenueRow label="League (TV)" amount={rev.league} total={totalRev} color="#5a7be8" />
-            <RevenueRow label="Matchday" amount={rev.matchday} total={totalRev} color="#d97a2e" />
-            <RevenueRow label="Commercial" amount={rev.commercial} total={totalRev} color="#9060b8" />
-            <RevenueRow label="Legacy" amount={rev.legacy} total={totalRev} color="#c4a42a" />
+            <RevenueRow label="League (TV)" amount={rev.league} total={totalRev} color="var(--color-chart-1)" />
+            <RevenueRow label="Matchday" amount={rev.matchday} total={totalRev} color="var(--color-chart-2)" />
+            <RevenueRow label="Commercial" amount={rev.commercial} total={totalRev} color="var(--color-chart-3)" />
+            <RevenueRow label="Legacy" amount={rev.legacy} total={totalRev} color="var(--color-chart-4)" />
           </div>
         </Card>
 
@@ -136,8 +133,7 @@ export function FinancesScreen() {
               fontSize: 'var(--text-2xl)',
               fontWeight: 'var(--weight-bold)',
               marginBottom: 'var(--space-1)',
-              fontVariantNumeric: 'tabular-nums',
-            }}>
+              fontVariantNumeric: 'tabular-nums' }}>
               {summary.fanbase.toLocaleString()}
             </div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
@@ -167,8 +163,7 @@ export function FinancesScreen() {
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: 'var(--space-3)',
-        }}>
+          gap: 'var(--space-3)' }}>
           <LegacyStat label="Championships" value={lp.championships || 0} icon="🏆" />
           <LegacyStat label="Seasons in T1" value={lp.seasonsInT1 || 0} icon="⭐" />
           <LegacyStat label="Playoff Apps" value={lp.playoffAppearances || 0} icon="🏀" />
@@ -183,8 +178,7 @@ export function FinancesScreen() {
         <Card padding="lg" className="animate-slide-up">
           <CardHeader>Owner Mode</CardHeader>
           <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3)',
-          }}>
+            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3)' }}>
             <MiniCard label="Arena" value={`${(userTeam.finances.arena?.capacity || 0).toLocaleString()} seats`}
               sub={`${userTeam.finances.arena?.condition || 0}% condition`} />
             <MiniCard label="Sponsors" value={`${userTeam.finances.sponsorships?.length || 0} deals`}
@@ -214,18 +208,15 @@ function StatCard({ label, value, valueColor, sub, subColor }) {
       <div style={{
         fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
         fontWeight: 'var(--weight-medium)', textTransform: 'uppercase',
-        letterSpacing: '0.04em', marginBottom: 'var(--space-2)',
-      }}>{label}</div>
+        letterSpacing: '0.04em', marginBottom: 'var(--space-2)' }}>{label}</div>
       <div style={{
         fontSize: typeof value === 'string' ? 'var(--text-2xl)' : undefined,
         fontWeight: 'var(--weight-bold)', color: valueColor || 'var(--color-text)',
-        fontVariantNumeric: 'tabular-nums', lineHeight: 'var(--leading-tight)',
-      }}>{value}</div>
+        fontVariantNumeric: 'tabular-nums', lineHeight: 'var(--leading-tight)' }}>{value}</div>
       {sub && (
         <div style={{
           fontSize: 'var(--text-sm)', color: subColor || 'var(--color-text-tertiary)',
-          marginTop: 'var(--space-1)',
-        }}>{sub}</div>
+          marginTop: 'var(--space-1)' }}>{sub}</div>
       )}
     </Card>
   );
@@ -236,19 +227,15 @@ function ProgressBar({ value, floorPct }) {
   const color = pct > 0.9 ? 'var(--color-loss)' : pct > 0.8 ? 'var(--color-warning)' : 'var(--color-win)';
   return (
     <div style={{
-      background: 'var(--color-bg-sunken)', borderRadius: 'var(--radius-sm)',
-      height: 20, position: 'relative', overflow: 'hidden',
-    }}>
+      background: 'var(--color-bg-sunken)',
+      height: 20, position: 'relative', overflow: 'hidden' }}>
       <div style={{
         position: 'absolute', left: 0, top: 0, height: '100%',
-        width: `${pct * 100}%`, background: color,
-        borderRadius: 'var(--radius-sm)', transition: 'width 0.5s var(--ease-out)',
-      }} />
+        width: `${pct * 100}%`, background: color, transition: 'width 0.5s var(--ease-out)' }} />
       {floorPct > 0 && (
         <div style={{
           position: 'absolute', left: `${floorPct * 100}%`, top: 0,
-          height: '100%', width: 2, background: 'var(--color-warning)', opacity: 0.7,
-        }} />
+          height: '100%', width: 2, background: 'var(--color-warning)', opacity: 0.7 }} />
       )}
     </div>
   );
@@ -260,20 +247,16 @@ function RevenueRow({ label, amount, total, color }) {
     <div>
       <div style={{
         display: 'flex', justifyContent: 'space-between', marginBottom: 4,
-        fontSize: 'var(--text-sm)',
-      }}>
+        fontSize: 'var(--text-sm)' }}>
         <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
         <span style={{ fontWeight: 'var(--weight-semi)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>
           {formatCurrency(amount)}
         </span>
       </div>
       <div style={{
-        background: 'var(--color-bg-sunken)', borderRadius: 3, height: 8, overflow: 'hidden',
-      }}>
+        background: 'var(--color-bg-sunken)', height: 8, overflow: 'hidden' }}>
         <div style={{
-          height: '100%', width: `${pct}%`, background: color,
-          borderRadius: 3, transition: 'width 0.4s var(--ease-out)',
-        }} />
+          height: '100%', width: `${pct}%`, background: color, transition: 'width 0.4s var(--ease-out)' }} />
       </div>
     </div>
   );
@@ -283,8 +266,7 @@ function LegacyStat({ label, value, icon }) {
   return (
     <div style={{
       textAlign: 'center', padding: 'var(--space-3)',
-      background: 'var(--color-bg-sunken)', borderRadius: 'var(--radius-md)',
-    }}>
+      background: 'var(--color-bg-sunken)' }}>
       <div style={{ fontSize: 'var(--text-xs)', marginBottom: 'var(--space-1)' }}>{icon}</div>
       <div style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--weight-bold)', fontVariantNumeric: 'tabular-nums' }}>
         {value}
@@ -299,9 +281,7 @@ function LegacyStat({ label, value, icon }) {
 function MiniCard({ label, value, sub }) {
   return (
     <div style={{
-      padding: 'var(--space-3)', background: 'var(--color-bg-sunken)',
-      borderRadius: 'var(--radius-md)',
-    }}>
+      padding: 'var(--space-3)', background: 'var(--color-bg-sunken)' }}>
       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semi)' }}>{value}</div>
       {sub && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 2 }}>{sub}</div>}
@@ -322,8 +302,7 @@ function Loader({ text }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '60vh', color: 'var(--color-text-tertiary)',
-    }}>{text}</div>
+      minHeight: '60vh', color: 'var(--color-text-tertiary)' }}>{text}</div>
   );
 }
 

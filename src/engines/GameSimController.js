@@ -884,8 +884,8 @@ export class GameSimController {
         let status, statusColor, nextAction;
 
         if (gameState.currentTier === 1) {
- if (rank === totalTeams) { status = 'AUTO-RELEGATED TO TIER 2'; statusColor = '#ea4335'; nextAction = 'relegate'; }
- else if (rank >= totalTeams - 2 && rank <= totalTeams - 1) { status = 'RELEGATION PLAYOFF'; statusColor = '#ffa500'; nextAction = 'relegation-playoff'; }
+ if (rank === totalTeams) { status = 'AUTO-RELEGATED TO TIER 2'; statusColor = 'var(--color-loss)'; nextAction = 'relegate'; }
+ else if (rank >= totalTeams - 2 && rank <= totalTeams - 1) { status = 'RELEGATION PLAYOFF'; statusColor = 'var(--color-warning)'; nextAction = 'relegation-playoff'; }
             else {
                 // Check if user is in the top 8 of their conference (championship playoff eligible)
                 const t1Sorted = helpers.sortTeamsByStandings(gameState.tier1Teams, gameState.tier1Schedule);
@@ -902,9 +902,9 @@ export class GameSimController {
                     const confTeams = inEastPlayoffs ? eastTeams.slice(0, 8) : westTeams.slice(0, 8);
                     const seed = confTeams.findIndex(t => t.id === userTeam.id) + 1;
  status = `#${seed} SEED — ${conf} Conference Playoffs!`;
-                    statusColor = '#ffd700'; nextAction = 'championship';
+                    statusColor = 'var(--color-tier1)'; nextAction = 'championship';
                 } else {
- status = 'Safe in Tier 1'; statusColor = '#34a853'; nextAction = 'stay';
+ status = 'Safe in Tier 1'; statusColor = 'var(--color-win)'; nextAction = 'stay';
                 }
             }
         } else if (gameState.currentTier === 2) {
@@ -913,13 +913,13 @@ export class GameSimController {
             const divSorted = helpers.sortTeamsByStandings(divTeams, gameState.schedule);
             const divRank = divSorted.findIndex(t => t.id === userTeam.id) + 1;
 
- if (rank === totalTeams) { status = 'AUTO-RELEGATED TO TIER 3'; statusColor = '#ea4335'; nextAction = 'relegate'; }
- else if (rank >= totalTeams - 2 && rank <= totalTeams - 1) { status = 'RELEGATION PLAYOFF'; statusColor = '#ffa500'; nextAction = 'relegation-playoff'; }
+ if (rank === totalTeams) { status = 'AUTO-RELEGATED TO TIER 3'; statusColor = 'var(--color-loss)'; nextAction = 'relegate'; }
+ else if (rank >= totalTeams - 2 && rank <= totalTeams - 1) { status = 'RELEGATION PLAYOFF'; statusColor = 'var(--color-warning)'; nextAction = 'relegation-playoff'; }
             else if (divRank <= 4) {
  status = `#${divRank} SEED — ${userTeam.division} Division Playoffs!`;
-                statusColor = '#ffd700'; nextAction = 't2-championship';
+                statusColor = 'var(--color-tier1)'; nextAction = 't2-championship';
             }
-            else { status = 'Season Over — Staying in Tier 2'; statusColor = '#667eea'; nextAction = 'stay'; }
+            else { status = 'Season Over — Staying in Tier 2'; statusColor = 'var(--color-text-secondary)'; nextAction = 'stay'; }
         } else {
             const divisionTeams = teams.filter(t => t.division === userTeam.division);
             const divisionSorted = helpers.sortTeamsByStandings(divisionTeams, gameState.schedule);
@@ -927,8 +927,8 @@ export class GameSimController {
 
             if (divisionRank <= 2) {
  status = divisionRank === 1 ? '#1 SEED — Metro League Playoffs!' : '#2 SEED — Metro League Playoffs!';
-                statusColor = '#cd7f32'; nextAction = 't3-championship';
-            } else { status = 'Season Over — Staying in Tier 3'; statusColor = '#667eea'; nextAction = 'stay'; }
+                statusColor = 'var(--color-tier3)'; nextAction = 't3-championship';
+            } else { status = 'Season Over — Staying in Tier 3'; statusColor = 'var(--color-text-secondary)'; nextAction = 'stay'; }
         }
 
         const tier1Sorted = helpers.sortTeamsByStandings(gameState.tier1Teams, gameState.tier1Schedule);
@@ -1769,7 +1769,13 @@ export class GameSimController {
         const pd = gameState.t2PlayoffData;
         const postseason = gameState.postseasonResults;
 
-        // The background simulation already has all results — just use those
+        // Copy background sim's national bracket rounds into interactive results
+        // so the bracket viewer can display them
+        if (postseason.t2?.nationalBracket?.rounds) {
+            pd.interactiveResults.nationalRounds = postseason.t2.nationalBracket.rounds;
+        }
+        pd._pendingNationalRoundResults = null;
+
         if (window._reactShowChampionship) {
             window._reactShowChampionship({ mode: 't2-complete', champion: postseason.t2.champion });
             return;

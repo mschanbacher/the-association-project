@@ -742,6 +742,71 @@
                         getSimulationController: () => simulationController
                     }
                 });
+                // Wire playoff callbacks to window for React modal buttons
+                const gsc = _gameSimController;
+
+                // Series-level (user is in an active series)
+                window.simPlayoffGame = () => {
+                    const pw = gsc._playoffWatch;
+                    if (!pw) return;
+                    const isHigherHome = pw.homePattern[pw.gameNum];
+                    const homeTeam = isHigherHome ? pw.higherSeed : pw.lowerSeed;
+                    const awayTeam = isHigherHome ? pw.lowerSeed : pw.higherSeed;
+                    const gameResult = simulationController.simulatePlayoffGame(homeTeam, awayTeam);
+                    const higherSeedWon = (gameResult.winner.id === pw.higherSeed.id);
+                    if (higherSeedWon) pw.higherWins++; else pw.lowerWins++;
+                    const gameEntry = {
+                        gameNumber: pw.gameNum + 1, homeTeam, awayTeam,
+                        homeScore: gameResult.homeScore, awayScore: gameResult.awayScore,
+                        winner: higherSeedWon ? pw.higherSeed : pw.lowerSeed
+                    };
+                    // Store box score if player stats available
+                    if (gameResult.homePlayerStats && gameResult.awayPlayerStats) {
+                        const mapStats = (stats) => (stats || [])
+                            .filter(p => p.minutesPlayed > 0)
+                            .sort((a, b) => b.minutesPlayed - a.minutesPlayed)
+                            .map(p => ({
+                                name: p.playerName || p.name || 'Unknown', pos: p.position || '',
+                                min: p.minutesPlayed || 0, pts: p.points || 0,
+                                reb: p.rebounds || 0, ast: p.assists || 0,
+                                stl: p.steals || 0, blk: p.blocks || 0, to: p.turnovers || 0,
+                                pf: p.fouls || 0, starter: p.gamesStarted > 0,
+                                fgm: p.fieldGoalsMade || 0, fga: p.fieldGoalsAttempted || 0,
+                                tpm: p.threePointersMade || 0, tpa: p.threePointersAttempted || 0,
+                                ftm: p.freeThrowsMade || 0, fta: p.freeThrowsAttempted || 0
+                            }));
+                        gameEntry.boxScore = {
+                            home: { city: homeTeam.city || '', name: homeTeam.name, score: gameResult.homeScore, players: mapStats(gameResult.homePlayerStats) },
+                            away: { city: awayTeam.city || '', name: awayTeam.name, score: gameResult.awayScore, players: mapStats(gameResult.awayPlayerStats) },
+                            quarterScores: gameResult.quarterScores || null
+                        };
+                    }
+                    pw.games.push(gameEntry);
+                    pw.gameNum++;
+                    gsc._showPlayoffSeriesStatus();
+                };
+                window.watchPlayoffGame = () => gsc.watchPlayoffGame();
+                window.simPlayoffSeries = () => gsc.simRestOfPlayoffSeries();
+                window.viewPlayoffBracket = () => gsc.openBracketViewer();
+
+                // T1 Championship
+                window.simChampionshipRound = () => gsc.continueAfterChampionshipRound();
+                window.simAllChampionshipRounds = () => gsc.simAllChampionshipRounds();
+                window.skipChampionshipPlayoffs = () => gsc.skipChampionshipPlayoffs();
+                window.advanceFromChampionship = () => gsc.continueAfterChampionshipRound();
+
+                // T2
+                window.continueT2AfterDivSemis = () => gsc.continueT2AfterDivisionSemis();
+                window.continueT2AfterDivFinal = () => gsc.continueT2AfterDivisionFinal();
+                window.simT2PlayoffRound = () => gsc.continueT2AfterNationalRound();
+                window.simAllT2Rounds = () => gsc.simAllT2Rounds();
+                window.skipT2Playoffs = () => gsc._finishT2Playoffs();
+                window.advanceFromT2Playoffs = () => gsc._finishT2Playoffs();
+
+                // T3
+                window.simT3PlayoffRound = () => gsc.continueT2AfterNationalRound();
+                window.simAllT3Rounds = () => gsc.simAllT2Rounds();
+                window.skipT3Playoffs = () => gsc._finishT2Playoffs();
             }
             return _gameSimController;
         }

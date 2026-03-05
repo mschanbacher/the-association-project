@@ -401,7 +401,12 @@ function MarketDisplay({ data }) {
 }
 
 function ResultsView({ results, fc, getTeamById, userOffers }) {
-  const { signed = [], lost = [], aiSignings = [] } = results;
+  // Results from engine is a flat array: [{ player, winningOffer, userOffered, userWon, numOffers }]
+  // Categorize into signed (user won), lost (user offered but lost), aiSignings (user didn't offer)
+  const resultsArray = Array.isArray(results) ? results : [];
+  const signed = resultsArray.filter(r => r.userWon);
+  const lost = resultsArray.filter(r => r.userOffered && !r.userWon);
+  const aiSignings = resultsArray.filter(r => !r.userOffered);
 
   return (
     <div>
@@ -447,9 +452,10 @@ function ResultSection({ title, color, children }) {
 
 function ResultRow({ result, fc, won, getTeamById }) {
   const p = result.player || result;
-  const teamName = result.signedWith
-    ? (getTeamById ? getTeamById(result.signedWith)?.name : result.teamName)
-    : result.teamName;
+  const winningTeamId = result.winningOffer?.teamId;
+  const teamName = !won && winningTeamId && getTeamById
+    ? (getTeamById(winningTeamId)?.name || 'Unknown team')
+    : null;
 
   return (
     <div style={{
@@ -471,7 +477,7 @@ function ResultRow({ result, fc, won, getTeamById }) {
         ) : (
           <span style={{ color: 'var(--color-loss)', fontWeight: 600 }}>Declined</span>
         )}
-        {result.salary && <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)' }}>{fc(result.salary)}</span>}
+        {(result.winningOffer?.salary || result.salary) && <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)' }}>{fc(result.winningOffer?.salary || result.salary)}</span>}
       </div>
     </div>
   );

@@ -212,6 +212,9 @@ export class OffseasonController {
 
         // Otherwise show static postseason results summary
         if (window._reactShowChampionship) {
+            // Wire the continue button callback
+            window.advanceFromPostseason = () => this.continueAfterPostseason();
+
             window._reactShowChampionship({
                 mode: 'postseason',
                 t1Champion: postseasonResults.t1?.champion || null,

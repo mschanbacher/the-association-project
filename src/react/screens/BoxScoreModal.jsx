@@ -8,7 +8,7 @@ export function BoxScoreModal({ isOpen, onClose, data }) {
   const winner = (home.score || 0) > (away.score || 0) ? 'home' : 'away';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} maxWidth={820}>
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth={820} zIndex={1400}>
       <ModalHeader onClose={onClose}>Box Score</ModalHeader>
       <ModalBody style={{ padding: 'var(--space-4) var(--space-5)' }}>
         {/* Scoreboard */}

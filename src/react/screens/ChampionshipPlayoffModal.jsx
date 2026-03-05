@@ -242,7 +242,7 @@ function RoundView({ data }) {
           {finalsSeries.map((s, i) => <SeriesCard key={`f${i}`} series={s} userTeamId={userTeamId} isFinals />)}
           {champion && (
             <ChampionBanner
-              tier="NAPL Champion"
+              tier="NBA Champion"
               name={champion.name}
               isUser={champion.id === userTeamId}
             />
@@ -271,8 +271,8 @@ function CompleteView({ data }) {
   const { championName } = data;
   return (
     <div style={{ textAlign: 'center', padding: '20px 0' }}>
-      <PageTitle label="Championship Complete" title="NAPL Playoffs" />
-      <ChampionBanner tier="NAPL Champion" name={championName} isUser />
+      <PageTitle label="Championship Complete" title="NBA Playoffs" />
+      <ChampionBanner tier="NBA Champion" name={championName} isUser />
       <ActionBar>
         <Button variant="secondary" onClick={() => window.viewPlayoffBracket?.()}>View Bracket</Button>
         <Button variant="primary" onClick={() => window.advanceFromChampionship?.()}>Continue to Offseason</Button>
@@ -284,10 +284,30 @@ function CompleteView({ data }) {
 function SeriesWatchView({ data }) {
   const { higherSeed, lowerSeed, higherWins, lowerWins, bestOf, nextGameNum, games, userTeamId, isHigherHome } = data;
   const userIsHigher = userTeamId === higherSeed.id;
-  const opponent = userIsHigher ? lowerSeed : higherSeed;
-  const userWins = userIsHigher ? higherWins : lowerWins;
-  const oppWins = userIsHigher ? lowerWins : higherWins;
-  const userHome = (userIsHigher && isHigherHome) || (!userIsHigher && !isHigherHome);
+
+  // Helper to get user/opp scores from game objects (which store home/away)
+  const getScores = (g) => {
+    const higherIsHome = g.homeTeam?.id === higherSeed.id;
+    const hScore = higherIsHome ? g.homeScore : g.awayScore;
+    const lScore = higherIsHome ? g.awayScore : g.homeScore;
+    return {
+      userScore: userIsHigher ? hScore : lScore,
+      oppScore: userIsHigher ? lScore : hScore,
+    };
+  };
+
+  const handleBoxScore = (gameIdx) => {
+    const g = games[gameIdx];
+    if (g?.boxScore) {
+      window._reactShowBoxScore?.({
+        home: g.boxScore.home,
+        away: g.boxScore.away,
+        quarterScores: g.boxScore.quarterScores,
+        date: `Playoff Game ${i + 1}`,
+        hasDetailedStats: true,
+      });
+    }
+  };
 
   return (
     <div>
@@ -317,14 +337,15 @@ function SeriesWatchView({ data }) {
       {games && games.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 20 }}>
           {games.map((g, i) => {
-            const userScore = userIsHigher ? g.higherScore : g.lowerScore;
-            const oppScore = userIsHigher ? g.lowerScore : g.higherScore;
+            const { userScore, oppScore } = getScores(g);
             const won = userScore > oppScore;
+            const hasBox = !!g.boxScore;
             return (
-              <div key={i} style={{
+              <div key={i} onClick={() => hasBox && handleBoxScore(i)} style={{
                 width: 60, padding: '8px 4px', textAlign: 'center',
                 background: won ? 'var(--color-accent-bg)' : 'var(--color-loss-bg)',
                 border: `1px solid ${won ? 'var(--color-accent-border)' : 'var(--color-border-subtle)'}`,
+                cursor: hasBox ? 'pointer' : 'default',
               }}>
                 <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>G{i + 1}</div>
                 <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{userScore}</div>
@@ -354,6 +375,7 @@ function SeriesWatchView({ data }) {
           Watch Game {nextGameNum || (games ? games.length + 1 : 1)}
         </Button>
         <Button variant="secondary" onClick={() => window.simPlayoffSeries?.()}>Sim Series</Button>
+        <Button variant="ghost" onClick={() => window.viewPlayoffBracket?.()}>View Bracket</Button>
       </ActionBar>
     </div>
   );
@@ -373,63 +395,82 @@ function T2ActionBar({ data }) {
 }
 
 function T2DivSemisView({ data }) {
-  const { divisions, userTeamId } = data;
+  const { division, semi1, semi2, userTeam } = data;
+  const userTeamId = userTeam?.id;
+  const userSeries = [semi1, semi2].find(s =>
+    s?.higherSeed?.id === userTeamId || s?.lowerSeed?.id === userTeamId
+  );
   return (
     <div>
       <PageTitle label="NARBL Playoffs" title="Division Semifinals" />
-      {Object.entries(divisions || {}).map(([div, series]) => (
-        <div key={div}>
-          <SectionHeader>{div}</SectionHeader>
-          {series.map((s, i) => <InlineSeriesCard key={i} result={s} userTeamId={userTeamId} />)}
-        </div>
-      ))}
-      <T2ActionBar data={data} />
+      <SectionHeader>{division} Division</SectionHeader>
+      {semi1 && <InlineSeriesCard result={semi1} userTeamId={userTeamId} />}
+      {semi2 && <InlineSeriesCard result={semi2} userTeamId={userTeamId} />}
+      {userSeries && <UserSeriesDetail series={userSeries} userTeamId={userTeamId} />}
+      <ActionBar>
+        <Button variant="ghost" onClick={() => window.viewPlayoffBracket?.()}>View Bracket</Button>
+        <Button variant="primary" onClick={() => window.continueT2AfterDivSemis?.()}>Continue</Button>
+      </ActionBar>
     </div>
   );
 }
 
 function T2DivFinalView({ data }) {
-  const { divisions, userTeamId } = data;
+  const { division, divFinal, userTeam } = data;
+  const userTeamId = userTeam?.id;
+  const isUserSeries = divFinal?.higherSeed?.id === userTeamId || divFinal?.lowerSeed?.id === userTeamId;
   return (
     <div>
       <PageTitle label="NARBL Playoffs" title="Division Finals" />
-      {Object.entries(divisions || {}).map(([div, result]) => (
-        <div key={div}>
-          <SectionHeader>{div} Division Champion</SectionHeader>
-          <InlineSeriesCard result={result} userTeamId={userTeamId} />
-          {result.winner && (
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-accent)', marginBottom: 12 }}>
-              Champion: {result.winner.name}
-            </div>
-          )}
+      <SectionHeader>{division} Division Final</SectionHeader>
+      {divFinal && <InlineSeriesCard result={divFinal} userTeamId={userTeamId} />}
+      {divFinal?.winner && (
+        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-accent)', marginBottom: 12 }}>
+          Division Champion: {divFinal.winner.name}
         </div>
-      ))}
-      <T2ActionBar data={data} />
+      )}
+      {isUserSeries && divFinal && <UserSeriesDetail series={divFinal} userTeamId={userTeamId} />}
+      <ActionBar>
+        <Button variant="ghost" onClick={() => window.viewPlayoffBracket?.()}>View Bracket</Button>
+        <Button variant="primary" onClick={() => window.continueT2AfterDivFinal?.()}>Continue</Button>
+      </ActionBar>
     </div>
   );
 }
 
 function T2NationalRoundView({ data }) {
-  const { roundName, series, champion, userTeamId } = data;
+  const { roundName, roundResults, champion, userTeam } = data;
+  const userTeamId = userTeam?.id;
+  // roundResults is array of { result: { higherSeed, lowerSeed, winner, ... } } or null
+  const series = (roundResults || []).filter(Boolean).map(r => r.result);
+  const userSeries = series.find(s =>
+    s?.higherSeed?.id === userTeamId || s?.lowerSeed?.id === userTeamId
+  );
   return (
     <div>
       <PageTitle label="NARBL Playoffs" title={roundName || 'National Round'} />
-      {(series || []).map((s, i) => <InlineSeriesCard key={i} result={s} userTeamId={userTeamId} />)}
+      {series.map((s, i) => <InlineSeriesCard key={i} result={s} userTeamId={userTeamId} />)}
+      {userSeries && <UserSeriesDetail series={userSeries} userTeamId={userTeamId} />}
       {champion && <ChampionBanner tier="NARBL Champion" name={champion.name} isUser={champion.id === userTeamId} />}
-      <T2ActionBar data={data} />
+      <ActionBar>
+        <Button variant="ghost" onClick={() => window.viewPlayoffBracket?.()}>View Bracket</Button>
+        <Button variant="secondary" onClick={() => window.simT2PlayoffRound?.()}>Sim Round</Button>
+        <Button variant="primary" onClick={() => window.simAllT2Rounds?.()}>Sim Remaining</Button>
+      </ActionBar>
     </div>
   );
 }
 
 function T2EliminationView({ data }) {
-  const { userEliminated, eliminatedBy, userTeamId } = data;
+  const { userTeam, eliminatedIn, champion } = data;
   return (
     <div style={{ textAlign: 'center', padding: '20px 0' }}>
       <PageTitle label="NARBL Playoffs" title="Eliminated" />
       <div style={{ fontSize: 'var(--text-md)', color: 'var(--color-loss)', marginBottom: 20 }}>
-        Your team has been eliminated{eliminatedBy ? ` by ${eliminatedBy}` : ''}
+        Your team has been eliminated{eliminatedIn ? ` in the ${eliminatedIn}` : ''}
       </div>
       <ActionBar>
+        <Button variant="ghost" onClick={() => window.viewPlayoffBracket?.()}>View Bracket</Button>
         <Button variant="secondary" onClick={() => window.simAllT2Rounds?.()}>Sim Remaining</Button>
         <Button variant="primary" onClick={() => window.skipT2Playoffs?.()}>Skip to Offseason</Button>
       </ActionBar>
@@ -444,6 +485,7 @@ function T2CompleteView({ data }) {
       <PageTitle label="Playoffs Complete" title="NARBL Playoffs" />
       {champion && <ChampionBanner tier="NARBL Champion" name={champion.name} isUser={champion.id === userTeamId} />}
       <ActionBar>
+        <Button variant="ghost" onClick={() => window.viewPlayoffBracket?.()}>View Bracket</Button>
         <Button variant="primary" onClick={() => window.advanceFromT2Playoffs?.()}>Continue</Button>
       </ActionBar>
     </div>
@@ -457,6 +499,7 @@ function T2CompleteView({ data }) {
 function T3ActionBar() {
   return (
     <ActionBar>
+      <Button variant="ghost" onClick={() => window.viewPlayoffBracket?.()}>View Bracket</Button>
       <Button variant="secondary" onClick={() => window.simT3PlayoffRound?.()}>Sim Round</Button>
       <Button variant="primary" onClick={() => window.simAllT3Rounds?.()}>Sim Remaining</Button>
     </ActionBar>
@@ -465,15 +508,12 @@ function T3ActionBar() {
 
 function T3MetroResultView({ data }) {
   const { metroName, result, userTeamId } = data;
+  const isUserSeries = result?.higherSeed?.id === userTeamId || result?.lowerSeed?.id === userTeamId;
   return (
     <div>
-      <PageTitle label="Metro League Playoffs" title={metroName || 'Metro Final'} />
+      <PageTitle label="MBL Playoffs" title={metroName || 'Metro Final'} />
       <InlineSeriesCard result={result} userTeamId={userTeamId} />
-      {result?.winner && (
-        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-accent)', marginBottom: 8 }}>
-          Metro Champion: {result.winner.name}
-        </div>
-      )}
+      {isUserSeries && result && <UserSeriesDetail series={result} userTeamId={userTeamId} />}
       <T3ActionBar />
     </div>
   );
@@ -481,10 +521,14 @@ function T3MetroResultView({ data }) {
 
 function T3RegionalResultView({ data }) {
   const { regionName, series, userTeamId } = data;
+  const userSeries = (series || []).find(s =>
+    s?.higherSeed?.id === userTeamId || s?.lowerSeed?.id === userTeamId
+  );
   return (
     <div>
-      <PageTitle label="Metro League Playoffs" title={regionName || 'Regional Round'} />
+      <PageTitle label="MBL Playoffs" title={regionName || 'Regional Round'} />
       {(series || []).map((s, i) => <InlineSeriesCard key={i} result={s} userTeamId={userTeamId} />)}
+      {userSeries && <UserSeriesDetail series={userSeries} userTeamId={userTeamId} />}
       <T3ActionBar />
     </div>
   );
@@ -494,9 +538,9 @@ function T3NationalRoundView({ data }) {
   const { roundName, series, champion, userTeamId } = data;
   return (
     <div>
-      <PageTitle label="Metro League Playoffs" title={roundName || 'National Round'} />
+      <PageTitle label="MBL Playoffs" title={roundName || 'National Round'} />
       {(series || []).map((s, i) => <InlineSeriesCard key={i} result={s} userTeamId={userTeamId} />)}
-      {champion && <ChampionBanner tier="Metro League Champion" name={champion.name} isUser={champion.id === userTeamId} />}
+      {champion && <ChampionBanner tier="MBL Champion" name={champion.name} isUser={champion.id === userTeamId} />}
       <T3ActionBar />
     </div>
   );
@@ -506,11 +550,12 @@ function T3EliminationView({ data }) {
   const { eliminatedBy } = data;
   return (
     <div style={{ textAlign: 'center', padding: '20px 0' }}>
-      <PageTitle label="Metro League Playoffs" title="Eliminated" />
+      <PageTitle label="MBL Playoffs" title="Eliminated" />
       <div style={{ fontSize: 'var(--text-md)', color: 'var(--color-loss)', marginBottom: 20 }}>
         Your team has been eliminated{eliminatedBy ? ` by ${eliminatedBy}` : ''}
       </div>
       <ActionBar>
+        <Button variant="ghost" onClick={() => window.viewPlayoffBracket?.()}>View Bracket</Button>
         <Button variant="secondary" onClick={() => window.simAllT3Rounds?.()}>Sim Remaining</Button>
         <Button variant="primary" onClick={() => window.skipT3Playoffs?.()}>Skip to Offseason</Button>
       </ActionBar>
@@ -522,11 +567,82 @@ function T3CompleteView({ data }) {
   const { champion, userTeamId } = data;
   return (
     <div style={{ textAlign: 'center', padding: '20px 0' }}>
-      <PageTitle label="Playoffs Complete" title="Metro League Playoffs" />
-      {champion && <ChampionBanner tier="Metro League Champion" name={champion.name} isUser={champion.id === userTeamId} />}
+      <PageTitle label="Playoffs Complete" title="MBL Playoffs" />
+      {champion && <ChampionBanner tier="MBL Champion" name={champion.name} isUser={champion.id === userTeamId} />}
       <ActionBar>
-        <Button variant="primary" onClick={() => window.advanceFromT3Playoffs?.()}>Continue</Button>
+        <Button variant="ghost" onClick={() => window.viewPlayoffBracket?.()}>View Bracket</Button>
+        <Button variant="primary" onClick={() => window.advanceFromT2Playoffs?.()}>Continue</Button>
       </ActionBar>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   POSTSEASON SUMMARY
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════
+   USER SERIES DETAIL — game-by-game results with box score access
+   ═══════════════════════════════════════════════════════════════ */
+
+function UserSeriesDetail({ series, userTeamId }) {
+  if (!series?.games || series.games.length === 0) return null;
+
+  const userIsHigher = series.higherSeed?.id === userTeamId;
+  const won = series.winner?.id === userTeamId;
+
+  const getScores = (g) => {
+    const higherIsHome = g.homeTeam?.id === series.higherSeed?.id;
+    const hScore = higherIsHome ? g.homeScore : g.awayScore;
+    const lScore = higherIsHome ? g.awayScore : g.homeScore;
+    return {
+      userScore: userIsHigher ? hScore : lScore,
+      oppScore: userIsHigher ? lScore : hScore,
+    };
+  };
+
+  const handleBoxScore = (g) => {
+    if (g?.boxScore && window._reactShowBoxScore) {
+      window._reactShowBoxScore({
+        home: g.boxScore.home,
+        away: g.boxScore.away,
+        quarterScores: g.boxScore.quarterScores,
+        date: `Playoff Game ${g.gameNumber || ''}`,
+        hasDetailedStats: true,
+      });
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 12, marginBottom: 16 }}>
+      <div style={{
+        fontSize: 10, fontWeight: 600, color: won ? 'var(--color-win)' : 'var(--color-loss)',
+        textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8,
+      }}>
+        Series {won ? 'Won' : 'Lost'} {series.higherSeedWins || series.higherWins}–{series.lowerSeedWins || series.lowerWins}
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {series.games.map((g, i) => {
+          const { userScore, oppScore } = getScores(g);
+          const gameWon = userScore > oppScore;
+          const hasBox = !!g.boxScore;
+          return (
+            <div key={i} onClick={() => hasBox && handleBoxScore(g)} style={{
+              width: 60, padding: '8px 4px', textAlign: 'center',
+              background: gameWon ? 'var(--color-accent-bg)' : 'var(--color-loss-bg)',
+              border: `1px solid ${gameWon ? 'var(--color-accent-border)' : 'var(--color-border-subtle)'}`,
+              cursor: hasBox ? 'pointer' : 'default',
+            }}>
+              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>G{i + 1}</div>
+              <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{userScore}</div>
+              <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{oppScore}</div>
+              <div style={{ fontSize: 9, fontWeight: 700, marginTop: 2, color: gameWon ? 'var(--color-win)' : 'var(--color-loss)' }}>
+                {gameWon ? 'W' : 'L'}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -542,6 +658,10 @@ function PostseasonView({ data }) {
     t1Relegation, t2Relegation, userTeamId,
   } = data;
 
+  // t1Finals comes as { conf, result: { higherSeed, lowerSeed, ... } }
+  // InlineSeriesCard expects the inner result object
+  const finalsResult = t1Finals?.result || t1Finals;
+
   return (
     <div>
       <PageTitle label="Postseason" title="Postseason Results" />
@@ -549,7 +669,7 @@ function PostseasonView({ data }) {
       {/* Champions */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
         {t1Champion && (
-          <ChampionBanner tier="Tier 1 — NAPL Champion" name={t1Champion.name}
+          <ChampionBanner tier="Tier 1 — NBA Champion" name={t1Champion.name}
             isUser={t1Champion.id === userTeamId} />
         )}
         {t2Champion && (
@@ -557,16 +677,16 @@ function PostseasonView({ data }) {
             isUser={t2Champion.id === userTeamId} />
         )}
         {t3Champion && (
-          <ChampionBanner tier="Tier 3 — Metro Champion" name={t3Champion.name}
+          <ChampionBanner tier="Tier 3 — MBL Champion" name={t3Champion.name}
             isUser={t3Champion.id === userTeamId} />
         )}
       </div>
 
       {/* Finals detail */}
-      {t1Finals && (
+      {finalsResult && (
         <>
-          <SectionHeader>NAPL Finals</SectionHeader>
-          <InlineSeriesCard result={t1Finals} userTeamId={userTeamId} />
+          <SectionHeader>NBA Finals</SectionHeader>
+          <InlineSeriesCard result={finalsResult} userTeamId={userTeamId} />
         </>
       )}
 

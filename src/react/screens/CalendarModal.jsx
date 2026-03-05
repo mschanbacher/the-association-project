@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Modal, ModalHeader, ModalBody } from '../components/Modal.jsx';
 
 const MONTH_NAMES = ['January','February','March','April','May','June',
@@ -8,13 +8,11 @@ const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 export function CalendarModal({ isOpen, data, onClose }) {
   const [selectedDate, setSelectedDate] = useState(null);
 
-  // All data derived from props — hooks before early return
   const {
     months, currentDate, userGamesByDate, allGamesByDate,
     seasonDates, startYear, allTeams, userTeamId, gameState
   } = data || {};
 
-  // Build day detail data when a date is selected
   const dayDetail = useMemo(() => {
     if (!selectedDate || !gameState) return null;
     return buildDayDetail(selectedDate, gameState, allTeams, userTeamId);
@@ -27,27 +25,39 @@ export function CalendarModal({ isOpen, data, onClose }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} maxWidth={1100} zIndex={1300}>
       <ModalHeader onClose={onClose}>
-        {'\ud83d\udcc5'} Season {startYear}-{(startYear + 1) % 100} Calendar
+        Season {startYear}–{(startYear + 1) % 100} Calendar
       </ModalHeader>
 
       <ModalBody style={{ maxHeight: '75vh', overflowY: 'auto' }}>
         {/* Legend */}
         <div style={{
-          display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap',
-          marginBottom: 'var(--space-4)', fontSize: 'var(--text-xs)',
-          color: 'var(--color-text-secondary)',
+          display: 'flex', gap: 16, flexWrap: 'wrap',
+          marginBottom: 16, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)',
         }}>
-          <LegendItem color="rgba(102,126,234,0.6)" label="Home Game" />
-          <LegendItem color="rgba(234,67,53,0.5)" label="Away Game" />
-          <LegendItem color="var(--color-bg-active)" label="League Games" border />
-          <LegendItem color="rgba(255,215,0,0.3)" label="Special Event" />
-          <LegendItem color="transparent" label="Today" todayBorder />
+          <LegendItem bg="var(--color-bg-raised)" label="Home" />
+          <LegendItem bg="var(--color-accent-bg)" label="Away" />
+          <LegendItem bg="var(--color-warning-bg)" label="Event" />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{
+              width: 14, height: 14, display: 'inline-block',
+              borderLeft: '3px solid var(--color-accent)', background: 'var(--color-bg-sunken)',
+            }} />
+            Today
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 5, height: 5, display: 'inline-block', background: 'var(--color-win)' }} />
+            Win
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 5, height: 5, display: 'inline-block', background: 'var(--color-loss)' }} />
+            Loss
+          </span>
         </div>
 
         {/* Month Grid */}
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
-          gap: 'var(--space-4)',
+          gap: 'var(--gap)',
         }}>
           {(months || []).map(({ year, month }) => (
             <MonthCard key={`${year}-${month}`}
@@ -73,21 +83,15 @@ export function CalendarModal({ isOpen, data, onClose }) {
   );
 }
 
-/* ── Legend Item ── */
-function LegendItem({ color, label, border, todayBorder }) {
+function LegendItem({ bg, label }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <span style={{
-        width: 14, height: 14, borderRadius: 3, display: 'inline-block',
-        background: color,
-        border: todayBorder ? '2px solid #ffd700' : border ? '1px solid var(--color-border-subtle)' : 'none',
-      }} />
+      <span style={{ width: 14, height: 14, display: 'inline-block', background: bg }} />
       {label}
     </span>
   );
 }
 
-/* ── Month Card ── */
 function MonthCard({
   year, month, currentDate, userGamesByDate, allGamesByDate,
   allStarStart, allStarEnd, tradeDeadline, tier1End,
@@ -95,18 +99,15 @@ function MonthCard({
 }) {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const blanks = Array.from({ length: firstDay });
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   return (
     <div style={{
-      background: 'var(--color-bg-sunken)', borderRadius: 'var(--radius-lg)',
-      padding: 'var(--space-3)', border: '1px solid var(--color-border-subtle)',
+      background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)',
+      padding: 12,
     }}>
       <div style={{
-        textAlign: 'center', fontWeight: 'var(--weight-semi)',
-        fontSize: 'var(--text-sm)', color: 'var(--color-warning)',
-        marginBottom: 'var(--space-2)',
+        textAlign: 'center', fontWeight: 600, fontSize: 'var(--text-sm)',
+        color: 'var(--color-text)', marginBottom: 10,
       }}>
         {MONTH_NAMES[month]} {year}
       </div>
@@ -116,10 +117,13 @@ function MonthCard({
         gap: 2, textAlign: 'center',
       }}>
         {DAY_NAMES.map(d => (
-          <div key={d} style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px 0' }}>{d}</div>
+          <div key={d} style={{
+            fontSize: 10, color: 'var(--color-text-tertiary)',
+            padding: '2px 0', fontWeight: 600,
+          }}>{d}</div>
         ))}
-        {blanks.map((_, i) => <div key={`b${i}`} />)}
-        {days.map(day => {
+        {Array.from({ length: firstDay }).map((_, i) => <div key={`b${i}`} />)}
+        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
           const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           return (
             <DayCell key={day} day={day} dateStr={dateStr}
@@ -137,7 +141,6 @@ function MonthCard({
   );
 }
 
-/* ── Day Cell ── */
 function DayCell({
   day, dateStr, currentDate, selectedDate, userGame, dayGames,
   allStarStart, allStarEnd, tradeDeadline, tier1End, onClick,
@@ -148,103 +151,129 @@ function DayCell({
   const isTradeDeadline = dateStr === tradeDeadline;
   const isSeasonEnd = dateStr === tier1End;
   const isSpecial = isAllStar || isTradeDeadline || isSeasonEnd;
-  const hasContent = userGame || (dayGames && dayGames.total > 0);
+  const hasContent = userGame || (dayGames && dayGames.total > 0) || isSpecial;
 
-  let bg = 'transparent';
+  // Default: sunken (blends into grid)
+  let bg = 'var(--color-bg-sunken)';
   let textColor = 'var(--color-text-tertiary)';
-  let dotText = '';
+  let sub = '';
+  let resultDot = null;
 
   if (userGame) {
-    bg = userGame.isHome
-      ? (userGame.played ? 'rgba(102,126,234,0.35)' : 'rgba(102,126,234,0.6)')
-      : (userGame.played ? 'rgba(234,67,53,0.3)' : 'rgba(234,67,53,0.5)');
+    // User games pop out of the grid
+    if (userGame.isHome) {
+      bg = 'var(--color-bg-raised)';
+    } else {
+      bg = 'var(--color-accent-bg)';
+    }
     textColor = 'var(--color-text)';
     const oppName = userGame.opponent ? userGame.opponent.name.split(' ').pop() : '???';
-    dotText = `${userGame.isHome ? 'vs' : '@'} ${oppName}`;
-  } else if (dayGames && dayGames.total > 0) {
-    bg = 'var(--color-bg-active)';
-    textColor = 'var(--color-text-secondary)';
-    dotText = `${dayGames.total}g`;
-  }
+    sub = `${userGame.isHome ? 'vs' : '@'} ${oppName}`;
 
-  if (isSpecial) {
-    bg = 'rgba(255,215,0,0.15)';
-    textColor = '#ffd700';
-    dotText = isAllStar ? '\u2b50' : isTradeDeadline ? 'TDL' : 'END';
+    if (userGame.played) {
+      const won = userGame.isHome
+        ? userGame.homeScore > userGame.awayScore
+        : userGame.awayScore > userGame.homeScore;
+      resultDot = won ? 'var(--color-win)' : 'var(--color-loss)';
+    }
+  } else if (isSpecial) {
+    bg = 'var(--color-warning-bg)';
+    textColor = 'var(--color-warning)';
+    sub = isAllStar ? 'ASG' : isTradeDeadline ? 'TDL' : 'END';
+  } else if (dayGames && dayGames.total > 0) {
+    // League games stay sunken
+    sub = `${dayGames.total}g`;
   }
 
   return (
     <div
       onClick={hasContent ? () => onClick(dateStr) : undefined}
       style={{
-        background: isSelected ? 'var(--color-accent)30' : bg,
-        borderRadius: 4, padding: '3px 1px', minHeight: 36,
-        color: textColor,
-        border: isToday ? '2px solid #ffd700' : isSelected ? '1px solid var(--color-accent)' : 'none',
+        background: isSelected ? 'var(--color-accent-bg)' : bg,
+        padding: '4px 3px', minHeight: 40,
+        borderLeft: isToday ? '3px solid var(--color-accent)' : undefined,
         cursor: hasContent ? 'pointer' : 'default',
-        transition: 'background 0.15s',
+        transition: 'all 100ms ease',
+        position: 'relative',
       }}
     >
-      <div style={{ fontSize: '0.8em', fontWeight: isToday ? 'var(--weight-bold)' : 'var(--weight-normal)' }}>{day}</div>
-      {dotText && (
+      <div style={{
+        fontSize: 11,
+        fontWeight: isToday ? 700 : userGame ? 600 : 400,
+        color: textColor,
+      }}>{day}</div>
+      {sub && (
         <div style={{
-          fontSize: '0.5em', overflow: 'hidden', textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap', opacity: 0.85, marginTop: 1,
-        }}>{dotText}</div>
+          fontSize: 7, color: textColor, opacity: 0.75,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          marginTop: 1,
+        }}>{sub}</div>
+      )}
+      {resultDot && (
+        <div style={{
+          position: 'absolute', top: 3, right: 3,
+          width: 5, height: 5, background: resultDot,
+        }} />
       )}
     </div>
   );
 }
 
-/* ── Day Detail Panel ── */
 function DayDetailPanel({ detail, userTeamId, onShowBoxScore }) {
   const { formattedDate, event, userGame, otherGames, dateStr } = detail;
 
   return (
     <div style={{
-      marginTop: 'var(--space-4)', background: 'var(--color-bg-sunken)',
-      borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)',
-      border: '1px solid var(--color-border-subtle)',
+      marginTop: 'var(--gap)', background: 'var(--color-bg-sunken)',
+      border: '1px solid var(--color-border-subtle)', padding: '14px 16px',
     }}>
       <div style={{
-        fontWeight: 'var(--weight-semi)', color: 'var(--color-warning)',
-        marginBottom: 'var(--space-3)', fontSize: 'var(--text-sm)',
+        fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)',
+        textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10,
       }}>
         {formattedDate}
       </div>
 
       {event && (
         <div style={{
-          marginBottom: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)',
-          background: 'rgba(255,215,0,0.1)', borderRadius: 'var(--radius-md)',
-          color: '#ffd700', fontSize: 'var(--text-sm)',
+          marginBottom: 12, padding: '8px 12px',
+          background: 'var(--color-warning-bg)',
+          color: 'var(--color-warning)', fontSize: 'var(--text-sm)', fontWeight: 600,
         }}>{event}</div>
       )}
 
       {!userGame && otherGames.length === 0 && (
-        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>No games scheduled</div>
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+          No games scheduled
+        </div>
       )}
 
       {userGame && (
-        <div style={{ marginBottom: 'var(--space-3)' }}>
-          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
-            {'\ud83c\udfc0'} Your Game
-          </div>
-          <GameRow game={userGame} userTeamId={userTeamId} dateStr={dateStr} onShowBoxScore={onShowBoxScore} highlight />
+        <div style={{ marginBottom: 12 }}>
+          <div style={{
+            fontSize: 10, fontWeight: 600, color: 'var(--color-accent)',
+            textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6,
+          }}>Your Game</div>
+          <GameRow game={userGame} userTeamId={userTeamId}
+            dateStr={dateStr} onShowBoxScore={onShowBoxScore} highlight />
         </div>
       )}
 
       {otherGames.length > 0 && (
-        <details style={{ marginTop: 'var(--space-1)' }}>
+        <details style={{ marginTop: 4 }}>
           <summary style={{
             cursor: 'pointer', color: 'var(--color-text-tertiary)',
-            fontSize: 'var(--text-xs)', marginBottom: 'var(--space-2)',
+            fontSize: 'var(--text-xs)', marginBottom: 6,
           }}>
             {otherGames.length} other game{otherGames.length !== 1 ? 's' : ''} today
           </summary>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', maxHeight: 300, overflowY: 'auto' }}>
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 4,
+            maxHeight: 300, overflowY: 'auto',
+          }}>
             {otherGames.map((g, i) => (
-              <GameRow key={i} game={g} userTeamId={userTeamId} dateStr={dateStr} onShowBoxScore={onShowBoxScore} />
+              <GameRow key={i} game={g} userTeamId={userTeamId}
+                dateStr={dateStr} onShowBoxScore={onShowBoxScore} />
             ))}
           </div>
         </details>
@@ -253,22 +282,25 @@ function DayDetailPanel({ detail, userTeamId, onShowBoxScore }) {
   );
 }
 
-/* ── Game Row ── */
 function GameRow({ game, userTeamId, dateStr, onShowBoxScore, highlight }) {
-  const isUser = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
-  const bg = highlight
-    ? 'rgba(102,126,234,0.12)'
-    : 'var(--color-bg-active)';
-
   if (!game.played) {
     return (
       <div style={{
-        background: bg, padding: 'var(--space-2) var(--space-3)',
-        borderRadius: 'var(--radius-md)', opacity: 0.6, fontSize: 'var(--text-sm)',
-        display: 'flex', justifyContent: 'space-between',
+        background: highlight ? 'var(--color-accent-bg)' : 'var(--color-bg-active)',
+        border: highlight ? '1px solid var(--color-accent-border)' : '1px solid var(--color-border-subtle)',
+        padding: '10px 12px', fontSize: 'var(--text-sm)',
       }}>
-        <span>{game.homeName} vs {game.awayName}</span>
-        <span style={{ color: 'var(--color-text-tertiary)' }}>Upcoming</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: 500 }}>{game.homeName}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>—</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+          <span style={{ fontWeight: 500 }}>{game.awayName}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>—</span>
+        </div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+          {highlight ? (game.homeTeamId === userTeamId ? 'Home' : 'Away') + ' · ' : ''}Upcoming
+        </div>
       </div>
     );
   }
@@ -276,27 +308,46 @@ function GameRow({ game, userTeamId, dateStr, onShowBoxScore, highlight }) {
   const homeWon = game.homeScore > game.awayScore;
   return (
     <div
-      onClick={game.played ? () => onShowBoxScore(dateStr, game.homeTeamId, game.awayTeamId) : undefined}
+      onClick={() => onShowBoxScore(dateStr, game.homeTeamId, game.awayTeamId)}
       style={{
-        background: bg, padding: 'var(--space-2) var(--space-3)',
-        borderRadius: 'var(--radius-md)', cursor: game.played ? 'pointer' : 'default',
-        fontSize: 'var(--text-sm)',
-        border: highlight ? '1px solid rgba(102,126,234,0.25)' : '1px solid var(--color-border-subtle)',
+        background: highlight ? 'var(--color-accent-bg)' : 'var(--color-bg-raised)',
+        border: highlight ? '1px solid var(--color-accent-border)' : '1px solid var(--color-border-subtle)',
+        padding: '10px 12px', cursor: 'pointer', fontSize: 'var(--text-sm)',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-        <span style={{ fontWeight: homeWon ? 'var(--weight-semi)' : 'var(--weight-normal)', opacity: homeWon ? 1 : 0.6 }}>{game.homeName}</span>
-        <span style={{ fontWeight: homeWon ? 'var(--weight-semi)' : 'var(--weight-normal)', opacity: homeWon ? 1 : 0.6 }}>{game.homeScore}</span>
+        <span style={{
+          fontWeight: homeWon ? 600 : 400,
+          color: homeWon ? 'var(--color-text)' : 'var(--color-text-secondary)',
+        }}>{game.homeName}</span>
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontWeight: homeWon ? 700 : 400,
+          color: homeWon ? 'var(--color-text)' : 'var(--color-text-secondary)',
+        }}>{game.homeScore}</span>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontWeight: !homeWon ? 'var(--weight-semi)' : 'var(--weight-normal)', opacity: !homeWon ? 1 : 0.6 }}>{game.awayName}</span>
-        <span style={{ fontWeight: !homeWon ? 'var(--weight-semi)' : 'var(--weight-normal)', opacity: !homeWon ? 1 : 0.6 }}>{game.awayScore}</span>
+        <span style={{
+          fontWeight: !homeWon ? 600 : 400,
+          color: !homeWon ? 'var(--color-text)' : 'var(--color-text-secondary)',
+        }}>{game.awayName}</span>
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontWeight: !homeWon ? 700 : 400,
+          color: !homeWon ? 'var(--color-text)' : 'var(--color-text-secondary)',
+        }}>{game.awayScore}</span>
       </div>
+      {highlight && (
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+          {game.homeTeamId === userTeamId ? 'Home' : 'Away'}
+          {' · '}{homeWon === (game.homeTeamId === userTeamId) ? 'W' : 'L'}
+          {' · View Box Score →'}
+        </div>
+      )}
     </div>
   );
 }
 
-/* ── Helper: build day detail from gameState ── */
 function buildDayDetail(dateStr, gameState, allTeams, userTeamId) {
   const CalendarEngine = window.CalendarEngine;
   if (!CalendarEngine) return null;

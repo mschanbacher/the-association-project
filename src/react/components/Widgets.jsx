@@ -34,7 +34,7 @@ export function TeamSummaryWidget() {
       <MetricCard label="Cap Space"
         value={fmtShort(capSpace)}
         detail={`of ${fmtShort(effCap)}`}
-        valueColor={capSpace > 0 ? 'var(--color-win)' : 'var(--color-loss)'} />
+        valueColor={capSpace < 0 ? 'var(--color-loss)' : undefined} />
       <MetricCard label="Coach"
         value={coach ? coach.name.split(' ').pop() : 'None'}
         detail={coach ? `${coach.overall} OVR · ${coach.archetype}` : 'Hire →'} />

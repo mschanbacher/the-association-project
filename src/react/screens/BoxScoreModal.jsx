@@ -1,13 +1,6 @@
 import React, { useMemo } from 'react';
 import { Modal, ModalHeader, ModalBody } from '../components/Modal.jsx';
-import { Button } from '../components/Button.jsx';
 
-/**
- * BoxScoreModal — full game box score with quarter scoring and player stats.
- * Props:
- *   data: { home, away, date, hasDetailedStats, quarterScores }
- *   isOpen, onClose
- */
 export function BoxScoreModal({ isOpen, onClose, data }) {
   if (!isOpen || !data) return null;
 
@@ -17,26 +10,22 @@ export function BoxScoreModal({ isOpen, onClose, data }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} maxWidth={820}>
       <ModalHeader onClose={onClose}>Box Score</ModalHeader>
-      <ModalBody style={{ padding: 'var(--space-5) var(--space-6)' }}>
+      <ModalBody style={{ padding: 'var(--space-4) var(--space-5)' }}>
         {/* Scoreboard */}
-        <div style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
-          <div style={{
-            fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)',
-            marginBottom: 'var(--space-3)',
-          }}>{date || ''}</div>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-4)' }}>
+          {date && (
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 16 }}>
+              {date}
+            </div>
+          )}
 
           <div style={{
-            display: 'flex', justifyContent: 'center', alignItems: 'center',
-            gap: 'var(--space-8)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 48,
           }}>
             <ScoreBlock team={away} isWinner={winner === 'away'} />
-            <span style={{
-              fontSize: 'var(--text-lg)', color: 'var(--color-text-tertiary)', opacity: 0.3,
-            }}>@</span>
             <ScoreBlock team={home} isWinner={winner === 'home'} />
           </div>
 
-          {/* Quarter scores */}
           {quarterScores && quarterScores.home && (
             <QuarterTable home={home} away={away} quarterScores={quarterScores} />
           )}
@@ -44,7 +33,7 @@ export function BoxScoreModal({ isOpen, onClose, data }) {
 
         {/* Player stats */}
         {hasDetailedStats ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
             <TeamBoxTable team={away} />
             <TeamBoxTable team={home} />
           </div>
@@ -53,7 +42,7 @@ export function BoxScoreModal({ isOpen, onClose, data }) {
             textAlign: 'center', color: 'var(--color-text-tertiary)',
             padding: 'var(--space-5)', fontSize: 'var(--text-sm)',
           }}>
-            Detailed box score available for your team's games only.
+            Detailed stats available for your team's games only.
           </div>
         )}
       </ModalBody>
@@ -61,20 +50,16 @@ export function BoxScoreModal({ isOpen, onClose, data }) {
   );
 }
 
-
-/* ═══════════════════════════════════════════════════════════════ */
 function ScoreBlock({ team, isWinner }) {
-  const name = teamName(team);
   return (
     <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+        {teamName(team)}
+      </div>
       <div style={{
-        fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)',
-        marginBottom: 'var(--space-1)',
-      }}>{name}</div>
-      <div style={{
-        fontSize: '2.5em', fontWeight: 'var(--weight-bold)',
-        fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
-        color: isWinner ? 'var(--color-win)' : 'var(--color-text)', lineHeight: 1,
+        fontSize: 42, fontWeight: 700, fontFamily: 'var(--font-mono)',
+        fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+        color: isWinner ? 'var(--color-text)' : 'var(--color-text-tertiary)',
       }}>{team.score}</div>
     </div>
   );
@@ -83,30 +68,27 @@ function ScoreBlock({ team, isWinner }) {
 function QuarterTable({ home, away, quarterScores }) {
   const periods = quarterScores.home.length;
   return (
-    <div style={{ marginTop: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}>
-      <table style={{
-        borderCollapse: 'collapse', fontSize: 'var(--text-xs)',
-        fontFamily: 'var(--font-mono)',
-      }}>
+    <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+      <table style={{ borderCollapse: 'collapse', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)' }}>
         <thead>
           <tr style={{ color: 'var(--color-text-tertiary)' }}>
             <th style={qCell}></th>
             {Array.from({ length: periods }, (_, i) => (
               <th key={i} style={qCell}>{i < 4 ? `Q${i + 1}` : `OT${i - 3}`}</th>
             ))}
-            <th style={{ ...qCell, fontWeight: 'var(--weight-bold)' }}>F</th>
+            <th style={{ ...qCell, fontWeight: 700 }}>F</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td style={{ ...qCell, textAlign: 'left', color: 'var(--color-text-secondary)' }}>{teamName(away)}</td>
             {quarterScores.away.map((q, i) => <td key={i} style={qCell}>{q}</td>)}
-            <td style={{ ...qCell, fontWeight: 'var(--weight-bold)' }}>{away.score}</td>
+            <td style={{ ...qCell, fontWeight: 700 }}>{away.score}</td>
           </tr>
           <tr>
             <td style={{ ...qCell, textAlign: 'left', color: 'var(--color-text-secondary)' }}>{teamName(home)}</td>
             {quarterScores.home.map((q, i) => <td key={i} style={qCell}>{q}</td>)}
-            <td style={{ ...qCell, fontWeight: 'var(--weight-bold)' }}>{home.score}</td>
+            <td style={{ ...qCell, fontWeight: 700 }}>{home.score}</td>
           </tr>
         </tbody>
       </table>
@@ -123,6 +105,12 @@ function TeamBoxTable({ team }) {
   const starters = players.filter(p => p.starter);
   const bench = players.filter(p => !p.starter);
 
+  // Identify player of the game (highest pts in this team)
+  const topPlayerId = players.reduce((best, p) =>
+    (p.pts || 0) > (best.pts || 0) ? p : best, { pts: -1 }
+  );
+  const topPlayerName = topPlayerId.name;
+
   const totals = useMemo(() =>
     players.reduce((t, p) => ({
       pts: t.pts + (p.pts || 0), reb: t.reb + (p.reb || 0), ast: t.ast + (p.ast || 0),
@@ -138,37 +126,34 @@ function TeamBoxTable({ team }) {
     <div>
       {/* Team header with shooting splits */}
       <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        paddingBottom: 'var(--space-2)', borderBottom: '2px solid var(--color-border)',
-        marginBottom: 'var(--space-2)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        paddingBottom: 8, borderBottom: '2px solid var(--color-border)', marginBottom: 4,
       }}>
-        <div style={{ fontWeight: 'var(--weight-bold)', fontSize: 'var(--text-md)' }}>
+        <div style={{ fontWeight: 700, fontSize: 'var(--text-base)' }}>
           {teamName(team)} — {team.score}
         </div>
         <div style={{
-          display: 'flex', gap: 'var(--space-4)',
+          display: 'flex', gap: 16,
           fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
+          fontFamily: 'var(--font-mono)',
         }}>
-          <span>FG: {totals.fgm}–{totals.fga} ({pct(totals.fgm, totals.fga)}%)</span>
-          <span>3PT: {totals.tpm}–{totals.tpa} ({pct(totals.tpm, totals.tpa)}%)</span>
-          <span>FT: {totals.ftm}–{totals.fta} ({pct(totals.ftm, totals.fta)}%)</span>
-          <span>TO: {totals.to}</span>
+          <span>FG {totals.fgm}–{totals.fga} ({pctFmt(totals.fgm, totals.fga)})</span>
+          <span>3P {totals.tpm}–{totals.tpa} ({pctFmt(totals.tpm, totals.tpa)})</span>
+          <span>FT {totals.ftm}–{totals.fta} ({pctFmt(totals.ftm, totals.fta)})</span>
         </div>
       </div>
 
-      {/* Table */}
       <div style={{ overflowX: 'auto' }}>
         <table style={{
           width: '100%', borderCollapse: 'collapse',
-          fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)',
-          whiteSpace: 'nowrap',
+          fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap',
         }}>
           <thead>
             <tr style={{
               color: 'var(--color-text-tertiary)',
               borderBottom: '1px solid var(--color-border-subtle)',
             }}>
-              <Th align="left">Player</Th>
+              <Th left>Player</Th>
               <Th>MIN</Th>
               <Th bold>PTS</Th>
               <Th>REB</Th>
@@ -184,23 +169,20 @@ function TeamBoxTable({ team }) {
             </tr>
           </thead>
           <tbody>
-            {starters.map((p, i) => <PlayerRow key={i} p={p} even={i % 2 === 0} />)}
+            {starters.map((p, i) => <PRow key={i} p={p} highlight={p.name === topPlayerName} />)}
             {bench.length > 0 && (
               <tr>
                 <td colSpan={13} style={{
-                  padding: '3px 8px', fontSize: 'var(--text-xs)',
-                  color: 'var(--color-text-tertiary)',
+                  padding: '4px 6px', fontSize: 10, fontFamily: 'var(--font-body)',
+                  color: 'var(--color-text-tertiary)', letterSpacing: '0.04em',
                   borderTop: '1px solid var(--color-border-subtle)',
+                  textTransform: 'uppercase',
                 }}>Bench</td>
               </tr>
             )}
-            {bench.map((p, i) => <PlayerRow key={`b${i}`} p={p} even={i % 2 === 0} />)}
-            {/* Totals */}
-            <tr style={{
-              borderTop: '2px solid var(--color-border)',
-              fontWeight: 'var(--weight-bold)',
-            }}>
-              <Td align="left">TOTAL</Td>
+            {bench.map((p, i) => <PRow key={`b${i}`} p={p} highlight={p.name === topPlayerName} />)}
+            <tr style={{ borderTop: '2px solid var(--color-border)', fontWeight: 700 }}>
+              <Td left>TOTAL</Td>
               <Td></Td>
               <Td>{totals.pts}</Td>
               <Td>{totals.reb}</Td>
@@ -209,9 +191,9 @@ function TeamBoxTable({ team }) {
               <Td>{totals.blk}</Td>
               <Td>{totals.to}</Td>
               <Td>{totals.fgm}–{totals.fga}</Td>
-              <Td>{pct(totals.fgm, totals.fga)}</Td>
+              <Td>{pctFmt(totals.fgm, totals.fga)}</Td>
               <Td>{totals.tpm}–{totals.tpa}</Td>
-              <Td>{pct(totals.tpm, totals.tpa)}</Td>
+              <Td>{pctFmt(totals.tpm, totals.tpa)}</Td>
               <Td>{totals.ftm}–{totals.fta}</Td>
             </tr>
           </tbody>
@@ -221,12 +203,16 @@ function TeamBoxTable({ team }) {
   );
 }
 
-function PlayerRow({ p, even }) {
+function PRow({ p, highlight }) {
   return (
-    <tr style={{ background: even ? 'var(--color-bg-sunken)' : 'transparent' }}>
-      <Td align="left">
-        <strong>{p.name}</strong>{' '}
-        <span style={{ color: 'var(--color-text-tertiary)', fontSize: '0.9em' }}>{p.pos}</span>
+    <tr style={{
+      borderBottom: '1px solid var(--color-border-subtle)',
+      background: highlight ? 'var(--color-accent-bg)' : 'transparent',
+    }}>
+      <Td left>
+        <span style={{ fontWeight: 500, fontFamily: 'var(--font-body)' }}>{p.name}</span>
+        {' '}
+        <span style={{ color: 'var(--color-text-tertiary)' }}>{p.pos}</span>
       </Td>
       <Td>{p.min}</Td>
       <Td bold>{p.pts}</Td>
@@ -236,38 +222,38 @@ function PlayerRow({ p, even }) {
       <Td>{p.blk}</Td>
       <Td>{p.to}</Td>
       <Td>{p.fgm}–{p.fga}</Td>
-      <Td>{pct(p.fgm, p.fga)}</Td>
+      <Td>{pctFmt(p.fgm, p.fga)}</Td>
       <Td>{p.tpm}–{p.tpa}</Td>
-      <Td>{pct(p.tpm, p.tpa)}</Td>
+      <Td>{pctFmt(p.tpm, p.tpa)}</Td>
       <Td>{p.ftm}–{p.fta}</Td>
     </tr>
   );
 }
 
-function Th({ children, align = 'center', bold }) {
+function Th({ children, left, bold }) {
   return (
     <th style={{
-      padding: '5px 4px', textAlign: align,
-      fontWeight: bold ? 'var(--weight-bold)' : 'var(--weight-medium)',
+      padding: '5px 4px', textAlign: left ? 'left' : 'center',
+      fontWeight: bold ? 700 : 600,
     }}>{children}</th>
   );
 }
 
-function Td({ children, align = 'center', bold }) {
+function Td({ children, left, bold }) {
   return (
     <td style={{
-      padding: '5px 4px', textAlign: align,
-      fontWeight: bold ? 'var(--weight-bold)' : undefined,
+      padding: '5px 4px', textAlign: left ? 'left' : 'center',
+      fontWeight: bold ? 700 : undefined,
     }}>{children}</td>
   );
 }
 
-function pct(m, a) {
-  return a > 0 ? ((m / a) * 100).toFixed(1) : '—';
+function pctFmt(m, a) {
+  if (!a || a === 0) return '—';
+  return ((m / a) * 100).toFixed(1);
 }
 
 function teamName(team) {
-  // boxScore objects use 'teamName', team objects use 'name', some have 'city'
   const n = team.teamName || team.name || '';
   if (team.city) return `${team.city} ${n}`;
   return n;

@@ -128,18 +128,27 @@ function WinProbArc({ probability, size = 140 }) {
   const cx = size / 2;
   const cy = size / 2 + 10;
 
-  const startAngle = Math.PI;
-  const endAngle = 0;
-  const sweepAngle = startAngle - (startAngle - endAngle) * probability;
+  // Clamp to avoid degenerate arcs at extremes
+  const prob = Math.max(0.02, Math.min(0.98, probability));
 
-  const x1 = cx + radius * Math.cos(startAngle);
-  const y1 = cy - radius * Math.sin(startAngle);
-  const x2 = cx + radius * Math.cos(sweepAngle);
-  const y2 = cy - radius * Math.sin(sweepAngle);
-  const bgX2 = cx + radius * Math.cos(endAngle);
-  const bgY2 = cy - radius * Math.sin(endAngle);
+  // Arc goes left (π) to right (0) — a semicircle
+  // Fill angle: how far from the left the fill extends
+  const fillAngle = Math.PI * (1 - prob);
 
   const arcColor = pct >= 60 ? 'var(--color-accent)' : pct >= 45 ? 'var(--color-text-secondary)' : 'var(--color-loss)';
+
+  // Background arc endpoints (full semicircle, left to right)
+  const bgX1 = cx - radius;
+  const bgY1 = cy;
+  const bgX2 = cx + radius;
+  const bgY2 = cy;
+
+  // Fill arc endpoint
+  const fillX2 = cx + radius * Math.cos(Math.PI - Math.PI * prob);
+  const fillY2 = cy - radius * Math.sin(Math.PI - Math.PI * prob);
+
+  // Large arc flag: 1 if fill covers more than half the semicircle (prob > 0.5)
+  const largeArc = prob > 0.5 ? 1 : 0;
 
   return (
     <div style={{ position: 'relative', width: size, height: size / 2 + 24, margin: '0 auto' }}>
@@ -149,15 +158,15 @@ function WinProbArc({ probability, size = 140 }) {
             <line x1="0" y1="0" x2="0" y2="6" stroke={arcColor} strokeWidth="3" strokeOpacity="0.5" />
           </pattern>
         </defs>
-        {/* Hatched background arc */}
+        {/* Hatched background arc (full semicircle) */}
         <path
-          d={`M ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${bgX2} ${bgY2}`}
+          d={`M ${bgX1} ${bgY1} A ${radius} ${radius} 0 1 1 ${bgX2} ${bgY2}`}
           fill="none" stroke="url(#winProbHatch)" strokeWidth={strokeWidth} strokeLinecap="butt"
         />
         {/* Solid fill arc */}
         {pct > 0 && (
           <path
-            d={`M ${x1} ${y1} A ${radius} ${radius} 0 ${probability > 0.5 ? 1 : 0} 1 ${x2} ${y2}`}
+            d={`M ${bgX1} ${bgY1} A ${radius} ${radius} 0 ${largeArc} 1 ${fillX2} ${fillY2}`}
             fill="none" stroke={arcColor} strokeWidth={strokeWidth} strokeLinecap="butt"
           />
         )}

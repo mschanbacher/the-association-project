@@ -483,7 +483,7 @@ export class GMMode {
                                     fgm: p.fieldGoalsMade, fga: p.fieldGoalsAttempted,
                                     tpm: p.threePointersMade, tpa: p.threePointersAttempted,
                                     ftm: p.freeThrowsMade, fta: p.freeThrowsAttempted,
-                                    starter: p.gamesStarted > 0
+                                    starter: p.gamesStarted > 0, pm: p.plusMinus || 0
                                 }))
                         },
                         away: {
@@ -503,7 +503,7 @@ export class GMMode {
                                     fgm: p.fieldGoalsMade, fga: p.fieldGoalsAttempted,
                                     tpm: p.threePointersMade, tpa: p.threePointersAttempted,
                                     ftm: p.freeThrowsMade, fta: p.freeThrowsAttempted,
-                                    starter: p.gamesStarted > 0
+                                    starter: p.gamesStarted > 0, pm: p.plusMinus || 0
                                 }))
                         }
                     };

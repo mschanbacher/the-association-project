@@ -114,6 +114,8 @@ export const StatEngine = {
         const homeWon = homeScore > awayScore;
         const diff = homeScore - awayScore;
 
+        this._distributePlusMinus(homeStats, awayStats, diff);
+
         return {
             homeTeam: homeTeam,
             awayTeam: awayTeam,
@@ -411,6 +413,64 @@ export const StatEngine = {
         return statLine;
     },
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // PLUS/MINUS DISTRIBUTION
+    // ─────────────────────────────────────────────────────────────────────────
+    // Assigns per-player +/- values that satisfy the hard constraint:
+    //   sum(team +/-) = 5 × margin  (5 players on court at all times)
+    //
+    // Approach: weight each player by minutes × relative performance, distribute
+    // the team's share of the margin proportionally, add calibrated noise, then
+    // integer-round while enforcing the sum constraint exactly.
+    //
+    _distributePlusMinus(homeStats, awayStats, margin) {
+        // Performance proxy: points + 0.7*ast + 0.5*reb per minute played
+        // Represents the player's impact while on court relative to teammates
+        const perfScore = (s) => {
+            if (!s.minutesPlayed || s.minutesPlayed === 0) return 0;
+            return (s.points + s.assists * 0.7 + s.rebounds * 0.5) / s.minutesPlayed;
+        };
+
+        const distribute = (stats, teamMargin) => {
+            const active = stats.filter(s => s.minutesPlayed > 0);
+            if (active.length === 0) return;
+
+            // Total team-minutes is always 240 (5 players × 48 min)
+            // Each player's "court share" = their minutes / 48
+            // Their expected margin contribution = courtShare × teamMargin
+            const avgPerf = active.reduce((sum, s) => sum + perfScore(s), 0) / active.length;
+
+            // Raw float +/- for each active player
+            const raw = active.map(s => {
+                const courtShare = s.minutesPlayed / 48;
+                const perfDelta = avgPerf > 0 ? (perfScore(s) - avgPerf) / avgPerf : 0;
+                // Skill deviation: good players trend positive relative to team margin,
+                // poor performers trend negative. Cap at ±8 to prevent outliers.
+                const skillBias = Math.max(-8, Math.min(8, perfDelta * Math.abs(teamMargin) * 0.4));
+                // Noise: ~±3 points, scaled by minutes (benchwarmers noisier)
+                const noise = (Math.random() - 0.5) * 6 * (1 - s.minutesPlayed / 48);
+                return courtShare * teamMargin + skillBias + noise;
+            });
+
+            // Integer-round while enforcing sum = 5 × teamMargin exactly
+            const target = Math.round(teamMargin) * 5;
+            const rounded = raw.map(v => Math.round(v));
+            let remainder = target - rounded.reduce((a, b) => a + b, 0);
+
+            // Distribute remainder by largest fractional parts (standard rounding fix)
+            const fracs = raw.map((v, i) => ({ i, frac: v - Math.floor(v) }))
+                .sort((a, b) => remainder > 0 ? b.frac - a.frac : a.frac - b.frac);
+            for (let j = 0; j < Math.abs(remainder); j++) {
+                rounded[fracs[j % fracs.length].i] += remainder > 0 ? 1 : -1;
+            }
+
+            active.forEach((s, i) => { s.plusMinus = rounded[i]; });
+        };
+
+        distribute(homeStats,  margin);   // home margin is positive when home wins
+        distribute(awayStats, -margin);   // away margin is the inverse
+    },
+
     _normalizeTeamStats(playerStats, pace, team, tier) {
         const rawTotal = playerStats.reduce((sum, s) => sum + s.points, 0);
         if (rawTotal === 0) return playerStats;
@@ -517,6 +577,7 @@ export const StatEngine = {
             fieldGoalsMade: 0, fieldGoalsAttempted: 0,
             threePointersMade: 0, threePointersAttempted: 0,
             freeThrowsMade: 0, freeThrowsAttempted: 0,
+            plusMinus: 0,
         };
     },
 
@@ -540,31 +601,171 @@ export const StatEngine = {
         s.threePointersAttempted += g.threePointersAttempted;
         s.freeThrowsMade += g.freeThrowsMade;
         s.freeThrowsAttempted += g.freeThrowsAttempted;
+        s.plusMinus = (s.plusMinus || 0) + (g.plusMinus || 0);
     },
 
     getSeasonAverages(player) {
         const s = player.seasonStats;
         if (!s || s.gamesPlayed === 0) return null;
         const gp = s.gamesPlayed;
+        const mpg = s.minutesPlayed / gp;
+
+        const fgPct    = s.fieldGoalsAttempted > 0 ? +(s.fieldGoalsMade / s.fieldGoalsAttempted).toFixed(3) : 0;
+        const threePct = s.threePointersAttempted > 0 ? +(s.threePointersMade / s.threePointersAttempted).toFixed(3) : 0;
+        const ftPct    = s.freeThrowsAttempted > 0 ? +(s.freeThrowsMade / s.freeThrowsAttempted).toFixed(3) : 0;
+
+        // True Shooting %: points / (2 × (FGA + 0.44 × FTA))
+        const tsDenom = 2 * (s.fieldGoalsAttempted + 0.44 * s.freeThrowsAttempted);
+        const tsPct   = tsDenom > 0 ? +(s.points / tsDenom).toFixed(3) : 0;
+
+        // Per-36 normalised (most useful for bench players with low minutes)
+        const totalMin = s.minutesPlayed || 1;
+        const per36 = {
+            points:    +((s.points    / totalMin) * 36).toFixed(1),
+            rebounds:  +((s.rebounds  / totalMin) * 36).toFixed(1),
+            assists:   +((s.assists   / totalMin) * 36).toFixed(1),
+            steals:    +((s.steals    / totalMin) * 36).toFixed(1),
+            blocks:    +((s.blocks    / totalMin) * 36).toFixed(1),
+            turnovers: +((s.turnovers / totalMin) * 36).toFixed(1),
+        };
+
         return {
-            gamesPlayed: gp,
-            gamesStarted: s.gamesStarted,
-            minutesPerGame:  +(s.minutesPlayed / gp).toFixed(1),
-            pointsPerGame:   +(s.points / gp).toFixed(1),
-            reboundsPerGame: +(s.rebounds / gp).toFixed(1),
-            assistsPerGame:  +(s.assists / gp).toFixed(1),
-            stealsPerGame:   +(s.steals / gp).toFixed(1),
-            blocksPerGame:   +(s.blocks / gp).toFixed(1),
+            gamesPlayed:      gp,
+            gamesStarted:     s.gamesStarted,
+            minutesPerGame:   +mpg.toFixed(1),
+            pointsPerGame:    +(s.points    / gp).toFixed(1),
+            reboundsPerGame:  +(s.rebounds  / gp).toFixed(1),
+            assistsPerGame:   +(s.assists   / gp).toFixed(1),
+            stealsPerGame:    +(s.steals    / gp).toFixed(1),
+            blocksPerGame:    +(s.blocks    / gp).toFixed(1),
             turnoversPerGame: +(s.turnovers / gp).toFixed(1),
-            foulsPerGame:    +(s.fouls / gp).toFixed(1),
-            fieldGoalPct:    s.fieldGoalsAttempted > 0 ? +(s.fieldGoalsMade / s.fieldGoalsAttempted).toFixed(3) : 0,
-            threePointPct:   s.threePointersAttempted > 0 ? +(s.threePointersMade / s.threePointersAttempted).toFixed(3) : 0,
-            freeThrowPct:    s.freeThrowsAttempted > 0 ? +(s.freeThrowsMade / s.freeThrowsAttempted).toFixed(3) : 0,
-            totalPoints: s.points,
+            foulsPerGame:     +(s.fouls     / gp).toFixed(1),
+            fieldGoalPct:     fgPct,
+            threePointPct:    threePct,
+            freeThrowPct:     ftPct,
+            trueShootingPct:  tsPct,
+            plusMinus:        s.plusMinus || 0,
+            plusMinusPerGame: gp > 0 ? +((s.plusMinus || 0) / gp).toFixed(1) : 0,
+            // Season totals (for leaderboards / awards)
+            totalPoints:   s.points,
             totalRebounds: s.rebounds,
-            totalAssists: s.assists,
-            totalSteals: s.steals,
-            totalBlocks: s.blocks,
+            totalAssists:  s.assists,
+            totalSteals:   s.steals,
+            totalBlocks:   s.blocks,
+            totalPlusMinus: s.plusMinus || 0,
+            // Shooting volume (useful context for pct evaluation)
+            fgaPerGame:  +(s.fieldGoalsAttempted  / gp).toFixed(1),
+            tpaPerGame:  +(s.threePointersAttempted / gp).toFixed(1),
+            ftaPerGame:  +(s.freeThrowsAttempted   / gp).toFixed(1),
+            // Per-36
+            per36,
+        };
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PLAYER ANALYTICS
+    // ─────────────────────────────────────────────────────────────────────────
+    // Single entry point for the roster screen and any evaluation UI.
+    // Returns everything needed to assess a player's current-season value,
+    // contract fit, and role suitability — all derived on demand from raw
+    // season stats so no save migration is ever needed.
+    //
+    // @param {Object} player - Player object with seasonStats
+    // @param {Object} team   - Team object (for salary cap context), optional
+    // @returns {Object|null} Analytics object, or null if no games played
+    //
+    getPlayerAnalytics(player, team = null) {
+        const avgs = this.getSeasonAverages(player);
+        if (!avgs) return null;
+
+        const s = player.seasonStats;
+        const gp = avgs.gamesPlayed;
+
+        // ── Value score (0-100) ──────────────────────────────────────────────
+        // A rough composite that surfaces whether the player is producing
+        // relative to their role. Not a real PER — just a useful sorting key.
+        // Weights: scoring(30) + efficiency(20) + playmaking(15) +
+        //          defense(15) + rebounding(10) + +/-(10)
+        const scoringVal  = Math.min(30, avgs.pointsPerGame * 1.0);
+        const effVal      = avgs.trueShootingPct > 0 ? Math.min(20, (avgs.trueShootingPct - 0.45) * 200) : 10;
+        const makeVal     = Math.min(15, (avgs.assistsPerGame * 1.2) - (avgs.turnoversPerGame * 0.8));
+        const defVal      = Math.min(15, (avgs.stealsPerGame * 3) + (avgs.blocksPerGame * 2.5));
+        const rebVal      = Math.min(10, avgs.reboundsPerGame * 0.8);
+        const pmVal       = Math.min(10, Math.max(-10, avgs.plusMinusPerGame * 0.8));
+        const valueScore  = Math.max(0, Math.round(scoringVal + effVal + makeVal + defVal + rebVal + pmVal));
+
+        // ── Role fit ────────────────────────────────────────────────────────
+        // What role does this player's production suggest?
+        const mpg = avgs.minutesPerGame;
+        const role = mpg >= 30 ? (avgs.pointsPerGame >= 18 ? 'Star' : 'Starter')
+                   : mpg >= 18 ? 'Rotation'
+                   : mpg >= 8  ? 'Bench'
+                   : 'End of Bench';
+
+        // ── Contract value ───────────────────────────────────────────────────
+        // Is this player over/under performing their contract?
+        // Uses a simple salary-per-value-point ratio vs team average.
+        const salary = player.salary || 0;
+        const valuePerDollar = salary > 0 ? valueScore / (salary / 1_000_000) : null;
+        let contractVerdict = null;
+        if (valuePerDollar !== null) {
+            // Calibrated roughly: 10+ value/M = great deal, <3 = overpaid
+            contractVerdict = valuePerDollar >= 10 ? 'great_deal'
+                            : valuePerDollar >= 6  ? 'good_value'
+                            : valuePerDollar >= 3  ? 'fair'
+                            : 'overpaid';
+        }
+
+        // ── Shooting breakdown ───────────────────────────────────────────────
+        const shootingProfile = {
+            fgPct:        avgs.fieldGoalPct,
+            threePct:     avgs.threePointPct,
+            ftPct:        avgs.freeThrowPct,
+            tsPct:        avgs.trueShootingPct,
+            threeRate:    s.fieldGoalsAttempted > 0
+                            ? +(s.threePointersAttempted / s.fieldGoalsAttempted).toFixed(3)
+                            : 0,
+            ftRate:       s.fieldGoalsAttempted > 0
+                            ? +(s.freeThrowsAttempted / s.fieldGoalsAttempted).toFixed(3)
+                            : 0,
+            fgaPerGame:   avgs.fgaPerGame,
+            tpaPerGame:   avgs.tpaPerGame,
+        };
+
+        // ── Trend signals ────────────────────────────────────────────────────
+        // Simple flags the UI can use to surface concerns without needing
+        // game-by-game history.
+        const flags = [];
+        if (avgs.turnoversPerGame > avgs.assistsPerGame * 0.6)
+            flags.push({ type: 'warning', label: 'High TO rate' });
+        if (avgs.fgaPerGame >= 8 && avgs.fieldGoalPct < 0.40)
+            flags.push({ type: 'warning', label: 'Poor FG%' });
+        if (avgs.plusMinusPerGame < -4)
+            flags.push({ type: 'warning', label: 'Negative impact' });
+        if (avgs.trueShootingPct > 0.60 && avgs.pointsPerGame >= 10)
+            flags.push({ type: 'positive', label: 'Efficient scorer' });
+        if (avgs.plusMinusPerGame > 5)
+            flags.push({ type: 'positive', label: 'High +/-' });
+        if (avgs.stealsPerGame >= 1.5 || avgs.blocksPerGame >= 1.5)
+            flags.push({ type: 'positive', label: 'Defensive impact' });
+        if (player.contractYears === 1)
+            flags.push({ type: 'info', label: 'Expiring contract' });
+        if ((player.fatigue || 0) >= 60)
+            flags.push({ type: 'warning', label: 'Fatigued' });
+
+        return {
+            avgs,
+            per36:           avgs.per36,
+            valueScore,
+            role,
+            contractVerdict,
+            valuePerDollar:  valuePerDollar ? +valuePerDollar.toFixed(1) : null,
+            shootingProfile,
+            flags,
+            // Convenience pass-throughs for the UI
+            plusMinus:       avgs.plusMinus,
+            plusMinusPerGame: avgs.plusMinusPerGame,
+            gamesPlayed:     gp,
         };
     },
 

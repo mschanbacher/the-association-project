@@ -56,7 +56,6 @@ export function TopBar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
         <SimControls gameState={gameState} />
         <Divider />
-        <TopBarButton label="Trade" onClick={() => window._reactOpenTrade?.()} />
         <TopBarButton label="Menu" onClick={() => {
           if (window._reactOpenGameMenu) window._reactOpenGameMenu();
           else window.openGameMenu?.();

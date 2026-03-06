@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useGame } from '../hooks/GameBridge.jsx';
 import { Card, CardHeader } from './Card.jsx';
 import { Badge, RatingBadge } from './Badge.jsx';
-import { HEX_AXES, hexComponentsFromAnalytics, hexComponentsFromProfile } from '../screens/RosterScreen.jsx';
+import { HEX_AXES, hexComponentsFromAnalytics, hexComponentsFromProfile, ratingColor } from '../visualizations/PlayerVisuals.jsx';
+import { buildTeamLog, TeamFormSparkline } from '../visualizations/SparklineComponents.jsx';
 
 // ── Mini hex thumbnail (dashboard only — no hover, no labels) ────────────────
 function MiniHex({ components, size = 56 }) {
@@ -480,6 +481,56 @@ export function RecentActivityWidget() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   Team Form Widget — dashboard sparkline showing team GameScore arc
+   ═══════════════════════════════════════════════════════════════ */
+
+export function TeamFormWidget() {
+  const { gameState } = useGame();
+  if (!gameState?.userTeam) return null;
+
+  const roster = gameState.userTeam.roster || [];
+
+  const teamLog = useMemo(() => buildTeamLog(roster), [roster]);
+
+  if (teamLog.length < 3) return null;
+
+  // Coach name for the subheader
+  const coach = gameState.userTeam.coach;
+  const coachName = coach ? coach.name : null;
+
+  // Recent form label: last 5 games as W/L string if we have it, or just game count
+  const gamesPlayed = teamLog.length;
+
+  return (
+    <Card padding="md">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div>
+          <CardLabel>Team Form</CardLabel>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>
+            Avg player Game Score · {gamesPlayed}G
+            {coachName && (
+              <span style={{ marginLeft: 6, color: 'var(--color-text-tertiary)' }}>
+                · {coachName}
+              </span>
+            )}
+          </div>
+        </div>
+        {/* GameScore legend pill */}
+        <div style={{
+          fontSize: 9, color: 'var(--color-text-tertiary)',
+          padding: '2px 7px', border: '1px solid var(--color-border)',
+          lineHeight: 1.6, maxWidth: 180, textAlign: 'right',
+        }}>
+          Game Score: pts + ast + stl + blk − tov − missed shots
+        </div>
+      </div>
+
+      <TeamFormSparkline teamLog={teamLog} height={64} />
+    </Card>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Shared Primitives
    ═══════════════════════════════════════════════════════════════ */
 
@@ -542,12 +593,7 @@ function TD({ children, pl, pr, left, right, mono, bold, style }) {
   );
 }
 
-function ratingColor(r) {
-  if (r >= 80) return 'var(--color-rating-elite)';
-  if (r >= 70) return 'var(--color-rating-good)';
-  if (r >= 60) return 'var(--color-rating-avg)';
-  return 'var(--color-rating-poor)';
-}
+
 
 function fmtShort(amount) {
   if (amount >= 1e6) return '$' + (amount / 1e6).toFixed(1) + 'M';

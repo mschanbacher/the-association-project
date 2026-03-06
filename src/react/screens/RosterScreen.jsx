@@ -3,353 +3,14 @@ import { useGame } from '../hooks/GameBridge.jsx';
 import { Card, CardHeader } from '../components/Card.jsx';
 import { Badge, RatingBadge } from '../components/Badge.jsx';
 import { Button } from '../components/Button.jsx';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PLAYER ROLE HEXAGON — shared constants, math, and components
-// Used by PlayerDetailRow (full hex + breakdown) and exported for the
-// RosterQuickWidget mini thumbnails on the dashboard.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Six axes — maxes mirror StatEngine valueScore component caps exactly.
-export const HEX_AXES = [
-  { key: 'scoring',    label: 'Scoring',    max: 30, short: 'SCR',
-    tip: 'Points per game contribution.\nMax 30 — elite scorers reach the ceiling.' },
-  { key: 'efficiency', label: 'Efficiency', max: 20, short: 'EFF',
-    tip: 'True Shooting % above league average.\nMax 20 — rewards efficiency over volume.' },
-  { key: 'playmaking', label: 'Playmaking', max: 15, short: 'PLY',
-    tip: 'Assists weighted against turnovers.\nMax 15 — net creation value.' },
-  { key: 'defense',    label: 'Defense',    max: 15, short: 'DEF',
-    tip: 'Steals × 3 + Blocks × 2.5.\nMax 15 — defensive impact.' },
-  { key: 'rebounding', label: 'Rebounding', max: 10, short: 'REB',
-    tip: 'Rebounds per game contribution.\nMax 10.' },
-  { key: 'impact',     label: 'Impact',     max: 10, short: '+/-',
-    tip: 'Plus/Minus per game — how the score\nmoves while on the court. Can be negative.' },
-];
-
-// Derive hex components from a StatEngine analytics object.
-// Returns null if analytics is unavailable.
-export function hexComponentsFromAnalytics(analytics, avgs) {
-  if (!analytics || !avgs) return null;
-  const scoring    = Math.min(30, avgs.pointsPerGame * 1.0);
-  const efficiency = avgs.trueShootingPct > 0
-    ? Math.min(20, (avgs.trueShootingPct - 0.45) * 200) : 10;
-  const playmaking = Math.min(15, (avgs.assistsPerGame * 1.2) - (avgs.turnoversPerGame * 0.8));
-  const defense    = Math.min(15, (avgs.stealsPerGame * 3) + (avgs.blocksPerGame * 2.5));
-  const rebounding = Math.min(10, avgs.reboundsPerGame * 0.8);
-  const impact     = Math.min(10, Math.max(-10, avgs.plusMinusPerGame * 0.8));
-  return {
-    scoring:    Math.round(Math.max(0, scoring)),
-    efficiency: Math.round(Math.max(0, efficiency)),
-    playmaking: Math.round(Math.max(0, playmaking)),
-    defense:    Math.round(Math.max(0, defense)),
-    rebounding: Math.round(Math.max(0, rebounding)),
-    impact:     Math.round(impact),  // allow negative
-    isProjection: false,
-  };
-}
-
-// Pre-season fallback: derive hex components from scoring profile + ratings.
-// Used before any games are played. Clearly labelled as a projection.
-export function hexComponentsFromProfile(player) {
-  const sp = player.scoringProfile;
-  const r  = player.rating || 60;
-  const off = player.offRating || r;
-  const def = player.defRating || r;
-  const pos = player.position || 'SF';
-
-  // Scoring: scaled from offRating, tempered by usage tendency
-  const usageMod = sp ? sp.usageTendency : 1.0;
-  const scoring = Math.min(30, Math.max(0, (off - 60) * 0.6 * usageMod));
-
-  // Efficiency: from scoring profile efficiency scalar if available, else offRating proxy
-  const effScalar = sp ? sp.efficiency : 1.0;
-  const efficiency = Math.min(20, Math.max(0, (effScalar - 0.88) * 100));
-
-  // Playmaking: PG/SG get higher base, from offRating
-  const playmakingBase = ['PG', 'SG'].includes(pos) ? 1.4 : ['SF'].includes(pos) ? 0.9 : 0.5;
-  const playmaking = Math.min(15, Math.max(0, (off - 60) * 0.3 * playmakingBase));
-
-  // Defense: from defRating
-  const defense = Math.min(15, Math.max(0, (def - 60) * 0.4));
-
-  // Rebounding: C/PF get higher, from defRating (proxy for athleticism/positioning)
-  const rebBase = ['C', 'PF'].includes(pos) ? 1.3 : 0.6;
-  const rebounding = Math.min(10, Math.max(0, (def - 60) * 0.2 * rebBase));
-
-  // Impact: neutral pre-season
-  const impact = Math.min(10, Math.max(-5, (r - 65) * 0.15));
-
-  return {
-    scoring:    Math.round(scoring),
-    efficiency: Math.round(efficiency),
-    playmaking: Math.round(playmaking),
-    defense:    Math.round(defense),
-    rebounding: Math.round(rebounding),
-    impact:     Math.round(impact),
-    isProjection: true,
-  };
-}
-
-// Normalize a raw component value to 0–1 against its axis max.
-function hexNorm(components, axis) {
-  const raw = components?.[axis.key] || 0;
-  return Math.min(1, Math.max(0, raw / axis.max));
-}
-
-// Color for a normalized 0–1 performance level.
-function hexPerfColor(n) {
-  if (n >= 0.80) return 'var(--color-rating-elite)';
-  if (n >= 0.55) return 'var(--color-rating-good)';
-  if (n >= 0.30) return 'var(--color-rating-avg)';
-  return 'var(--color-rating-poor)';
-}
-
-// Polar → cartesian.
-function hexPolar(cx, cy, r, angle) {
-  return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
-}
-
-// Axis angle: 0 points up (−π/2), clockwise.
-function hexAngle(i) { return (Math.PI * 2 * i) / 6 - Math.PI / 2; }
-
-// SVG path for a regular hexagon at given radius.
-function hexGridPath(cx, cy, r) {
-  return HEX_AXES.map((_, i) => {
-    const [x, y] = hexPolar(cx, cy, r, hexAngle(i));
-    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-  }).join(' ') + ' Z';
-}
-
-// ── Full HexChart (used in PlayerDetailRow) ───────────────────────────────────
-function HexChart({ components, size = 180, hoveredAxis, onHoverAxis }) {
-  const cx = size / 2, cy = size / 2;
-  const maxR = size * 0.36;
-  const rings = [0.25, 0.5, 0.75, 1.0];
-
-  const pts = HEX_AXES.map((axis, i) => {
-    const n = hexNorm(components, axis);
-    const [x, y] = hexPolar(cx, cy, n * maxR, hexAngle(i));
-    return { x, y, n, color: hexPerfColor(n) };
-  });
-
-  const outerPts = HEX_AXES.map((_, i) => hexPolar(cx, cy, maxR, hexAngle(i)));
-  const dataPath = pts.map((p, i) =>
-    `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
-  ).join(' ') + ' Z';
-
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
-      <defs>
-        {pts.map((p, i) => {
-          const j = (i + 1) % 6;
-          const q = pts[j];
-          return (
-            <linearGradient key={i} id={`hex-eg-${i}`}
-              x1={p.x} y1={p.y} x2={q.x} y2={q.y}
-              gradientUnits="userSpaceOnUse">
-              <stop offset="0%"   stopColor={p.color} />
-              <stop offset="100%" stopColor={q.color} />
-            </linearGradient>
-          );
-        })}
-      </defs>
-
-      {/* Grid rings */}
-      {rings.map((frac, ri) => (
-        <path key={ri} d={hexGridPath(cx, cy, maxR * frac)}
-          fill="none"
-          stroke={ri === 3 ? 'var(--color-border)' : 'var(--color-border-subtle)'}
-          strokeWidth={ri === 3 ? 1 : 0.75} />
-      ))}
-
-      {/* Spokes */}
-      {outerPts.map(([ox, oy], i) => (
-        <line key={i} x1={cx} y1={cy} x2={ox} y2={oy}
-          stroke={hoveredAxis === i ? 'var(--color-border)' : 'var(--color-border-subtle)'}
-          strokeWidth={hoveredAxis === i ? 1 : 0.75} />
-      ))}
-
-      {/* Data fill */}
-      <path d={dataPath} fill="var(--color-accent)" fillOpacity={0.10} />
-
-      {/* Gradient edges */}
-      {pts.map((p, i) => {
-        const j = (i + 1) % 6;
-        const q = pts[j];
-        const hot = hoveredAxis === i || hoveredAxis === j;
-        return (
-          <line key={i}
-            x1={p.x} y1={p.y} x2={q.x} y2={q.y}
-            stroke={`url(#hex-eg-${i})`}
-            strokeWidth={hot ? 2.5 : 1.8} />
-        );
-      })}
-
-      {/* Invisible hover targets on outer ring */}
-      {outerPts.map(([ox, oy], i) => (
-        <circle key={i} cx={ox} cy={oy} r={10}
-          fill="transparent" style={{ cursor: 'default' }}
-          onMouseEnter={() => onHoverAxis?.(i)}
-          onMouseLeave={() => onHoverAxis?.(null)} />
-      ))}
-
-      {/* Data point dots */}
-      {pts.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y}
-          r={hoveredAxis === i ? 4 : 3}
-          fill={p.color} stroke="var(--color-bg-raised)" strokeWidth={1.5} />
-      ))}
-
-      {/* Axis endpoint squares on outer ring */}
-      {outerPts.map(([ox, oy], i) => {
-        const n = hexNorm(components, HEX_AXES[i]);
-        const hot = hoveredAxis === i;
-        const s = hot ? 5 : 3.5;
-        return (
-          <rect key={i} x={ox - s / 2} y={oy - s / 2} width={s} height={s}
-            fill={hexPerfColor(n)} />
-        );
-      })}
-
-      {/* Axis labels */}
-      {HEX_AXES.map((axis, i) => {
-        const angle = hexAngle(i);
-        const [lx, ly] = hexPolar(cx, cy, maxR + 20, angle);
-        const anchor = Math.abs(Math.cos(angle)) < 0.15 ? 'middle'
-          : Math.cos(angle) > 0 ? 'start' : 'end';
-        const dy = Math.sin(angle) > 0.3 ? '0.9em'
-          : Math.sin(angle) < -0.3 ? '0em' : '0.35em';
-        const hot = hoveredAxis === i;
-        const n = hexNorm(components, axis);
-        return (
-          <text key={i} x={lx} y={ly}
-            textAnchor={anchor} dy={dy}
-            fontSize={hot ? 10 : 9}
-            fontFamily="var(--font-mono)"
-            fontWeight={hot ? 700 : 600}
-            fill={hot ? hexPerfColor(n) : 'var(--color-text-tertiary)'}
-            letterSpacing="0.04em">
-            {axis.short}
-          </text>
-        );
-      })}
-    </svg>
-  );
-}
-
-// ── Tooltip shown on axis hover ───────────────────────────────────────────────
-function HexAxisTooltip({ axis, components }) {
-  if (!axis) return null;
-  const raw = components?.[axis.key] || 0;
-  const n   = hexNorm(components, axis);
-  const col = hexPerfColor(n);
-  const tier = n >= 0.80 ? 'Elite' : n >= 0.55 ? 'Good' : n >= 0.30 ? 'Average' : 'Below Avg';
-
-  return (
-    <div style={{
-      background: 'var(--color-bg-raised)',
-      border: '1px solid var(--color-border)',
-      padding: '10px 12px',
-      minWidth: 180, maxWidth: 210,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-      pointerEvents: 'none',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text)',
-          textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {axis.label}
-        </span>
-        <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: col }}>
-          {raw >= 0 ? `${raw} / ${axis.max}` : `${raw}`}
-        </span>
-      </div>
-      <div style={{ height: 3, background: 'var(--color-bg-sunken)', marginBottom: 6, position: 'relative' }}>
-        <div style={{ position: 'absolute', left: 0, top: 0, height: '100%',
-          width: `${Math.max(0, n * 100)}%`, background: col }} />
-      </div>
-      <div style={{ fontSize: 10, fontWeight: 600, color: col, fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
-        {tier}
-      </div>
-      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-        {axis.tip}
-      </div>
-    </div>
-  );
-}
-
-// ── Value breakdown bars (cross-linked with hex hover) ────────────────────────
-function HexBreakdown({ components, hoveredAxis, onHoverAxis }) {
-  const total = Math.max(0,
-    HEX_AXES.reduce((sum, ax) => sum + Math.max(0, components?.[ax.key] || 0), 0));
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)',
-        textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
-        Component Breakdown
-      </div>
-      {HEX_AXES.map((axis, i) => {
-        const raw = components?.[axis.key] || 0;
-        const n   = Math.min(1, Math.max(0, raw / axis.max));
-        const col = hexPerfColor(n);
-        const hot = hoveredAxis === i;
-        return (
-          <div key={axis.key}
-            onMouseEnter={() => onHoverAxis?.(i)}
-            onMouseLeave={() => onHoverAxis?.(null)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '2px 4px',
-              background: hot ? 'var(--color-accent-bg)' : 'transparent',
-              cursor: 'default',
-            }}>
-            <span style={{
-              fontSize: 10, fontFamily: 'var(--font-mono)',
-              color: hot ? col : 'var(--color-text-tertiary)',
-              width: 30, textAlign: 'right', flexShrink: 0,
-              letterSpacing: '0.03em', fontWeight: hot ? 700 : 400,
-            }}>{axis.short}</span>
-            <div style={{ flex: 1, height: 4, background: 'var(--color-bg-sunken)', position: 'relative' }}>
-              <div style={{
-                position: 'absolute', left: 0, top: 0, height: '100%',
-                width: `${Math.max(0, n * 100)}%`,
-                background: col, opacity: hot ? 1 : 0.7,
-              }} />
-            </div>
-            <span style={{
-              fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
-              color: hot ? col : 'var(--color-text-secondary)',
-              width: 26, textAlign: 'right', flexShrink: 0,
-            }}>{raw > 0 ? `+${raw}` : raw}</span>
-            <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 20, flexShrink: 0 }}>
-              /{axis.max}
-            </span>
-          </div>
-        );
-      })}
-      {/* Total */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '5px 4px 2px',
-        borderTop: '1px solid var(--color-border-subtle)', marginTop: 2,
-      }}>
-        <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)',
-          width: 30, textAlign: 'right' }}>TOT</span>
-        <div style={{ flex: 1 }} />
-        <span style={{
-          fontSize: 15, fontFamily: 'var(--font-mono)', fontWeight: 700,
-          color: total >= 60 ? 'var(--color-rating-elite)'
-            : total >= 40 ? 'var(--color-rating-good)'
-            : total >= 25 ? 'var(--color-rating-avg)'
-            : 'var(--color-rating-poor)',
-          width: 26, textAlign: 'right',
-        }}>{total}</span>
-        <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 20 }}>/100</span>
-      </div>
-    </div>
-  );
-}
-
+import { Sparkline, SparklineGrid } from '../visualizations/SparklineComponents.jsx';
+import {
+  HEX_AXES, hexComponentsFromAnalytics, hexComponentsFromProfile,
+  hexNorm, hexPerfColor, HexChart, HexAxisTooltip, HexBreakdown,
+  SectionLabel, Tooltip, ratingColor,
+  PERCENTILE_STATS, MIN_GAMES_PERCENTILE, computePercentile, pctBarColor,
+  LeaguePercentileSection, PlayerStatGrid, AttrBars,
+} from '../visualizations/PlayerVisuals.jsx';
 export function RosterScreen() {
   const { gameState, engines, isReady } = useGame();
   const [sortBy, setSortBy] = useState('rating');
@@ -423,6 +84,26 @@ export function RosterScreen() {
 
   const capLabel = currentTier === 1 ? 'cap' : 'limit';
 
+  // ── Team Scoring Flow ──────────────────────────────────────────────────────
+  const [showScoringAst, setShowScoringAst] = useState(false);
+
+  const scoringRoster = useMemo(() => {
+    return (userTeam.roster || [])
+      .filter(p => p.seasonStats?.gamesPlayed > 0 && p.seasonStats?.points > 0)
+      .sort((a, b) => (b.seasonStats?.points || 0) - (a.seasonStats?.points || 0));
+  }, [roster]);
+
+  const teamTotalPts  = scoringRoster.reduce((s, p) => s + (p.seasonStats?.points  || 0), 0);
+  const teamTotalAst  = scoringRoster.reduce((s, p) => s + (p.seasonStats?.assists || 0), 0);
+  const hasScoringData = scoringRoster.length >= 2 && teamTotalPts > 0;
+  const teamTwoPts    = scoringRoster.reduce((s, p) => s + ((p.seasonStats?.fieldGoalsMade || 0) - (p.seasonStats?.threePointersMade || 0)) * 2, 0);
+  const teamThreePts  = scoringRoster.reduce((s, p) => s + (p.seasonStats?.threePointersMade || 0) * 3, 0);
+  const teamFTPts     = scoringRoster.reduce((s, p) => s + (p.seasonStats?.freeThrowsMade || 0), 0);
+  const topScorer     = scoringRoster[0];
+  const topScorerShare = topScorer ? (topScorer.seasonStats.points / teamTotalPts) : 0;
+  const loadLabel  = topScorerShare >= 0.28 ? 'Star-Heavy' : topScorerShare >= 0.20 ? 'Moderate' : 'Balanced';
+  const loadColor  = topScorerShare >= 0.28 ? 'var(--color-loss)' : topScorerShare >= 0.20 ? 'var(--color-warning)' : 'var(--color-win)';
+
   return (
     <div style={{
       maxWidth: 'var(--content-max)',
@@ -447,10 +128,16 @@ export function RosterScreen() {
         }}>
           Roster
         </h2>
-        <Button variant="secondary" size="sm"
-          onClick={() => window.openRosterManagementHub?.()}>
-          Open Full Manager →
-        </Button>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <Button variant="secondary" size="sm"
+            onClick={() => window._reactOpenFreeAgentBrowse?.()}>
+            Free Agents
+          </Button>
+          <Button variant="secondary" size="sm"
+            onClick={() => window._reactOpenTradeBrowse?.()}>
+            Trade
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -472,6 +159,186 @@ export function RosterScreen() {
           value={<PositionBar counts={posCounts} />}
           sub="" />
       </div>
+
+      {/* Team Scoring Flow */}
+      {hasScoringData && (
+        <Card padding="none">
+          {/* Card header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 16px', borderBottom: '1px solid var(--color-border-subtle)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)',
+                color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Scoring Flow
+              </span>
+              {/* Legend */}
+              <div style={{ display: 'flex', gap: 10 }}>
+                {[
+                  { label: '3PT', color: 'var(--color-zone-three)' },
+                  { label: '2PT', color: 'var(--color-zone-rim)'   },
+                  { label: 'FT',  color: 'var(--color-zone-mid)'   },
+                  ...(showScoringAst ? [{ label: 'AST', color: 'var(--color-warning)' }] : []),
+                ].map(({ label, color }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ width: 7, height: 7, background: color, opacity: 0.8 }} />
+                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{label}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Load balance badge */}
+              <span style={{
+                fontSize: 9, fontWeight: 700, color: loadColor,
+                textTransform: 'uppercase', letterSpacing: '0.05em',
+                border: `1px solid ${loadColor}`, padding: '1px 5px', opacity: 0.85,
+              }}>
+                {loadLabel}
+              </span>
+            </div>
+            {/* Assists toggle */}
+            <button
+              onClick={() => setShowScoringAst(v => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '3px 8px',
+                border: `1px solid ${showScoringAst ? 'var(--color-warning)' : 'var(--color-border)'}`,
+                background: showScoringAst ? 'var(--color-warning-bg)' : 'transparent',
+                cursor: 'pointer', fontFamily: 'var(--font-body)',
+              }}
+            >
+              <div style={{ width: 5, height: 5, background: showScoringAst ? 'var(--color-warning)' : 'var(--color-text-tertiary)' }} />
+              <span style={{
+                fontSize: 9, fontWeight: 600,
+                color: showScoringAst ? 'var(--color-warning)' : 'var(--color-text-tertiary)',
+                textTransform: 'uppercase', letterSpacing: '0.04em',
+              }}>
+                Assists
+              </span>
+            </button>
+          </div>
+
+          <div style={{ padding: '10px 16px 14px' }}>
+            {/* Team summary bar */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>
+                Team mix · {teamTotalPts} pts this season
+              </div>
+              <div style={{ display: 'flex', height: 14, overflow: 'hidden', gap: 1 }}>
+                {[
+                  { color: 'var(--color-zone-three)', pts: teamThreePts },
+                  { color: 'var(--color-zone-rim)',   pts: teamTwoPts   },
+                  { color: 'var(--color-zone-mid)',   pts: teamFTPts    },
+                ].map(({ color, pts }, i) => (
+                  <div key={i} style={{
+                    height: '100%',
+                    width: `${(pts / teamTotalPts * 100).toFixed(1)}%`,
+                    background: color, opacity: 0.75,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 8, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)',
+                  }}>
+                    {(pts / teamTotalPts * 100) >= 12 ? `${(pts / teamTotalPts * 100).toFixed(0)}%` : ''}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Per-player rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {/* Column headers */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '120px 1fr 44px 44px',
+                gap: 0, marginBottom: 3,
+                fontSize: 9, color: 'var(--color-text-tertiary)',
+                textTransform: 'uppercase', letterSpacing: '0.04em',
+              }}>
+                <div>Player</div>
+                <div style={{ paddingLeft: 6 }}>Scoring composition  <span style={{ opacity: 0.5 }}>← bar width = share of team pts</span></div>
+                <div style={{ textAlign: 'right' }}>PPG</div>
+                <div style={{ textAlign: 'right' }}>Share</div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+                {scoringRoster.map((p, i) => {
+                  const ss       = p.seasonStats;
+                  const gp       = ss.gamesPlayed;
+                  const twoMade  = (ss.fieldGoalsMade || 0) - (ss.threePointersMade || 0);
+                  const twoPts   = twoMade * 2;
+                  const threePts = (ss.threePointersMade || 0) * 3;
+                  const ftPts    = ss.freeThrowsMade || 0;
+                  const ptsShare = ss.points / teamTotalPts;
+                  const astShare = teamTotalAst > 0 ? (ss.assists || 0) / teamTotalAst : 0;
+                  const ppg      = (ss.points / gp).toFixed(1);
+                  const shareColor = ptsShare >= 0.20 ? 'var(--color-accent)'
+                    : ptsShare >= 0.12 ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)';
+
+                  return (
+                    <div key={p.id || i} style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+                      <div style={{
+                        display: 'grid', gridTemplateColumns: '120px 1fr 44px 44px',
+                        gap: 0, alignItems: 'center', padding: '6px 0',
+                      }}>
+                        {/* Name + pos */}
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 600,
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {p.name}
+                          </div>
+                          <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>
+                            {p.position} · {gp}G
+                          </div>
+                        </div>
+
+                        {/* Stacked scoring bar */}
+                        <div style={{ paddingLeft: 6, paddingRight: 8 }}>
+                          {/* Scoring bar — width = ptsShare of max player's share */}
+                          <div style={{
+                            position: 'relative', height: 18,
+                            width: `${(ptsShare / topScorerShare * 100).toFixed(1)}%`,
+                            display: 'flex', overflow: 'hidden',
+                          }}>
+                            {[
+                              { color: 'var(--color-zone-three)', pts: threePts },
+                              { color: 'var(--color-zone-rim)',   pts: twoPts   },
+                              { color: 'var(--color-zone-mid)',   pts: ftPts    },
+                            ].map(({ color, pts }, j) => (
+                              <div key={j} style={{
+                                height: '100%',
+                                width: `${(pts / ss.points * 100).toFixed(1)}%`,
+                                background: color, opacity: 0.8, flexShrink: 0,
+                              }} />
+                            ))}
+                          </div>
+                          {/* Assists underbar */}
+                          {showScoringAst && teamTotalAst > 0 && (
+                            <div style={{
+                              marginTop: 2, height: 4,
+                              width: `${(astShare / (scoringRoster[0] ? scoringRoster.reduce((m, q) => Math.max(m, (q.seasonStats?.assists||0)/teamTotalAst), 0) : 1) * ptsShare / topScorerShare * 100).toFixed(1)}%`,
+                              background: 'var(--color-warning)', opacity: 0.7,
+                            }} />
+                          )}
+                        </div>
+
+                        {/* PPG */}
+                        <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 700,
+                          fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>
+                          {ppg}
+                        </div>
+
+                        {/* Share */}
+                        <div style={{ textAlign: 'right', fontSize: 11, fontWeight: 600,
+                          fontFamily: 'var(--font-mono)', color: shareColor }}>
+                          {(ptsShare * 100).toFixed(0)}%
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Roster Table */}
       <Card padding="none" className="animate-fade-in">
@@ -675,14 +542,13 @@ function PlayerRow({ player, engines, expanded, onToggle, team }) {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   Player Detail — Expanded inline panel with full attributes + season stats
-   ═══════════════════════════════════════════════════════════════ */
 function PlayerDetailRow({ player, engines, team }) {
   const { PlayerAttributes: PA, StatEngine } = engines;
+  const { gameState } = useGame();
   const m = player.measurables;
   const attrs = player.attributes || {};
   const [hoveredAxis, setHoveredAxis] = useState(null);
+  const [pctFilterPos, setPctFilterPos] = useState(false);
 
   const measStr = m && PA?.formatHeight
     ? `${PA.formatHeight(m.height)} · ${m.weight}lbs · ${PA.formatWingspan ? PA.formatWingspan(m.wingspan) : m.wingspan + '"'} WS`
@@ -693,11 +559,25 @@ function PlayerDetailRow({ player, engines, team }) {
   const avgs = analytics?.avgs || null;
   const hasStats = avgs && avgs.gamesPlayed > 0;
 
-  const attrColor = (v) =>
-    v >= 80 ? 'var(--color-rating-elite)' :
-    v >= 70 ? 'var(--color-rating-good)' :
-    v >= 60 ? 'var(--color-rating-avg)' :
-    'var(--color-rating-poor)';
+  // ── Percentile pool — all eligible players in the user's current tier ──
+  const { tierPool, tierPoolByPos } = useMemo(() => {
+    const tierKey = `tier${gameState?.currentTier || 1}Teams`;
+    const tierTeams = gameState?.[tierKey] || [];
+    const pool = [];
+    tierTeams.forEach(t => {
+      (t.roster || []).forEach(p => {
+        if (!p.seasonStats || p.seasonStats.gamesPlayed < MIN_GAMES_PERCENTILE) return;
+        const a = StatEngine?.getSeasonAverages?.(p);
+        if (a) pool.push({ pos: p.position || p.pos, avgs: a });
+      });
+    });
+    const byPos = {};
+    pool.forEach(p => {
+      if (!byPos[p.pos]) byPos[p.pos] = [];
+      byPos[p.pos].push(p);
+    });
+    return { tierPool: pool, tierPoolByPos: byPos };
+  }, [gameState, StatEngine]);
 
   const pmColor = (v) =>
     v > 0 ? 'var(--color-win)' : v < 0 ? 'var(--color-loss)' : 'var(--color-text-tertiary)';
@@ -705,32 +585,6 @@ function PlayerDetailRow({ player, engines, team }) {
   const pct = (v) => v != null ? `${(v * 100).toFixed(1)}%` : '—';
   const stat = (v, decimals = 1) => v != null ? v.toFixed(decimals) : '—';
   const pm = (v) => v == null ? '—' : v > 0 ? `+${v}` : `${v}`;
-
-  const AttrBar = ({ label, value }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
-      <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', width: 100 }}>{label}</span>
-      <div style={{ flex: 1, height: 4, background: 'var(--color-bg-sunken)', position: 'relative' }}>
-        <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${value}%`, background: attrColor(value) }} />
-      </div>
-      <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600, width: 24, textAlign: 'right', color: attrColor(value) }}>{value}</span>
-    </div>
-  );
-
-  const offKeys = [
-    { key: 'clutch', label: 'Clutch' },
-    { key: 'basketballIQ', label: 'Basketball IQ' },
-    { key: 'speed', label: 'Speed' },
-  ];
-  const defKeys = [
-    { key: 'strength', label: 'Strength' },
-    { key: 'verticality', label: 'Verticality' },
-    { key: 'endurance', label: 'Endurance' },
-  ];
-  const intKeys = [
-    { key: 'workEthic', label: 'Work Ethic' },
-    { key: 'coachability', label: 'Coachability' },
-    { key: 'collaboration', label: 'Collaboration' },
-  ];
 
   const verdictLabel = {
     great_deal: { label: 'Great Deal', color: 'var(--color-win)' },
@@ -917,9 +771,6 @@ function PlayerDetailRow({ player, engines, team }) {
           {player.scoringProfile && (() => {
             const sp = player.scoringProfile;
             const shape = sp.shotShape || {};
-            const rimPct   = Math.round((shape.rim      || 0) * 100);
-            const midPct   = Math.round((shape.midrange  || 0) * 100);
-            const threePct = Math.round((shape.three     || 0) * 100);
 
             // Usage label: how shot-hungry relative to the 0.4–1.8 scale
             const usageLabel =
@@ -986,60 +837,201 @@ function PlayerDetailRow({ player, engines, team }) {
                   </div>
                 </div>
 
-                {/* Shot shape stacked bar */}
-                <div>
-                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
-                    Shot Distribution
-                  </div>
+                {/* Shot Zone Efficiency */}
+                {(() => {
+                  const ss = player.seasonStats;
+                  const hasGames = ss && ss.gamesPlayed > 0 && ss.fieldGoalsAttempted > 0;
 
-                  {/* The bar */}
-                  <div style={{ display: 'flex', height: 20, width: '100%', overflow: 'hidden', gap: 1 }}>
-                    {rimPct > 0 && (
-                      <div style={{
-                        width: `${rimPct}%`, background: 'var(--color-chart-2)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 10, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)',
-                        minWidth: rimPct < 8 ? 0 : 'auto', overflow: 'hidden',
-                      }}>
-                        {rimPct >= 8 ? `${rimPct}%` : ''}
-                      </div>
-                    )}
-                    {midPct > 0 && (
-                      <div style={{
-                        width: `${midPct}%`, background: 'var(--color-chart-4)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 10, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)',
-                        minWidth: midPct < 8 ? 0 : 'auto', overflow: 'hidden',
-                      }}>
-                        {midPct >= 8 ? `${midPct}%` : ''}
-                      </div>
-                    )}
-                    {threePct > 0 && (
-                      <div style={{
-                        flex: 1, background: 'var(--color-chart-1)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 10, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)',
-                      }}>
-                        {threePct >= 8 ? `${threePct}%` : ''}
-                      </div>
-                    )}
-                  </div>
+                  // League-average FG% benchmarks per zone
+                  const LEAGUE_AVG = { rim: 0.58, mid: 0.42, three: 0.36 };
 
-                  {/* Legend */}
-                  <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
-                    {[
-                      { label: 'At Rim', pct: rimPct,   color: 'var(--color-chart-2)' },
-                      { label: 'Midrange', pct: midPct,  color: 'var(--color-chart-4)' },
-                      { label: 'Three',   pct: threePct, color: 'var(--color-chart-1)' },
-                    ].map(({ label, pct: p, color }) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <div style={{ width: 8, height: 8, background: color, flexShrink: 0 }} />
-                        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{label}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{p}%</span>
+                  // Zone color tokens — defined in design-system.css
+                  const ZONE_COLOR = {
+                    rim:   'var(--color-zone-rim)',
+                    mid:   'var(--color-zone-mid)',
+                    three: 'var(--color-zone-three)',
+                  };
+
+                  // Efficiency tier → color
+                  const tierColor = (pct, zone) => {
+                    const d = pct - LEAGUE_AVG[zone];
+                    if (d >=  0.07) return 'var(--color-rating-elite)';
+                    if (d >=  0.02) return 'var(--color-win)';
+                    if (d >= -0.03) return 'var(--color-text-secondary)';
+                    return 'var(--color-loss)';
+                  };
+                  const tierLabel = (pct, zone) => {
+                    const d = pct - LEAGUE_AVG[zone];
+                    if (d >=  0.07) return 'Elite';
+                    if (d >=  0.02) return 'Good';
+                    if (d >= -0.03) return 'Avg';
+                    return 'Poor';
+                  };
+
+                  // Derive per-zone data from seasonStats + profile shape
+                  let zones = null;
+                  if (hasGames) {
+                    const { fieldGoalsAttempted: fga, fieldGoalsMade: fgm,
+                            threePointersAttempted: threePA, threePointersMade: threePM } = ss;
+                    const twoPA = fga - threePA;
+                    const twoPM = fgm - threePM;
+                    // Split 2PA into rim/mid using profile proportions
+                    const twoTotal = (shape.rim || 0) + (shape.midrange || 0);
+                    const rimShare = twoTotal > 0 ? (shape.rim || 0) / twoTotal : 0.6;
+                    const rimPA = Math.round(twoPA * rimShare);
+                    const midPA = twoPA - rimPA;
+                    // Estimate zone FG%: overall 2pt% ±offset by zone tendency
+                    const twoPct = twoPA > 0 ? twoPM / twoPA : 0;
+                    const rimPct2 = Math.min(0.72, twoPct + 0.06);
+                    const rimPM2 = Math.round(rimPA * rimPct2);
+                    const midPM2 = twoPM - rimPM2;
+                    const midPct2 = midPA > 0 ? midPM2 / midPA : 0;
+                    const threePct2 = threePA > 0 ? threePM / threePA : 0;
+                    zones = {
+                      rim:   { pa: rimPA,   pct: rimPct2,  share: rimPA  / fga, profileShare: shape.rim      || 0 },
+                      mid:   { pa: midPA,   pct: midPct2,  share: midPA  / fga, profileShare: shape.midrange || 0 },
+                      three: { pa: threePA, pct: threePct2, share: threePA / fga, profileShare: shape.three   || 0 },
+                      fga,
+                    };
+                  }
+
+                  // Profile-only shares (pre-season fallback)
+                  const profileShares = {
+                    rim:   shape.rim      || 0,
+                    mid:   shape.midrange || 0,
+                    three: shape.three    || 0,
+                  };
+
+                  const ZONE_DEFS = [
+                    { key: 'rim',   label: 'At Rim',   leagueAvgShare: 0.30 },
+                    { key: 'mid',   label: 'Midrange',  leagueAvgShare: 0.22 },
+                    { key: 'three', label: '3-Point',   leagueAvgShare: 0.32 },
+                  ];
+
+                  return (
+                    <div>
+                      {/* Column headers */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '62px 1fr 38px 46px 38px', gap: 0, marginBottom: 4 }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Shot Zones
+                        </div>
+                        <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', paddingLeft: 8 }}>
+                          {hasGames ? 'actual share  ░ = target' : 'profile target'}
+                        </div>
+                        {hasGames && <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Att</div>}
+                        {hasGames && <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>FG%</div>}
+                        {hasGames && <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Tier</div>}
                       </div>
-                    ))}
-                  </div>
-                </div>
+
+                      <div style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+                        {ZONE_DEFS.map(({ key, label, leagueAvgShare }, idx) => {
+                          const color = ZONE_COLOR[key];
+                          const profShare = profileShares[key];
+                          const z = zones?.[key];
+                          const actualShare = z?.share ?? 0;
+
+                          return (
+                            <div key={key}>
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: hasGames ? '62px 1fr 38px 46px 38px' : '62px 1fr',
+                                gap: 0, alignItems: 'center', padding: '7px 0',
+                              }}>
+                                {/* Zone label */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <div style={{ width: 7, height: 7, background: color, flexShrink: 0 }} />
+                                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: '0.02em' }}>
+                                    {label}
+                                  </span>
+                                </div>
+
+                                {/* Bar — ghost (profile target) behind actual */}
+                                <div style={{ position: 'relative', height: 18, marginLeft: 8, marginRight: 6 }}>
+                                  {/* Profile ghost */}
+                                  <div style={{
+                                    position: 'absolute', top: 0, left: 0, height: '100%',
+                                    width: `${(profShare * 100).toFixed(1)}%`,
+                                    background: color, opacity: 0.18,
+                                  }} />
+                                  {/* Actual bar (only if has games) */}
+                                  {hasGames && (
+                                    <div style={{
+                                      position: 'absolute', top: 2, left: 0, height: 'calc(100% - 4px)',
+                                      width: `${(actualShare * 100).toFixed(1)}%`,
+                                      background: color, opacity: 0.75,
+                                    }} />
+                                  )}
+                                  {/* League avg share tick */}
+                                  <div style={{
+                                    position: 'absolute', top: 0, left: `${leagueAvgShare * 100}%`,
+                                    width: 1, height: '100%', background: 'var(--color-border)',
+                                  }} />
+                                  {/* Share label */}
+                                  <div style={{
+                                    position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+                                    left: `calc(${((hasGames ? actualShare : profShare) * 100).toFixed(1)}% + 4px)`,
+                                    fontSize: 9, fontFamily: 'var(--font-mono)',
+                                    color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap',
+                                  }}>
+                                    {((hasGames ? actualShare : profShare) * 100).toFixed(0)}%
+                                  </div>
+                                </div>
+
+                                {/* Attempts */}
+                                {hasGames && (
+                                  <div style={{ textAlign: 'right', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
+                                    {z?.pa ?? 0}
+                                  </div>
+                                )}
+
+                                {/* FG% */}
+                                {hasGames && (
+                                  <div style={{ textAlign: 'right', fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700, color: tierColor(z?.pct ?? 0, key) }}>
+                                    {((z?.pct ?? 0) * 100).toFixed(1)}%
+                                  </div>
+                                )}
+
+                                {/* Tier label */}
+                                {hasGames && (
+                                  <div style={{ textAlign: 'right', fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)', color: tierColor(z?.pct ?? 0, key) }}>
+                                    {tierLabel(z?.pct ?? 0, key)}
+                                  </div>
+                                )}
+                              </div>
+                              {idx < 2 && <div style={{ height: 1, background: 'var(--color-border-subtle)' }} />}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Pre-season note / eFG summary */}
+                      <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        {!hasGames ? (
+                          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
+                            Profile target — live FG% updates once games are played
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>
+                            ░ = profile target  ·  <span style={{ opacity: 0.7 }}>│</span> = league avg share
+                          </span>
+                        )}
+                        {hasGames && (() => {
+                          const { fieldGoalsAttempted: fga, fieldGoalsMade: fgm, threePointersMade: tpm } = ss;
+                          const efg = fga > 0 ? (fgm + 0.5 * tpm) / fga : 0;
+                          const efgColor = efg >= 0.56 ? 'var(--color-rating-elite)' : efg >= 0.52 ? 'var(--color-win)' : efg >= 0.48 ? 'var(--color-text-secondary)' : 'var(--color-loss)';
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                              <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>eFG%</span>
+                              <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: efgColor }}>
+                                {(efg * 100).toFixed(1)}%
+              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}
@@ -1127,74 +1119,141 @@ function PlayerDetailRow({ player, engines, team }) {
             );
           })()}
 
-          {/* ── Attributes ── */}
-          <div>
-            <SectionLabel>Attributes</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          {/* ── League Percentiles ── */}
+          {hasStats && tierPool.length >= 5 && (() => {
+            const playerPos  = player.position || player.pos || '';
+            const activePool = pctFilterPos ? (tierPoolByPos[playerPos] || tierPool) : tierPool;
+            const n          = activePool.length;
+
+            return (
               <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Offense</div>
-                {offKeys.map(({ key, label }) => <AttrBar key={key} label={label} value={attrs[key] || 50} />)}
+                {/* Header row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <SectionLabel style={{ marginBottom: 0 }}>League Percentiles</SectionLabel>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>
+                      vs {n} {pctFilterPos ? `${playerPos}s` : 'players'} · T{gameState?.currentTier} · min {MIN_GAMES_PERCENTILE}GP
+                    </span>
+                    {/* Position filter toggle */}
+                    <button
+                      onClick={() => setPctFilterPos(f => !f)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '2px 7px',
+                        border: `1px solid ${pctFilterPos ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                        background: pctFilterPos ? 'var(--color-accent-bg)' : 'transparent',
+                        cursor: 'pointer', fontFamily: 'var(--font-body)',
+                      }}
+                    >
+                      <div style={{
+                        width: 5, height: 5,
+                        background: pctFilterPos ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                      }} />
+                      <span style={{
+                        fontSize: 9, fontWeight: 600,
+                        color: pctFilterPos ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                        textTransform: 'uppercase', letterSpacing: '0.04em',
+                      }}>
+                        {playerPos} only
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Column labels */}
+                <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 48px 62px', gap: 0, marginBottom: 2 }}>
+                  <div />
+                  <div style={{ position: 'relative', height: 12, marginLeft: 6, marginRight: 8 }}>
+                    <span style={{
+                      position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+                      fontSize: 8, color: 'var(--color-text-tertiary)',
+                    }}>50th</span>
+                    <span style={{
+                      position: 'absolute', left: '75%', transform: 'translateX(-50%)',
+                      fontSize: 8, color: 'var(--color-text-tertiary)', opacity: 0.6,
+                    }}>75th</span>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Stat</div>
+                  <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Rank</div>
+                </div>
+
+                {/* Stat rows */}
+                <div style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+                  {PERCENTILE_STATS.map((stat, i) => {
+                    const playerVal = avgs[stat.key];
+                    if (playerVal == null) return null;
+                    const poolVals = activePool.map(p => p.avgs[stat.key]).filter(v => v != null);
+                    if (poolVals.length === 0) return null;
+                    const pct  = computePercentile(playerVal, poolVals);
+                    const rank = Math.round((1 - pct) * n) + 1;
+                    const color = pctBarColor(pct);
+                    return (
+                      <div key={stat.key}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 48px 62px', gap: 0, alignItems: 'center', padding: '6px 0' }}>
+                          {/* Label */}
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {stat.label}
+                          </div>
+                          {/* Bar */}
+                          <div style={{ position: 'relative', height: 14, marginLeft: 6, marginRight: 8, background: 'var(--color-bg-sunken)', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${(pct * 100).toFixed(1)}%`, background: color, opacity: 0.75 }} />
+                            {/* 50th tick */}
+                            <div style={{ position: 'absolute', top: 0, left: '50%', width: 1, height: '100%', background: 'var(--color-border)' }} />
+                            {/* 75th tick */}
+                            <div style={{ position: 'absolute', top: 0, left: '75%', width: 1, height: '100%', background: 'var(--color-border)', opacity: 0.5 }} />
+                          </div>
+                          {/* Value */}
+                          <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color }}>
+                            {stat.fmt(playerVal)}
+                          </div>
+                          {/* Rank */}
+                          <div style={{ textAlign: 'right', fontSize: 9, fontFamily: 'var(--font-mono)' }}>
+                            <span style={{ fontWeight: 600, color }}>#{rank}</span>
+                            <span style={{ color: 'var(--color-text-tertiary)' }}> / {n}</span>
+                          </div>
+                        </div>
+                        {i < PERCENTILE_STATS.length - 1 && (
+                          <div style={{ height: 1, background: 'var(--color-border-subtle)' }} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Legend */}
+                <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+                  {[
+                    { color: 'var(--color-rating-elite)', label: 'Top 10%'     },
+                    { color: 'var(--color-rating-good)',  label: 'Top 25%'     },
+                    { color: 'var(--color-rating-avg)',   label: 'Middle 50%'  },
+                    { color: 'var(--color-rating-poor)',  label: 'Bottom 25%'  },
+                  ].map(({ color, label }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ width: 7, height: 7, background: color, opacity: 0.75 }} />
+                      <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Defense</div>
-                {defKeys.map(({ key, label }) => <AttrBar key={key} label={label} value={attrs[key] || 50} />)}
-              </div>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Intangibles</div>
-                {intKeys.map(({ key, label }) => <AttrBar key={key} label={label} value={attrs[key] || 50} />)}
-              </div>
+            );
+          })()}
+
+          {/* ── Season Arc Sparklines ── */}
+          {player.gameLog && player.gameLog.length >= 3 && (
+            <div>
+              <SectionLabel>Season Arc</SectionLabel>
+              <SparklineGrid gameLog={player.gameLog} />
             </div>
-          </div>
+          )}
+
+          {/* ── Attributes ── */}
+          <AttrBars attributes={player.attributes} />
 
         </div>
       </td>
     </tr>
   );
 }
-
-/* ═══════════════════════════════════════════════════════════════
-   Stat Tooltip
-   ═══════════════════════════════════════════════════════════════ */
-function Tooltip({ text, children }) {
-  const [visible, setVisible] = React.useState(false);
-  const [pos, setPos] = React.useState({ top: 0, left: 0 });
-  const ref = React.useRef(null);
-
-  const show = () => {
-    if (!ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    setPos({ top: r.bottom + 6, left: r.left + r.width / 2 });
-    setVisible(true);
-  };
-  const hide = () => setVisible(false);
-
-  return (
-    <>
-      <span ref={ref} onMouseEnter={show} onMouseLeave={hide} className="stat-tooltip-trigger">
-        {children}
-      </span>
-      {visible && (
-        <div className="stat-tooltip" style={{ top: pos.top, left: pos.left }}>
-          {text}
-        </div>
-      )}
-    </>
-  );
-}
-
-function SectionLabel({ children }) {
-  return (
-    <div style={{
-      fontSize: 10, fontWeight: 600, color: 'var(--color-accent)',
-      textTransform: 'uppercase', letterSpacing: '0.06em',
-      marginBottom: 8,
-    }}>
-      {children}
-    </div>
-  );
-}
-
-
 
 /* ═══════════════════════════════════════════════════════════════
    Summary Card
@@ -1289,18 +1348,6 @@ function SortTh({ label, col, sortBy, sortDir, onSort, width, align = 'center' }
       {label}{arrow}
     </th>
   );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   Helpers
-   ═══════════════════════════════════════════════════════════════ */
-function ratingColor(r) {
-  if (!r) return 'var(--color-text-tertiary)';
-  if (r >= 85) return 'var(--color-rating-elite)';
-  if (r >= 78) return 'var(--color-rating-good)';
-  if (r >= 70) return 'var(--color-rating-avg)';
-  if (r >= 60) return 'var(--color-rating-below)';
-  return 'var(--color-rating-poor)';
 }
 
 function formatCurrency(amount) {

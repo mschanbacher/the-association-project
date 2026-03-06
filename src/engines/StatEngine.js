@@ -446,6 +446,18 @@ export const StatEngine = {
         statLine.freeThrowsAttempted  = fta;
 
         statLine.points = (twoPM * 2) + (threePM * 3) + ftm;
+
+        // ── Offensive / Defensive rebound split ───────────────────────────
+        // Split total rebounds using position-aware ORB rates.
+        // Bigs crash the offensive glass more; guards stay back for transition D.
+        // These rates reflect NBA positional averages (ORB as % of total rebounds).
+        const orbRateByPosition = {
+            PG: 0.14, SG: 0.16, SF: 0.22, PF: 0.30, C: 0.32,
+        };
+        const orbRate = orbRateByPosition[position] || 0.22;
+        statLine.offensiveRebounds = Math.round(statLine.rebounds * orbRate);
+        statLine.defensiveRebounds = statLine.rebounds - statLine.offensiveRebounds;
+
         return statLine;
     },
 
@@ -729,13 +741,15 @@ export const StatEngine = {
     initializeSeasonStats(player) {
         player.seasonStats = {
             gamesPlayed: 0, gamesStarted: 0, minutesPlayed: 0,
-            points: 0, rebounds: 0, assists: 0, steals: 0, blocks: 0,
+            points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0,
+            assists: 0, steals: 0, blocks: 0,
             turnovers: 0, fouls: 0,
             fieldGoalsMade: 0, fieldGoalsAttempted: 0,
             threePointersMade: 0, threePointersAttempted: 0,
             freeThrowsMade: 0, freeThrowsAttempted: 0,
             plusMinus: 0,
         };
+        player.gameLog = [];
     },
 
     accumulateStats(player, gameStatLine) {
@@ -747,6 +761,8 @@ export const StatEngine = {
         s.minutesPlayed += g.minutesPlayed;
         s.points += g.points;
         s.rebounds += g.rebounds;
+        s.offensiveRebounds = (s.offensiveRebounds || 0) + (g.offensiveRebounds || 0);
+        s.defensiveRebounds = (s.defensiveRebounds || 0) + (g.defensiveRebounds || 0);
         s.assists += g.assists;
         s.steals += g.steals;
         s.blocks += g.blocks;
@@ -759,6 +775,42 @@ export const StatEngine = {
         s.freeThrowsMade += g.freeThrowsMade;
         s.freeThrowsAttempted += g.freeThrowsAttempted;
         s.plusMinus = (s.plusMinus || 0) + (g.plusMinus || 0);
+
+        // ── Per-game log for sparklines ────────────────────────────────────
+        if (!player.gameLog) player.gameLog = [];
+        if (player.gameLog.length < 100 && g.gamesPlayed > 0) {
+            const fgm = g.fieldGoalsMade || 0;
+            const fga = g.fieldGoalsAttempted || 0;
+            const ftm = g.freeThrowsMade || 0;
+            const fta = g.freeThrowsAttempted || 0;
+            const orb = g.offensiveRebounds || 0;
+            const drb = g.defensiveRebounds || 0;
+            // Hollinger GameScore:
+            // GmSc = PTS + 0.4×FGM − 0.7×FGA − 0.4×(FTA−FTM) + 0.7×ORB + 0.3×DRB
+            //        + STL + 0.7×AST + 0.7×BLK − 0.4×PF − TOV
+            const gs = +(
+                (g.points    || 0)
+                + 0.4  * fgm
+                - 0.7  * fga
+                - 0.4  * (fta - ftm)
+                + 0.7  * orb
+                + 0.3  * drb
+                + (g.steals    || 0)
+                + 0.7  * (g.assists   || 0)
+                + 0.7  * (g.blocks    || 0)
+                - 0.4  * (g.fouls     || 0)
+                - (g.turnovers || 0)
+            ).toFixed(1);
+            player.gameLog.push({
+                g:    s.gamesPlayed,
+                pts:  g.points       || 0,
+                reb:  g.rebounds     || 0,
+                ast:  g.assists      || 0,
+                fgPct: fga > 0 ? +(fgm / fga).toFixed(3) : 0,
+                pm:   g.plusMinus    || 0,
+                gs:   parseFloat(gs),
+            });
+        }
     },
 
     getSeasonAverages(player) {
@@ -792,6 +844,8 @@ export const StatEngine = {
             minutesPerGame:   +mpg.toFixed(1),
             pointsPerGame:    +(s.points    / gp).toFixed(1),
             reboundsPerGame:  +(s.rebounds  / gp).toFixed(1),
+            offensiveReboundsPerGame: +((s.offensiveRebounds || 0) / gp).toFixed(1),
+            defensiveReboundsPerGame: +((s.defensiveRebounds || 0) / gp).toFixed(1),
             assistsPerGame:   +(s.assists   / gp).toFixed(1),
             stealsPerGame:    +(s.steals    / gp).toFixed(1),
             blocksPerGame:    +(s.blocks    / gp).toFixed(1),
@@ -806,6 +860,8 @@ export const StatEngine = {
             // Season totals (for leaderboards / awards)
             totalPoints:   s.points,
             totalRebounds: s.rebounds,
+            totalOffensiveRebounds: s.offensiveRebounds || 0,
+            totalDefensiveRebounds: s.defensiveRebounds || 0,
             totalAssists:  s.assists,
             totalSteals:   s.steals,
             totalBlocks:   s.blocks,

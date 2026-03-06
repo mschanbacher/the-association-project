@@ -253,13 +253,12 @@ export class RosterController {
         else if (f.sort === 'salary') filtered.sort((a, b) => a.salary - b.salary);
 
         const display = filtered.slice(0, 100);
-        // [LEGACY REMOVED] let html = UIRenderer.scoutResultsTableHeader({ count: filtered.length, truncated: filtered.length > 100 });
+        // [LEGACY REMOVED] let html = UIRenderer.scoutResultsTableHeader({ count: filtered.length, truncated: filtered.length > 100 })
         display.forEach(p => {
             const watched = this._isOnWatchList(p.id);
-            // [LEGACY REMOVED] html += UIRenderer.scoutResultRow({ p, fit: p._fit, watched, getRatingColor: helpers.getRatingColor, gradeColor: helpers.gradeColor, formatCurrency: helpers.formatCurrency });
+            // [LEGACY REMOVED] html += UIRenderer.scoutResultRow(...)
         });
-        html += '</tbody></table>';
-        document.getElementById('scoutResults').innerHTML = html;
+        // [LEGACY DOM] scoutResults rendered by ScoutingScreen React component
     }
 
     showPlayerScoutDetail(playerId) {
@@ -348,11 +347,10 @@ export class RosterController {
             const p = allPlayers.find(pl => pl.id === w.id);
             // [LEGACY REMOVED] if (!p) { html += UIRenderer.watchListGoneRow({ w }); return; }
             const fit = helpers.calculateTeamFit(p, userTeam, coach);
- const contractLabel = p.contractYears <= 1 ? `<span style="color: #fbbc04;">${p.contractYears}yr ️</span>` : `${p.contractYears}yr`;
-            // [LEGACY REMOVED] html += UIRenderer.watchListRow({ p, fit, contractLabel, getRatingColor: helpers.getRatingColor, gradeColor: helpers.gradeColor, formatCurrency: helpers.formatCurrency });
+            const contractLabel = p.contractYears <= 1 ? `<span style="color: #fbbc04;">${p.contractYears}yr ️</span>` : `${p.contractYears}yr`;
+            // [LEGACY REMOVED] html += UIRenderer.watchListRow(...)
         });
-        html += '</tbody></table>';
-        content.innerHTML = html;
+        // [LEGACY DOM] watchList rendered by ScoutingScreen React component
     }
 
     renderNeedsTab() {

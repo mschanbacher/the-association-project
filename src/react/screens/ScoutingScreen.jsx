@@ -3,6 +3,7 @@ import { useGame } from '../hooks/GameBridge.jsx';
 import { Card, CardHeader } from '../components/Card.jsx';
 import { Badge, RatingBadge } from '../components/Badge.jsx';
 import { Button } from '../components/Button.jsx';
+import { ratingColor } from '../visualizations/PlayerVisuals.jsx';
 
 /* ═══════════════════════════════════════════════════════════════
    Scouting Screen — 4 tabs: Scanner, Pipeline, Watch List, Needs
@@ -105,14 +106,7 @@ function gradeColor(grade) {
   return 'var(--color-loss)';
 }
 
-function ratingColor(r) {
-  if (!r) return 'var(--color-text-tertiary)';
-  if (r >= 85) return 'var(--color-rating-elite)';
-  if (r >= 78) return 'var(--color-rating-good)';
-  if (r >= 70) return 'var(--color-rating-avg)';
-  if (r >= 60) return 'var(--color-rating-below)';
-  return 'var(--color-rating-poor)';
-}
+
 
 function formatCurrency(amount) {
   if (amount >= 1000000) return '$' + (amount / 1000000).toFixed(1) + 'M';

@@ -64,6 +64,11 @@
   --color-chart-3:        #9060b8;
   --color-chart-4:        #c4a42a;
 
+  /* Shot zone colors — used in Scoring Profile zone chart */
+  --color-zone-rim:       #4A7A6A;   /* teal-green: close, high value */
+  --color-zone-mid:       #8A8A7E;   /* neutral gray: often inefficient zone */
+  --color-zone-three:     #1B4D3E;   /* deep accent green: spacing premium */
+
   /* ── Rating Colors ── */
   --color-rating-elite:   #1B4D3E;
   --color-rating-good:    #4A7A6A;

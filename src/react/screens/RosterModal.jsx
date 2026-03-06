@@ -1,14 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Modal, ModalHeader, ModalBody } from '../components/Modal.jsx';
 import { Button } from '../components/Button.jsx';
+import { ratingColor } from '../visualizations/PlayerVisuals.jsx';
 
 const POSITIONS = ['ALL', 'PG', 'SG', 'SF', 'PF', 'C'];
 
 /* ── Design-system color functions (override any engine colors) ── */
-const ratingColor = (r) =>
-  r >= 85 ? 'var(--color-rating-elite)' : r >= 78 ? 'var(--color-rating-good)'
-  : r >= 70 ? 'var(--color-rating-avg)' : r >= 60 ? 'var(--color-rating-below)'
-  : 'var(--color-rating-poor)';
 
 const attrColor = (v) =>
   v >= 75 ? 'var(--color-rating-elite)' : v >= 60 ? 'var(--color-rating-good)'

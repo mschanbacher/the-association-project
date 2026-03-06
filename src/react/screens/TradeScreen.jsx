@@ -4,6 +4,7 @@ import { Modal, ModalHeader, ModalBody, ModalFooter } from '../components/Modal.
 import { Card, CardHeader } from '../components/Card.jsx';
 import { Badge } from '../components/Badge.jsx';
 import { Button } from '../components/Button.jsx';
+import { ratingColor } from '../visualizations/PlayerVisuals.jsx';
 
 /* ═══════════════════════════════════════════════════════════════
    TradeScreen — Full-screen modal for user-initiated trades.
@@ -17,14 +18,26 @@ import { Button } from '../components/Button.jsx';
      - TradeEngine.evaluateTrade (AI decision)
      - Trade execution (roster mutations, history, events)
    ═══════════════════════════════════════════════════════════════ */
-export function TradeScreen({ isOpen, onClose }) {
+export function TradeScreen({ isOpen, onClose, initialPartnerId = null }) {
   const { gameState, engines } = useGame();
-  const [partnerId, setPartnerId] = useState(null);
+  const [partnerId, setPartnerId] = useState(initialPartnerId);
   const [userGives, setUserGives] = useState([]);
   const [userReceives, setUserReceives] = useState([]);
   const [userGivesPicks, setUserGivesPicks] = useState([]);
   const [userReceivesPicks, setUserReceivesPicks] = useState([]);
   const [tradeResult, setTradeResult] = useState(null); // { accepted, reason }
+
+  // Sync initialPartnerId when it changes (e.g. opened from browse modal with a team pre-selected)
+  React.useEffect(() => {
+    if (isOpen) {
+      setPartnerId(initialPartnerId);
+      setUserGives([]);
+      setUserReceives([]);
+      setUserGivesPicks([]);
+      setUserReceivesPicks([]);
+      setTradeResult(null);
+    }
+  }, [isOpen, initialPartnerId]);
 
   if (!isOpen || !gameState?.userTeam) return null;
 
@@ -714,13 +727,7 @@ function fmtCurrency(amount) {
   return '$' + amount;
 }
 
-function ratingColor(r) {
-  if (r >= 85) return 'var(--color-rating-elite)';
-  if (r >= 78) return 'var(--color-rating-good)';
-  if (r >= 70) return 'var(--color-rating-avg)';
-  if (r >= 60) return 'var(--color-rating-below)';
-  return 'var(--color-rating-poor)';
-}
+
 
 /**
  * Direct trade execution fallback — used when legacy controller bridge isn't available.

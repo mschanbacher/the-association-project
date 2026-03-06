@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, ModalBody } from '../components/Modal.jsx';
 import { Button } from '../components/Button.jsx';
+import { SectionLabel as SectionLabelBase } from '../visualizations/PlayerVisuals.jsx';
 
 export function PlayoffModal({ isOpen, data, onClose }) {
   if (!isOpen || !data) return null;
@@ -172,10 +173,9 @@ function TeamRow({ team, won }) {
 
 function SectionLabel({ children }) {
   return (
-    <div style={{
-      fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)',
-      textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8,
-    }}>{children}</div>
+    <SectionLabelBase style={{ color: 'var(--color-text-tertiary)' }}>
+      {children}
+    </SectionLabelBase>
   );
 }
 

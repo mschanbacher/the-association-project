@@ -6,6 +6,7 @@ import {
   StandingsWidget,
   RecentActivityWidget,
   RosterQuickWidget,
+  TeamFormWidget,
 } from '../components/Widgets.jsx';
 
 export function DashboardScreen() {
@@ -44,13 +45,16 @@ export function DashboardScreen() {
         <StandingsWidget />
       </div>
 
-      {/* Row 3: Roster + Recent Activity */}
+      {/* Row 3: [Team Form stacked above Roster] + Recent Activity full height */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         gap: 'var(--gap)',
       }}>
-        <RosterQuickWidget />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+          <TeamFormWidget />
+          <RosterQuickWidget />
+        </div>
         <RecentActivityWidget />
       </div>
     </div>

@@ -3,6 +3,8 @@ import { useGame } from '../hooks/GameBridge.jsx';
 import { Card, CardHeader } from '../components/Card.jsx';
 import { Badge, RatingBadge } from '../components/Badge.jsx';
 import { Button } from '../components/Button.jsx';
+import { ratingColor } from '../visualizations/PlayerVisuals.jsx';
+import { buildTeamLog, SparklineGrid } from '../visualizations/SparklineComponents.jsx';
 
 export function CoachScreen() {
   const { gameState, engines, isReady } = useGame();
@@ -45,6 +47,8 @@ export function CoachScreen() {
   const synergyGrade = typeof synergyData === 'object' ? synergyData.grade : null;
   const synergyDesc = typeof synergyData === 'object' ? synergyData.description : '';
   const traitDefs = CoachEngine?.TRAIT_DEFINITIONS || {};
+
+  const teamLog = useMemo(() => buildTeamLog(userTeam.roster || []), [userTeam.roster]);
 
   // Build trait list
   const traits = useMemo(() => {
@@ -152,6 +156,24 @@ export function CoachScreen() {
           {getArchetypeDescription(coach.archetype)}
         </div>
       </Card>
+
+      {/* Team Season Arc */}
+      {teamLog.length >= 3 && (
+        <Card padding="lg" className="animate-slide-up">
+          <CardHeader>Team Season Arc</CardHeader>
+          <div style={{
+            fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)',
+            marginBottom: 'var(--space-4)', lineHeight: 'var(--leading-relaxed)',
+          }}>
+            Roster-averaged stats per game this season. A rising arc suggests the team is responding
+            well to the coaching system. A declining arc may signal a poor roster fit or coach fatigue.
+          </div>
+          <SparklineGrid
+            gameLog={teamLog}
+            gamesLabel={`Team Arc — ${teamLog.length}G · ${coach.archetype}`}
+          />
+        </Card>
+      )}
     </div>
   );
 }
@@ -250,13 +272,7 @@ function getArchetypeDescription(archetype) {
   return descriptions[archetype] || `Runs a ${archetype} system that shapes how the team plays on both ends of the floor.`;
 }
 
-function ratingColor(r) {
-  if (r >= 85) return 'var(--color-rating-elite)';
-  if (r >= 78) return 'var(--color-rating-good)';
-  if (r >= 70) return 'var(--color-rating-avg)';
-  if (r >= 60) return 'var(--color-rating-below)';
-  return 'var(--color-rating-poor)';
-}
+
 
 function formatCurrency(amount) {
   if (amount >= 1000000) return '$' + (amount / 1000000).toFixed(1) + 'M';

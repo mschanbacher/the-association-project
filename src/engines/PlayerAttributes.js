@@ -389,12 +389,12 @@ export class PlayerAttributes {
      * Get attribute color for UI
      */
     static getAttrColor(value) {
-        if (value >= 85) return '#4ecdc4';
-        if (value >= 75) return '#45b7d1';
-        if (value >= 65) return '#96ceb4';
-        if (value >= 55) return '#f9d56e';
-        if (value >= 45) return '#ffa07a';
-        return '#ff6b6b';
+        if (value >= 85) return 'var(--color-rating-elite)';
+        if (value >= 75) return 'var(--color-rating-good)';
+        if (value >= 65) return 'var(--color-rating-avg)';
+        if (value >= 55) return 'var(--color-warning)';
+        if (value >= 45) return 'var(--color-rating-below)';
+        return 'var(--color-rating-poor)';
     }
 
     /**

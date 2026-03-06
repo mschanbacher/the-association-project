@@ -14,6 +14,7 @@ import { PostGameModal } from './screens/PostGameModal.jsx';
 import { BoxScoreModal } from './screens/BoxScoreModal.jsx';
 import { NewGameFlow } from './screens/NewGameFlow.jsx';
 import { TradeScreen, AiTradeProposalModal } from './screens/TradeScreen.jsx';
+import { PlayerBrowseModal } from './screens/PlayerBrowseModal.jsx';
 import { GameMenuModal } from './screens/GameMenuModal.jsx';
 import { OffseasonTracker } from './screens/OffseasonTracker.jsx';
 import { OffseasonModals } from './screens/OffseasonModals.jsx';
@@ -50,6 +51,8 @@ function AppContent() {
   const [postGameData, setPostGameData] = useState(null);
   const [boxScoreData, setBoxScoreData] = useState(null);
   const [tradeOpen, setTradeOpen] = useState(false);
+  const [tradePartnerId, setTradePartnerId] = useState(null);
+  const [browseMode, setBrowseMode] = useState(null); // 'freeAgents' | 'trade' | null
   const [aiTradeOpen, setAiTradeOpen] = useState(false);
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [injuryData, setInjuryData] = useState(null);
@@ -105,7 +108,10 @@ function AppContent() {
     // Expose imperative openers so legacy code can call them directly
     window._reactShowPostGame = (data) => setPostGameData(data);
     window._reactShowBoxScore = (data) => setBoxScoreData(data);
-    window._reactOpenTrade = () => setTradeOpen(true);
+    window._reactOpenTrade = () => { setTradePartnerId(null); setTradeOpen(true); };
+    window._reactOpenTradeWith = (teamId) => { setTradePartnerId(teamId ?? null); setTradeOpen(true); };
+    window._reactOpenFreeAgentBrowse = () => setBrowseMode('freeAgents');
+    window._reactOpenTradeBrowse = () => setBrowseMode('trade');
     window._reactCloseTrade = () => setTradeOpen(false);
     window._reactOpenAiTrade = () => setAiTradeOpen(true);
     window._reactCloseAiTrade = () => setAiTradeOpen(false);
@@ -153,6 +159,9 @@ function AppContent() {
       delete window._reactShowPostGame;
       delete window._reactShowBoxScore;
       delete window._reactOpenTrade;
+      delete window._reactOpenTradeWith;
+      delete window._reactOpenFreeAgentBrowse;
+      delete window._reactOpenTradeBrowse;
       delete window._reactCloseTrade;
       delete window._reactOpenAiTrade;
       delete window._reactCloseAiTrade;
@@ -278,7 +287,13 @@ function AppContent() {
       />
       <TradeScreen
         isOpen={tradeOpen}
-        onClose={() => { setTradeOpen(false); refresh?.(); }}
+        initialPartnerId={tradePartnerId}
+        onClose={() => { setTradeOpen(false); setTradePartnerId(null); refresh?.(); }}
+      />
+      <PlayerBrowseModal
+        isOpen={browseMode !== null}
+        mode={browseMode || 'freeAgents'}
+        onClose={() => setBrowseMode(null)}
       />
       <AiTradeProposalModal
         isOpen={aiTradeOpen}

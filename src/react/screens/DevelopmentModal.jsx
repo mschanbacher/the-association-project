@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../components/Modal.jsx';
 import { Button } from '../components/Button.jsx';
+import { SectionLabel as SectionLabelBase } from '../visualizations/PlayerVisuals.jsx';
 
 export function DevelopmentModal({ isOpen, data, onContinue }) {
   const [tab, setTab] = useState('summary');
@@ -168,11 +169,9 @@ function MetricBox({ label, value, color }) {
 
 function SectionLabel({ children, color, mt }) {
   return (
-    <div style={{
-      fontSize: 10, fontWeight: 600, color,
-      textTransform: 'uppercase', letterSpacing: '0.06em',
-      marginBottom: 8, ...(mt ? { marginTop: 16 } : {}),
-    }}>{children}</div>
+    <SectionLabelBase style={{ color, ...(mt ? { marginTop: 16 } : {}) }}>
+      {children}
+    </SectionLabelBase>
   );
 }
 

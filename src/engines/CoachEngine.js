@@ -244,13 +244,19 @@ export class CoachEngine {
     }
 
     static getTraitColor(value) {
-        if (value >= 80) return '#4ecdc4'; if (value >= 60) return '#45b7d1';
-        if (value >= 40) return '#96ceb4'; if (value >= 20) return '#ffa07a'; return '#ff6b6b';
+        if (value >= 80) return 'var(--color-rating-elite)';
+        if (value >= 60) return 'var(--color-rating-good)';
+        if (value >= 40) return 'var(--color-rating-avg)';
+        if (value >= 20) return 'var(--color-warning)';
+        return 'var(--color-rating-poor)';
     }
 
     static getOverallColor(overall) {
-        if (overall >= 85) return '#4ecdc4'; if (overall >= 75) return '#45b7d1';
-        if (overall >= 65) return '#f9d56e'; if (overall >= 55) return '#ffa07a'; return '#ff6b6b';
+        if (overall >= 85) return 'var(--color-rating-elite)';
+        if (overall >= 75) return 'var(--color-rating-good)';
+        if (overall >= 65) return 'var(--color-rating-avg)';
+        if (overall >= 55) return 'var(--color-warning)';
+        return 'var(--color-rating-poor)';
     }
 
     static serializeCoach(coach) { return coach ? { ...coach } : null; }

@@ -186,6 +186,24 @@ export class PlayerDevelopmentEngine {
 
             player.rating = boundedRating;
 
+            // Re-sync offRating and defRating from current attributes so all three
+            // ratings stay consistent. applyDevelopment already wrote them from the
+            // unclamped newRating; recalculate here so they match the bounded overall.
+            // We scale off/def proportionally if the tier bound clamped the rating down.
+            if (player.attributes && player.measurables) {
+                const rawOff = PA.calculateOffRating(player.position, player.attributes, player.measurables);
+                const rawDef = PA.calculateDefRating(player.position, player.attributes, player.measurables);
+                if (boundedRating < finalRating && finalRating > 0) {
+                    // Clamp occurred — scale off/def down proportionally
+                    const scale = boundedRating / finalRating;
+                    player.offRating = Math.max(bounds.min, Math.min(99, Math.round(rawOff * scale)));
+                    player.defRating = Math.max(bounds.min, Math.min(99, Math.round(rawDef * scale)));
+                } else {
+                    player.offRating = rawOff;
+                    player.defRating = rawDef;
+                }
+            }
+
             // Age the player
             player.age++;
 

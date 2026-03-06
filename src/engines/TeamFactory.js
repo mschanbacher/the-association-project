@@ -561,6 +561,8 @@ export class TeamFactory {
             player.measurables = regen.measurables;
             player.attributes = regen.attributes;
             player.rating = regen.rating;
+            player.offRating = regen.offRating;
+            player.defRating = regen.defRating;
             player.salary = TeamFactory.generateSalary(player.rating, tier);
             player.fatigueThreshold = Math.max(60, Math.min(90, 65 + Math.round((player.attributes.endurance - 50) * 0.4)));
             // Regenerate profile now that position and rating are finalised
@@ -615,6 +617,8 @@ export class TeamFactory {
                 cheapPlayer.measurables = regen.measurables;
                 cheapPlayer.attributes = regen.attributes;
                 cheapPlayer.rating = regen.rating;
+                cheapPlayer.offRating = regen.offRating;
+                cheapPlayer.defRating = regen.defRating;
                 cheapPlayer.salary = TeamFactory.generateSalary(cheapPlayer.rating, tier);
                 if (totalSalary + cheapPlayer.salary <= cap) {
                     roster.push(cheapPlayer);

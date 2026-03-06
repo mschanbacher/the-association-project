@@ -4,6 +4,352 @@ import { Card, CardHeader } from '../components/Card.jsx';
 import { Badge, RatingBadge } from '../components/Badge.jsx';
 import { Button } from '../components/Button.jsx';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAYER ROLE HEXAGON — shared constants, math, and components
+// Used by PlayerDetailRow (full hex + breakdown) and exported for the
+// RosterQuickWidget mini thumbnails on the dashboard.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Six axes — maxes mirror StatEngine valueScore component caps exactly.
+export const HEX_AXES = [
+  { key: 'scoring',    label: 'Scoring',    max: 30, short: 'SCR',
+    tip: 'Points per game contribution.\nMax 30 — elite scorers reach the ceiling.' },
+  { key: 'efficiency', label: 'Efficiency', max: 20, short: 'EFF',
+    tip: 'True Shooting % above league average.\nMax 20 — rewards efficiency over volume.' },
+  { key: 'playmaking', label: 'Playmaking', max: 15, short: 'PLY',
+    tip: 'Assists weighted against turnovers.\nMax 15 — net creation value.' },
+  { key: 'defense',    label: 'Defense',    max: 15, short: 'DEF',
+    tip: 'Steals × 3 + Blocks × 2.5.\nMax 15 — defensive impact.' },
+  { key: 'rebounding', label: 'Rebounding', max: 10, short: 'REB',
+    tip: 'Rebounds per game contribution.\nMax 10.' },
+  { key: 'impact',     label: 'Impact',     max: 10, short: '+/-',
+    tip: 'Plus/Minus per game — how the score\nmoves while on the court. Can be negative.' },
+];
+
+// Derive hex components from a StatEngine analytics object.
+// Returns null if analytics is unavailable.
+export function hexComponentsFromAnalytics(analytics, avgs) {
+  if (!analytics || !avgs) return null;
+  const scoring    = Math.min(30, avgs.pointsPerGame * 1.0);
+  const efficiency = avgs.trueShootingPct > 0
+    ? Math.min(20, (avgs.trueShootingPct - 0.45) * 200) : 10;
+  const playmaking = Math.min(15, (avgs.assistsPerGame * 1.2) - (avgs.turnoversPerGame * 0.8));
+  const defense    = Math.min(15, (avgs.stealsPerGame * 3) + (avgs.blocksPerGame * 2.5));
+  const rebounding = Math.min(10, avgs.reboundsPerGame * 0.8);
+  const impact     = Math.min(10, Math.max(-10, avgs.plusMinusPerGame * 0.8));
+  return {
+    scoring:    Math.round(Math.max(0, scoring)),
+    efficiency: Math.round(Math.max(0, efficiency)),
+    playmaking: Math.round(Math.max(0, playmaking)),
+    defense:    Math.round(Math.max(0, defense)),
+    rebounding: Math.round(Math.max(0, rebounding)),
+    impact:     Math.round(impact),  // allow negative
+    isProjection: false,
+  };
+}
+
+// Pre-season fallback: derive hex components from scoring profile + ratings.
+// Used before any games are played. Clearly labelled as a projection.
+export function hexComponentsFromProfile(player) {
+  const sp = player.scoringProfile;
+  const r  = player.rating || 60;
+  const off = player.offRating || r;
+  const def = player.defRating || r;
+  const pos = player.position || 'SF';
+
+  // Scoring: scaled from offRating, tempered by usage tendency
+  const usageMod = sp ? sp.usageTendency : 1.0;
+  const scoring = Math.min(30, Math.max(0, (off - 60) * 0.6 * usageMod));
+
+  // Efficiency: from scoring profile efficiency scalar if available, else offRating proxy
+  const effScalar = sp ? sp.efficiency : 1.0;
+  const efficiency = Math.min(20, Math.max(0, (effScalar - 0.88) * 100));
+
+  // Playmaking: PG/SG get higher base, from offRating
+  const playmakingBase = ['PG', 'SG'].includes(pos) ? 1.4 : ['SF'].includes(pos) ? 0.9 : 0.5;
+  const playmaking = Math.min(15, Math.max(0, (off - 60) * 0.3 * playmakingBase));
+
+  // Defense: from defRating
+  const defense = Math.min(15, Math.max(0, (def - 60) * 0.4));
+
+  // Rebounding: C/PF get higher, from defRating (proxy for athleticism/positioning)
+  const rebBase = ['C', 'PF'].includes(pos) ? 1.3 : 0.6;
+  const rebounding = Math.min(10, Math.max(0, (def - 60) * 0.2 * rebBase));
+
+  // Impact: neutral pre-season
+  const impact = Math.min(10, Math.max(-5, (r - 65) * 0.15));
+
+  return {
+    scoring:    Math.round(scoring),
+    efficiency: Math.round(efficiency),
+    playmaking: Math.round(playmaking),
+    defense:    Math.round(defense),
+    rebounding: Math.round(rebounding),
+    impact:     Math.round(impact),
+    isProjection: true,
+  };
+}
+
+// Normalize a raw component value to 0–1 against its axis max.
+function hexNorm(components, axis) {
+  const raw = components?.[axis.key] || 0;
+  return Math.min(1, Math.max(0, raw / axis.max));
+}
+
+// Color for a normalized 0–1 performance level.
+function hexPerfColor(n) {
+  if (n >= 0.80) return 'var(--color-rating-elite)';
+  if (n >= 0.55) return 'var(--color-rating-good)';
+  if (n >= 0.30) return 'var(--color-rating-avg)';
+  return 'var(--color-rating-poor)';
+}
+
+// Polar → cartesian.
+function hexPolar(cx, cy, r, angle) {
+  return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
+}
+
+// Axis angle: 0 points up (−π/2), clockwise.
+function hexAngle(i) { return (Math.PI * 2 * i) / 6 - Math.PI / 2; }
+
+// SVG path for a regular hexagon at given radius.
+function hexGridPath(cx, cy, r) {
+  return HEX_AXES.map((_, i) => {
+    const [x, y] = hexPolar(cx, cy, r, hexAngle(i));
+    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(' ') + ' Z';
+}
+
+// ── Full HexChart (used in PlayerDetailRow) ───────────────────────────────────
+function HexChart({ components, size = 180, hoveredAxis, onHoverAxis }) {
+  const cx = size / 2, cy = size / 2;
+  const maxR = size * 0.36;
+  const rings = [0.25, 0.5, 0.75, 1.0];
+
+  const pts = HEX_AXES.map((axis, i) => {
+    const n = hexNorm(components, axis);
+    const [x, y] = hexPolar(cx, cy, n * maxR, hexAngle(i));
+    return { x, y, n, color: hexPerfColor(n) };
+  });
+
+  const outerPts = HEX_AXES.map((_, i) => hexPolar(cx, cy, maxR, hexAngle(i)));
+  const dataPath = pts.map((p, i) =>
+    `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
+  ).join(' ') + ' Z';
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
+      <defs>
+        {pts.map((p, i) => {
+          const j = (i + 1) % 6;
+          const q = pts[j];
+          return (
+            <linearGradient key={i} id={`hex-eg-${i}`}
+              x1={p.x} y1={p.y} x2={q.x} y2={q.y}
+              gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stopColor={p.color} />
+              <stop offset="100%" stopColor={q.color} />
+            </linearGradient>
+          );
+        })}
+      </defs>
+
+      {/* Grid rings */}
+      {rings.map((frac, ri) => (
+        <path key={ri} d={hexGridPath(cx, cy, maxR * frac)}
+          fill="none"
+          stroke={ri === 3 ? 'var(--color-border)' : 'var(--color-border-subtle)'}
+          strokeWidth={ri === 3 ? 1 : 0.75} />
+      ))}
+
+      {/* Spokes */}
+      {outerPts.map(([ox, oy], i) => (
+        <line key={i} x1={cx} y1={cy} x2={ox} y2={oy}
+          stroke={hoveredAxis === i ? 'var(--color-border)' : 'var(--color-border-subtle)'}
+          strokeWidth={hoveredAxis === i ? 1 : 0.75} />
+      ))}
+
+      {/* Data fill */}
+      <path d={dataPath} fill="var(--color-accent)" fillOpacity={0.10} />
+
+      {/* Gradient edges */}
+      {pts.map((p, i) => {
+        const j = (i + 1) % 6;
+        const q = pts[j];
+        const hot = hoveredAxis === i || hoveredAxis === j;
+        return (
+          <line key={i}
+            x1={p.x} y1={p.y} x2={q.x} y2={q.y}
+            stroke={`url(#hex-eg-${i})`}
+            strokeWidth={hot ? 2.5 : 1.8} />
+        );
+      })}
+
+      {/* Invisible hover targets on outer ring */}
+      {outerPts.map(([ox, oy], i) => (
+        <circle key={i} cx={ox} cy={oy} r={10}
+          fill="transparent" style={{ cursor: 'default' }}
+          onMouseEnter={() => onHoverAxis?.(i)}
+          onMouseLeave={() => onHoverAxis?.(null)} />
+      ))}
+
+      {/* Data point dots */}
+      {pts.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y}
+          r={hoveredAxis === i ? 4 : 3}
+          fill={p.color} stroke="var(--color-bg-raised)" strokeWidth={1.5} />
+      ))}
+
+      {/* Axis endpoint squares on outer ring */}
+      {outerPts.map(([ox, oy], i) => {
+        const n = hexNorm(components, HEX_AXES[i]);
+        const hot = hoveredAxis === i;
+        const s = hot ? 5 : 3.5;
+        return (
+          <rect key={i} x={ox - s / 2} y={oy - s / 2} width={s} height={s}
+            fill={hexPerfColor(n)} />
+        );
+      })}
+
+      {/* Axis labels */}
+      {HEX_AXES.map((axis, i) => {
+        const angle = hexAngle(i);
+        const [lx, ly] = hexPolar(cx, cy, maxR + 20, angle);
+        const anchor = Math.abs(Math.cos(angle)) < 0.15 ? 'middle'
+          : Math.cos(angle) > 0 ? 'start' : 'end';
+        const dy = Math.sin(angle) > 0.3 ? '0.9em'
+          : Math.sin(angle) < -0.3 ? '0em' : '0.35em';
+        const hot = hoveredAxis === i;
+        const n = hexNorm(components, axis);
+        return (
+          <text key={i} x={lx} y={ly}
+            textAnchor={anchor} dy={dy}
+            fontSize={hot ? 10 : 9}
+            fontFamily="var(--font-mono)"
+            fontWeight={hot ? 700 : 600}
+            fill={hot ? hexPerfColor(n) : 'var(--color-text-tertiary)'}
+            letterSpacing="0.04em">
+            {axis.short}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── Tooltip shown on axis hover ───────────────────────────────────────────────
+function HexAxisTooltip({ axis, components }) {
+  if (!axis) return null;
+  const raw = components?.[axis.key] || 0;
+  const n   = hexNorm(components, axis);
+  const col = hexPerfColor(n);
+  const tier = n >= 0.80 ? 'Elite' : n >= 0.55 ? 'Good' : n >= 0.30 ? 'Average' : 'Below Avg';
+
+  return (
+    <div style={{
+      background: 'var(--color-bg-raised)',
+      border: '1px solid var(--color-border)',
+      padding: '10px 12px',
+      minWidth: 180, maxWidth: 210,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      pointerEvents: 'none',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text)',
+          textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {axis.label}
+        </span>
+        <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: col }}>
+          {raw >= 0 ? `${raw} / ${axis.max}` : `${raw}`}
+        </span>
+      </div>
+      <div style={{ height: 3, background: 'var(--color-bg-sunken)', marginBottom: 6, position: 'relative' }}>
+        <div style={{ position: 'absolute', left: 0, top: 0, height: '100%',
+          width: `${Math.max(0, n * 100)}%`, background: col }} />
+      </div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: col, fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
+        {tier}
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+        {axis.tip}
+      </div>
+    </div>
+  );
+}
+
+// ── Value breakdown bars (cross-linked with hex hover) ────────────────────────
+function HexBreakdown({ components, hoveredAxis, onHoverAxis }) {
+  const total = Math.max(0,
+    HEX_AXES.reduce((sum, ax) => sum + Math.max(0, components?.[ax.key] || 0), 0));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)',
+        textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+        Component Breakdown
+      </div>
+      {HEX_AXES.map((axis, i) => {
+        const raw = components?.[axis.key] || 0;
+        const n   = Math.min(1, Math.max(0, raw / axis.max));
+        const col = hexPerfColor(n);
+        const hot = hoveredAxis === i;
+        return (
+          <div key={axis.key}
+            onMouseEnter={() => onHoverAxis?.(i)}
+            onMouseLeave={() => onHoverAxis?.(null)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '2px 4px',
+              background: hot ? 'var(--color-accent-bg)' : 'transparent',
+              cursor: 'default',
+            }}>
+            <span style={{
+              fontSize: 10, fontFamily: 'var(--font-mono)',
+              color: hot ? col : 'var(--color-text-tertiary)',
+              width: 30, textAlign: 'right', flexShrink: 0,
+              letterSpacing: '0.03em', fontWeight: hot ? 700 : 400,
+            }}>{axis.short}</span>
+            <div style={{ flex: 1, height: 4, background: 'var(--color-bg-sunken)', position: 'relative' }}>
+              <div style={{
+                position: 'absolute', left: 0, top: 0, height: '100%',
+                width: `${Math.max(0, n * 100)}%`,
+                background: col, opacity: hot ? 1 : 0.7,
+              }} />
+            </div>
+            <span style={{
+              fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
+              color: hot ? col : 'var(--color-text-secondary)',
+              width: 26, textAlign: 'right', flexShrink: 0,
+            }}>{raw > 0 ? `+${raw}` : raw}</span>
+            <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 20, flexShrink: 0 }}>
+              /{axis.max}
+            </span>
+          </div>
+        );
+      })}
+      {/* Total */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '5px 4px 2px',
+        borderTop: '1px solid var(--color-border-subtle)', marginTop: 2,
+      }}>
+        <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)',
+          width: 30, textAlign: 'right' }}>TOT</span>
+        <div style={{ flex: 1 }} />
+        <span style={{
+          fontSize: 15, fontFamily: 'var(--font-mono)', fontWeight: 700,
+          color: total >= 60 ? 'var(--color-rating-elite)'
+            : total >= 40 ? 'var(--color-rating-good)'
+            : total >= 25 ? 'var(--color-rating-avg)'
+            : 'var(--color-rating-poor)',
+          width: 26, textAlign: 'right',
+        }}>{total}</span>
+        <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 20 }}>/100</span>
+      </div>
+    </div>
+  );
+}
+
 export function RosterScreen() {
   const { gameState, engines, isReady } = useGame();
   const [sortBy, setSortBy] = useState('rating');
@@ -160,7 +506,7 @@ export function RosterScreen() {
             </thead>
             <tbody>
               {sortedRoster.map((player, i) => (
-                <PlayerRow key={player.id || i} player={player} engines={engines}
+                <PlayerRow key={player.id || i} player={player} engines={engines} team={userTeam}
                   expanded={expandedPlayer === (player.id || i)}
                   onToggle={() => setExpandedPlayer(expandedPlayer === (player.id || i) ? null : (player.id || i))} />
               ))}
@@ -175,7 +521,7 @@ export function RosterScreen() {
 /* ═══════════════════════════════════════════════════════════════
    Player Row
    ═══════════════════════════════════════════════════════════════ */
-function PlayerRow({ player, engines, expanded, onToggle }) {
+function PlayerRow({ player, engines, expanded, onToggle, team }) {
   const { PlayerAttributes: PA } = engines;
 
   const contractYears = player.contractYears || 1;
@@ -324,7 +670,7 @@ function PlayerRow({ player, engines, expanded, onToggle }) {
         </div>
       </td>
     </tr>
-    {expanded && <PlayerDetailRow player={player} engines={engines} team={userTeam} />}
+    {expanded && <PlayerDetailRow player={player} engines={engines} team={team} />}
     </>
   );
 }
@@ -336,6 +682,7 @@ function PlayerDetailRow({ player, engines, team }) {
   const { PlayerAttributes: PA, StatEngine } = engines;
   const m = player.measurables;
   const attrs = player.attributes || {};
+  const [hoveredAxis, setHoveredAxis] = useState(null);
 
   const measStr = m && PA?.formatHeight
     ? `${PA.formatHeight(m.height)} · ${m.weight}lbs · ${PA.formatWingspan ? PA.formatWingspan(m.wingspan) : m.wingspan + '"'} WS`
@@ -691,6 +1038,89 @@ function PlayerDetailRow({ player, engines, team }) {
                         <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{p}%</span>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Player Profile Hexagon ── */}
+          {(() => {
+            const avgs = analytics?.avgs || null;
+            const components = hexComponentsFromAnalytics(analytics, avgs)
+              ?? hexComponentsFromProfile(player);
+            if (!components) return null;
+            const isProjection = components.isProjection;
+            const total = Math.max(0,
+              HEX_AXES.reduce((sum, ax) => sum + Math.max(0, components[ax.key] || 0), 0));
+            return (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <SectionLabel style={{ marginBottom: 0 }}>Player Profile</SectionLabel>
+                  {isProjection && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 600, color: 'var(--color-warning)',
+                      textTransform: 'uppercase', letterSpacing: '0.06em',
+                      border: '1px solid var(--color-warning)',
+                      padding: '1px 5px',
+                    }}>
+                      Pre-Season Projection
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                  {/* Hex + tooltip */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <HexChart
+                      components={components}
+                      size={180}
+                      hoveredAxis={hoveredAxis}
+                      onHoverAxis={setHoveredAxis}
+                    />
+                    {/* Tooltip — anchored to right of chart */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0, left: 188,
+                      opacity: hoveredAxis !== null ? 1 : 0,
+                      pointerEvents: 'none',
+                      zIndex: 10,
+                      transition: 'opacity 100ms',
+                    }}>
+                      <HexAxisTooltip
+                        axis={hoveredAxis !== null ? HEX_AXES[hoveredAxis] : null}
+                        components={components}
+                      />
+                    </div>
+                  </div>
+                  {/* Breakdown bars */}
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <HexBreakdown
+                      components={components}
+                      hoveredAxis={hoveredAxis}
+                      onHoverAxis={setHoveredAxis}
+                    />
+                    {/* Value score callout */}
+                    <div style={{ marginTop: 16, display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                      <span style={{
+                        fontSize: 32, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                        color: total >= 60 ? 'var(--color-rating-elite)'
+                          : total >= 40 ? 'var(--color-rating-good)'
+                          : total >= 25 ? 'var(--color-rating-avg)'
+                          : 'var(--color-rating-poor)',
+                        lineHeight: 1,
+                      }}>{total}</span>
+                      <div>
+                        <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)',
+                          textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          Value Score
+                        </div>
+                        {analytics?.role && (
+                          <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 1 }}>
+                            {analytics.role}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -450,6 +450,19 @@ export class PlayerAttributes {
             player.offRating = this.calculateOffRating(pos, player.attributes, player.measurables);
             player.defRating = this.calculateDefRating(pos, player.attributes, player.measurables);
         }
+        // Consistency check: if off/def don't produce the stored overall within ±3,
+        // the stored values are stale. Recalculate to restore consistency.
+        if (player.attributes && player.measurables && player.rating) {
+            const pos = player.position || 'SF';
+            const expectedOverall = this.calculateRating(pos, player.attributes, player.measurables);
+            if (Math.abs(expectedOverall - player.rating) > 3) {
+                // Overall has drifted from what the attributes would produce —
+                // recalculate all three from attributes to restore consistency.
+                player.offRating = this.calculateOffRating(pos, player.attributes, player.measurables);
+                player.defRating = this.calculateDefRating(pos, player.attributes, player.measurables);
+                player.rating    = expectedOverall;
+            }
+        }
         return needsMigration;
     }
 }

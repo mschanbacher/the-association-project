@@ -2,6 +2,79 @@ import React from 'react';
 import { useGame } from '../hooks/GameBridge.jsx';
 import { Card, CardHeader } from './Card.jsx';
 import { Badge, RatingBadge } from './Badge.jsx';
+import { HEX_AXES, hexComponentsFromAnalytics, hexComponentsFromProfile } from '../screens/RosterScreen.jsx';
+
+// ── Mini hex thumbnail (dashboard only — no hover, no labels) ────────────────
+function MiniHex({ components, size = 56 }) {
+  const cx = size / 2, cy = size / 2;
+  const maxR = size * 0.38;
+
+  function perfColor(n) {
+    if (n >= 0.80) return 'var(--color-rating-elite)';
+    if (n >= 0.55) return 'var(--color-rating-good)';
+    if (n >= 0.30) return 'var(--color-rating-avg)';
+    return 'var(--color-rating-poor)';
+  }
+
+  function angle(i) { return (Math.PI * 2 * i) / 6 - Math.PI / 2; }
+  function polar(r, i) {
+    return [cx + r * Math.cos(angle(i)), cy + r * Math.sin(angle(i))];
+  }
+
+  const pts = HEX_AXES.map((ax, i) => {
+    const n = Math.min(1, Math.max(0, (components?.[ax.key] || 0) / ax.max));
+    const [x, y] = polar(n * maxR, i);
+    return { x, y, n, color: perfColor(n) };
+  });
+
+  const outerPts = HEX_AXES.map((_, i) => polar(maxR, i));
+
+  const dataPath = pts.map((p, i) =>
+    `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
+  ).join(' ') + ' Z';
+
+  const gridPath = outerPts.map(([x, y], i) =>
+    `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`
+  ).join(' ') + ' Z';
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
+      <defs>
+        {pts.map((p, i) => {
+          const j = (i + 1) % 6;
+          const q = pts[j];
+          return (
+            <linearGradient key={i} id={`mhex-${size}-${i}`}
+              x1={p.x} y1={p.y} x2={q.x} y2={q.y}
+              gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stopColor={p.color} />
+              <stop offset="100%" stopColor={q.color} />
+            </linearGradient>
+          );
+        })}
+      </defs>
+      {/* Outer ring only */}
+      <path d={gridPath} fill="none" stroke="var(--color-border-subtle)" strokeWidth={0.75} />
+      {/* Data fill */}
+      <path d={dataPath} fill="var(--color-accent)" fillOpacity={0.10} />
+      {/* Gradient edges */}
+      {pts.map((p, i) => {
+        const j = (i + 1) % 6;
+        const q = pts[j];
+        return (
+          <line key={i} x1={p.x} y1={p.y} x2={q.x} y2={q.y}
+            stroke={`url(#mhex-${size}-${i})`} strokeWidth={1.5} />
+        );
+      })}
+      {/* Endpoint dots */}
+      {outerPts.map(([ox, oy], i) => (
+        <rect key={i}
+          x={ox - 1.5} y={oy - 1.5} width={3} height={3}
+          fill={perfColor(pts[i].n)} />
+      ))}
+    </svg>
+  );
+}
 
 /* ═══════════════════════════════════════════════════════════════
    Team Summary Widget — metric cards in a 4-column grid
@@ -255,9 +328,10 @@ export function StandingsWidget() {
    Roster Quick Look — table, not cards
    ═══════════════════════════════════════════════════════════════ */
 export function RosterQuickWidget() {
-  const { gameState } = useGame();
+  const { gameState, engines } = useGame();
   if (!gameState?.userTeam) return null;
   const roster = [...(gameState.userTeam.roster || [])].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  const { StatEngine } = engines;
 
   return (
     <Card padding="none" interactive onClick={() => window._reactNavigate?.('roster')}>
@@ -267,6 +341,8 @@ export function RosterQuickWidget() {
           Manage →
         </span>
       </div>
+
+      {/* Option B — hex inline per row alongside OFF / DEF numbers */}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -275,30 +351,66 @@ export function RosterQuickWidget() {
             <TH>OVR</TH>
             <TH>OFF</TH>
             <TH>DEF</TH>
+            <TH style={{ width: 52, textAlign: 'center', padding: '7px 4px', fontSize: 10, fontWeight: 'var(--weight-semi)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Profile</TH>
             <TH pr right>Salary</TH>
           </tr>
         </thead>
         <tbody>
-          {roster.map((p, i) => (
-            <tr key={p.id || i} style={{
-              borderBottom: i < roster.length - 1 ? '1px solid var(--color-border-subtle)' : 'none',
-            }}>
-              <td style={{ padding: '6px 12px 6px 16px', fontWeight: 'var(--weight-medium)' }}>
-                {p.name}
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{p.age}</span>
-              </td>
-              <td style={{ padding: '6px 8px', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)' }}>{p.position}</td>
-              <TD mono bold style={{ color: ratingColor(p.rating) }}>{p.rating}</TD>
-              <TD mono style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)' }}>{p.offRating}</TD>
-              <TD mono style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)' }}>{p.defRating}</TD>
-              <TD pr mono right style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)' }}>{fmtShort(p.salary)}</TD>
-            </tr>
-          ))}
+          {roster.slice(0, 8).map((p, i) => {
+            const analytics = StatEngine?.getPlayerAnalytics?.(p, gameState.userTeam) || null;
+            const avgs = analytics?.avgs || null;
+            const components = hexComponentsFromAnalytics(analytics, avgs)
+              ?? hexComponentsFromProfile(p);
+            const isProjection = components?.isProjection;
+            return (
+              <tr key={p.id || i} style={{
+                borderBottom: i < Math.min(roster.length, 8) - 1 ? '1px solid var(--color-border-subtle)' : 'none',
+              }}>
+                <td style={{ padding: '5px 12px 5px 16px', fontWeight: 'var(--weight-medium)' }}>
+                  {p.name}
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{p.age}</span>
+                </td>
+                <td style={{ padding: '5px 8px', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)' }}>{p.position}</td>
+                <TD mono bold style={{ color: ratingColor(p.rating) }}>{p.rating}</TD>
+                <TD mono style={{ color: ratingColor(p.offRating), fontSize: 'var(--text-xs)' }}>{p.offRating}</TD>
+                <TD mono style={{ color: ratingColor(p.defRating), fontSize: 'var(--text-xs)' }}>{p.defRating}</TD>
+                <td style={{ padding: '2px 4px', textAlign: 'center', verticalAlign: 'middle' }}>
+                  {components
+                    ? <div style={{ display: 'inline-block', opacity: isProjection ? 0.5 : 1 }}>
+                        <MiniHex components={components} size={44} />
+                      </div>
+                    : <svg width={44} height={44} viewBox="0 0 44 44" style={{ display: 'inline-block', opacity: 0.2 }}>
+                        <path
+                          d={Array.from({ length: 6 }, (_, j) => {
+                            const a = (Math.PI * 2 * j) / 6 - Math.PI / 2;
+                            const r = 44 * 0.38;
+                            return `${j === 0 ? 'M' : 'L'} ${(22 + r * Math.cos(a)).toFixed(1)} ${(22 + r * Math.sin(a)).toFixed(1)}`;
+                          }).join(' ') + ' Z'}
+                          fill="none" stroke="var(--color-border)" strokeWidth={1}
+                        />
+                      </svg>
+                  }
+                </td>
+                <TD pr mono right style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)' }}>{fmtShort(p.salary)}</TD>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+      {roster.length > 8 && (
+        <div style={{
+          padding: '7px 16px', fontSize: 'var(--text-xs)',
+          color: 'var(--color-text-tertiary)',
+          borderTop: '1px solid var(--color-border-subtle)',
+        }}>
+          +{roster.length - 8} more — click to view full roster
+        </div>
+      )}
     </Card>
   );
 }
+
+
 
 /* ═══════════════════════════════════════════════════════════════
    Recent Activity Widget

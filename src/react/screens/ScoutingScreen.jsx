@@ -646,16 +646,15 @@ function PipelineTab({ gameState, engines }) {
   const raw    = gameState._raw || gameState;
   const season = gameState.currentSeason;
 
-  // Auto-generate if not yet populated — no legacy modal needed
-  useEffect(() => {
+  // Generate synchronously on first render — useState initializer runs before paint
+  const [preview] = useState(() => {
     if (!raw._pipelinePreview || raw._pipelinePreviewSeason !== season) {
-      const preview = generatePipelinePreview(engines);
-      raw._pipelinePreview       = preview;
+      const generated = generatePipelinePreview(engines);
+      raw._pipelinePreview       = generated;
       raw._pipelinePreviewSeason = season;
     }
-  }, [raw, season, engines]);
-
-  const preview  = raw._pipelinePreview || [];
+    return raw._pipelinePreview;
+  });
   const filtered = useMemo(() => {
     if (posFilter === 'ALL') return preview;
     return preview.filter(p => p.position === posFilter);

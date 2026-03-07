@@ -18919,14 +18919,14 @@ function PipelineTab({ gameState, engines }) {
   const [posFilter, setPosFilter] = reactExports.useState("ALL");
   const raw = gameState._raw || gameState;
   const season = gameState.currentSeason;
-  reactExports.useEffect(() => {
+  const [preview] = reactExports.useState(() => {
     if (!raw._pipelinePreview || raw._pipelinePreviewSeason !== season) {
-      const preview2 = generatePipelinePreview(engines);
-      raw._pipelinePreview = preview2;
+      const generated = generatePipelinePreview(engines);
+      raw._pipelinePreview = generated;
       raw._pipelinePreviewSeason = season;
     }
-  }, [raw, season, engines]);
-  const preview = raw._pipelinePreview || [];
+    return raw._pipelinePreview;
+  });
   const filtered = reactExports.useMemo(() => {
     if (posFilter === "ALL") return preview;
     return preview.filter((p) => p.position === posFilter);

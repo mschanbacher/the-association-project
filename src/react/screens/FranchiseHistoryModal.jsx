@@ -98,11 +98,11 @@ function MetricBox({ value, label, highlight }) {
     }}>
       <div style={{
         fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-mono)',
-        color: highlight ? '#1C1C1C' : 'var(--color-text)',
+        color: highlight ? 'var(--color-text)' : 'var(--color-text)',
       }}>{value}</div>
       <div style={{
         fontSize: 10, marginTop: 2,
-        color: highlight ? 'rgba(28,28,28,0.7)' : 'var(--color-text-tertiary)',
+        color: highlight ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)',
       }}>{label}</div>
     </div>
   );
@@ -116,8 +116,8 @@ function PlayoffBadge({ playoff }) {
 
   const colors = {
     champion:  { bg: 'var(--color-accent-bg)',  border: 'var(--color-accent)',  text: 'var(--color-accent)'  },
-    eliminated:{ bg: 'rgba(102,126,234,0.08)',   border: 'rgba(102,126,234,0.3)',text: '#667eea'              },
-    playoffs:  { bg: 'rgba(102,126,234,0.08)',   border: 'rgba(102,126,234,0.3)',text: '#667eea'              },
+    eliminated:{ bg: 'var(--color-info-bg)',       border: 'var(--color-info-bg)',  text: 'var(--color-info)'   },
+    playoffs:  { bg: 'var(--color-info-bg)',       border: 'var(--color-info-bg)',  text: 'var(--color-info)'   },
     missed:    { bg: 'var(--color-bg-sunken)',    border: 'var(--color-border-subtle)', text: 'var(--color-text-tertiary)' },
   };
   const c = colors[result] || colors.missed;

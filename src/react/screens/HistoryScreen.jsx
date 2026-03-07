@@ -121,9 +121,9 @@ function PlayoffBadge({ playoff }) {
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
       padding: '3px 8px', fontSize: 11, fontWeight: 600,
-      background: isChamp ? 'var(--color-accent-bg)' : 'rgba(102,126,234,0.08)',
-      border: `1px solid ${isChamp ? 'var(--color-accent-border)' : 'rgba(102,126,234,0.3)'}`,
-      color: isChamp ? 'var(--color-accent)' : '#667eea',
+      background: isChamp ? 'var(--color-accent-bg)' : 'var(--color-info-bg)',
+      border: `1px solid ${isChamp ? 'var(--color-accent-border)' : 'var(--color-info-bg)'}`,
+      color: isChamp ? 'var(--color-accent)' : 'var(--color-info)',
     }}>
       {isChamp && '🏆 '}
       {seedStr}{label}

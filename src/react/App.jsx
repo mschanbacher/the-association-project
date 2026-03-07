@@ -38,7 +38,6 @@ import { CollegeGradFAModal } from './screens/CollegeGradFAModal.jsx';
 import { BracketViewerModal } from './screens/BracketViewerModal.jsx';
 import { LotteryModal } from './screens/LotteryModal.jsx';
 import { UserDraftPickModal } from './screens/UserDraftPickModal.jsx';
-import { FranchiseHistoryModal } from './screens/FranchiseHistoryModal.jsx';
 import { WatchGameModal } from './screens/WatchGameModal.jsx';
 import { BreakingNewsModal } from './screens/BreakingNewsModal.jsx';
 
@@ -75,7 +74,6 @@ function AppContent() {
   const [bracketData, setBracketData] = useState(null);
   const [lotteryData, setLotteryData] = useState(null);
   const [draftPickData, setDraftPickData] = useState(null);
-  const [franchiseData, setFranchiseData] = useState(null);
   const [watchGameData, setWatchGameData] = useState(null);
   const [breakingNewsData, setBreakingNewsData] = useState(null);
 
@@ -146,8 +144,6 @@ function AppContent() {
     window._reactCloseLottery = () => setLotteryData(null);
     window._reactShowDraftPick = (data) => setDraftPickData({...data});
     window._reactCloseDraftPick = () => setDraftPickData(null);
-    window._reactShowFranchise = (data) => setFranchiseData({...data});
-    window._reactCloseFranchise = () => setFranchiseData(null);
     window._reactShowWatchGame = (data) => setWatchGameData({...data});
     window._reactCloseWatchGame = () => setWatchGameData(null);
     window._reactNavigate = (screen) => setActiveScreen(screen);
@@ -196,8 +192,6 @@ function AppContent() {
       delete window._reactCloseLottery;
       delete window._reactShowDraftPick;
       delete window._reactCloseDraftPick;
-      delete window._reactShowFranchise;
-      delete window._reactCloseFranchise;
       delete window._reactShowWatchGame;
       delete window._reactCloseWatchGame;
       delete window._reactNavigate;
@@ -445,11 +439,6 @@ function AppContent() {
         isOpen={!!draftPickData}
         data={draftPickData}
         onClose={() => setDraftPickData(null)}
-      />
-      <FranchiseHistoryModal
-        isOpen={!!franchiseData}
-        data={franchiseData}
-        onClose={() => setFranchiseData(null)}
       />
       <WatchGameModal
         isOpen={!!watchGameData}

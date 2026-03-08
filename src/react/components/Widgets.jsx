@@ -271,23 +271,17 @@ function NextGameSimControls() {
 }
 
 function SimActionBtn({ label, onClick, disabled, accent, style }) {
-  const [hov, setHov] = useState(false);
   return (
     <button
       onClick={disabled ? undefined : onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
       style={{
         padding: '7px 14px', border: accent ? 'none' : '1px solid var(--color-border)',
         borderRadius: 3,
-        background: accent
-          ? (hov && !disabled ? 'var(--color-accent-hover, #163d30)' : 'var(--color-accent)')
-          : (hov && !disabled ? 'var(--color-bg-hover)' : 'transparent'),
+        background: accent ? 'var(--color-accent)' : 'transparent',
         color: accent ? '#fff' : 'var(--color-text-secondary)',
         fontSize: 'var(--text-xs)', fontWeight: accent ? 700 : 500,
         fontFamily: 'var(--font-body)', cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1, whiteSpace: 'nowrap',
-        transition: 'background 80ms ease',
         ...style,
       }}
     >
@@ -297,22 +291,18 @@ function SimActionBtn({ label, onClick, disabled, accent, style }) {
 }
 
 function SimGroupBtn({ label, onClick, disabled, border }) {
-  const [hov, setHov] = useState(false);
   return (
     <button
       onClick={disabled ? undefined : onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
       style={{
         padding: '6px 10px',
+        border: 'none',
         borderLeft: border ? '1px solid var(--color-border)' : 'none',
-        border: 'none', borderLeft: border ? '1px solid var(--color-border)' : 'none',
-        background: hov && !disabled ? 'var(--color-bg-sunken)' : 'transparent',
+        background: 'transparent',
         color: 'var(--color-text-secondary)',
         fontSize: 'var(--text-xs)', fontWeight: 500,
         fontFamily: 'var(--font-body)', cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1, whiteSpace: 'nowrap',
-        transition: 'background 80ms ease',
       }}
     >
       {label}

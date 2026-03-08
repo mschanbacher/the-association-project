@@ -191,7 +191,132 @@ export function NextGameWidget() {
           </div>
         </div>
       </div>
+
+      {/* Sim controls — primary action + skip group */}
+      <NextGameSimControls />
     </Card>
+  );
+}
+
+function NextGameSimControls() {
+  const { gameState } = useGame();
+  const [simming, setSimming] = useState(false);
+
+  const { isSeasonComplete, offseasonPhase } = gameState || {};
+  const inOffseason = offseasonPhase && offseasonPhase !== 'none';
+  const disabled = isSeasonComplete || simming;
+
+  const wrap = useCallback((fn) => () => {
+    if (simming) return;
+    setSimming(true);
+    setTimeout(() => { fn?.(); setTimeout(() => setSimming(false), 200); }, 10);
+  }, [simming]);
+
+  if (inOffseason) {
+    const PHASE_LABELS = {
+      season_ended: 'Review Season', postseason: 'Playoffs',
+      promo_rel: 'Promotion / Relegation', draft: 'Draft',
+      college_fa: 'College Free Agency', development: 'Player Development',
+      free_agency: 'Free Agency', roster_compliance: 'Roster Compliance',
+      owner_mode: 'Owner Decisions', setup_complete: 'Start New Season',
+    };
+    return (
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border-subtle)' }}>
+        <button
+          onClick={wrap(() => window.resumeOffseason?.())}
+          style={{
+            width: '100%', padding: '9px 0', border: 'none',
+            background: 'var(--color-accent)', color: '#fff',
+            fontSize: 'var(--text-sm)', fontWeight: 700,
+            fontFamily: 'var(--font-body)', cursor: 'pointer', borderRadius: 3,
+            opacity: simming ? 0.6 : 1,
+          }}
+        >
+          {PHASE_LABELS[offseasonPhase] || 'Continue'} →
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      marginTop: 12, paddingTop: 12,
+      borderTop: '1px solid var(--color-border-subtle)',
+      display: 'flex', alignItems: 'center', gap: 6,
+    }}>
+      {/* Primary: Next */}
+      <SimActionBtn
+        label="Next ›"
+        accent
+        onClick={wrap(() => window.simNextGame?.())}
+        disabled={disabled}
+        style={{ flex: 1 }}
+      />
+      {/* Watch */}
+      <SimActionBtn
+        label="Watch"
+        onClick={wrap(() => window.watchNextGame?.())}
+        disabled={disabled}
+      />
+      {/* Grouped skip buttons */}
+      <div style={{
+        display: 'flex', border: '1px solid var(--color-border)', borderRadius: 3, overflow: 'hidden',
+      }}>
+        <SimGroupBtn label="Day" onClick={wrap(() => window.simDay?.())} disabled={disabled} />
+        <SimGroupBtn label="Week" onClick={wrap(() => window.simWeek?.())} disabled={disabled} border />
+        <SimGroupBtn label="Finish Season" onClick={wrap(() => window.finishSeason?.())} disabled={disabled} border />
+      </div>
+    </div>
+  );
+}
+
+function SimActionBtn({ label, onClick, disabled, accent, style }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={disabled ? undefined : onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        padding: '7px 14px', border: accent ? 'none' : '1px solid var(--color-border)',
+        borderRadius: 3,
+        background: accent
+          ? (hov && !disabled ? 'var(--color-accent-hover, #163d30)' : 'var(--color-accent)')
+          : (hov && !disabled ? 'var(--color-bg-hover)' : 'transparent'),
+        color: accent ? '#fff' : 'var(--color-text-secondary)',
+        fontSize: 'var(--text-xs)', fontWeight: accent ? 700 : 500,
+        fontFamily: 'var(--font-body)', cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.4 : 1, whiteSpace: 'nowrap',
+        transition: 'background 80ms ease',
+        ...style,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function SimGroupBtn({ label, onClick, disabled, border }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={disabled ? undefined : onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        padding: '6px 10px',
+        borderLeft: border ? '1px solid var(--color-border)' : 'none',
+        border: 'none', borderLeft: border ? '1px solid var(--color-border)' : 'none',
+        background: hov && !disabled ? 'var(--color-bg-sunken)' : 'transparent',
+        color: 'var(--color-text-secondary)',
+        fontSize: 'var(--text-xs)', fontWeight: 500,
+        fontFamily: 'var(--font-body)', cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.4 : 1, whiteSpace: 'nowrap',
+        transition: 'background 80ms ease',
+      }}
+    >
+      {label}
+    </button>
   );
 }
 

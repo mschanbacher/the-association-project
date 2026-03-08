@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useGame } from '../hooks/GameBridge.jsx';
 import { Card, CardHeader } from './Card.jsx';
 import { Badge, RatingBadge } from './Badge.jsx';

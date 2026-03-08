@@ -14745,11 +14745,11 @@ function NextGameWidget() {
 }
 function NextGameSimControls() {
   const { gameState } = useGame();
-  const [simming, setSimming] = useState(false);
+  const [simming, setSimming] = reactExports.useState(false);
   const { isSeasonComplete, offseasonPhase } = gameState || {};
   const inOffseason = offseasonPhase && offseasonPhase !== "none";
   const disabled = isSeasonComplete || simming;
-  const wrap = useCallback((fn) => () => {
+  const wrap = reactExports.useCallback((fn) => () => {
     if (simming) return;
     setSimming(true);
     setTimeout(() => {

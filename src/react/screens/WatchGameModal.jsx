@@ -80,6 +80,9 @@ export function WatchGameModal({ isOpen, data, onClose }) {
     }
   }, [isOpen, data?.homeName, data?.awayName]);
 
+  // userIsHome must be above all hooks that reference it
+  const userIsHome = data?.userIsHome ?? false;
+
   // ── Chart geometry constants — defined before hooks that reference them ──
   const CHART_H = 130;
   const CHART_W = 920;
@@ -121,9 +124,6 @@ export function WatchGameModal({ isOpen, data, onClose }) {
   }, [userIsHome]);
 
   const handleChartMouseLeave = useCallback(() => setTooltip(null), []);
-
-  // Extract userIsHome early — needed by handleChartMouseMove useCallback above
-  const userIsHome = data?.userIsHome ?? false;
 
   if (!isOpen || !data) return null;
   const { homeName, awayName, playoffContext } = data;

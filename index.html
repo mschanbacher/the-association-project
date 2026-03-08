@@ -28558,6 +28558,7 @@ function WatchGameModal({ isOpen, data, onClose }) {
       if (leadersRef.current) leadersRef.current.innerHTML = "";
     }
   }, [isOpen, data == null ? void 0 : data.homeName, data == null ? void 0 : data.awayName]);
+  const userIsHome = (data == null ? void 0 : data.userIsHome) ?? false;
   const CHART_H = 130;
   const CHART_W = 920;
   const TOTAL_GAME_SECONDS = 2880;
@@ -28602,7 +28603,6 @@ function WatchGameModal({ isOpen, data, onClose }) {
     });
   }, [userIsHome]);
   const handleChartMouseLeave = reactExports.useCallback(() => setTooltip(null), []);
-  const userIsHome = (data == null ? void 0 : data.userIsHome) ?? false;
   if (!isOpen || !data) return null;
   const { homeName, awayName, playoffContext } = data;
   const probToY = (prob) => (1 - prob) * CHART_H;

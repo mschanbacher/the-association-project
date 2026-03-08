@@ -280,7 +280,13 @@ export class GameSimController {
                 this._watchUserIsHome,
                 this._watchPreGameProb ?? 0.5
             );
-            refs.pushWinProb(elapsedSeconds, prob);
+            refs.pushWinProb(elapsedSeconds, prob, {
+                homeScore: state.homeScore,
+                awayScore: state.awayScore,
+                homeRun: state.homeRun,
+                awayRun: state.awayRun,
+                clockDisplay: state.clock?.display ?? '',
+            });
         }
     }
 

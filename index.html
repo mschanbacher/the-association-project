@@ -28492,6 +28492,7 @@ function WatchGameModal({ isOpen, data, onClose }) {
   const [finalData, setFinalData] = reactExports.useState(null);
   const [winProbPoints, setWinProbPoints] = reactExports.useState([]);
   const [currentWinProb, setCurrentWinProb] = reactExports.useState(null);
+  const [tooltip, setTooltip] = reactExports.useState(null);
   const winProbPointsRef = reactExports.useRef([]);
   const homeScoreRef = reactExports.useRef(null);
   const awayScoreRef = reactExports.useRef(null);
@@ -28500,6 +28501,7 @@ function WatchGameModal({ isOpen, data, onClose }) {
   const momentumRef = reactExports.useRef(null);
   const playsRef = reactExports.useRef(null);
   const leadersRef = reactExports.useRef(null);
+  const chartWrapRef = reactExports.useRef(null);
   reactExports.useEffect(() => {
     if (isOpen && data) {
       const root2 = document.documentElement;
@@ -28523,15 +28525,15 @@ function WatchGameModal({ isOpen, data, onClose }) {
         },
         setSpeed: (s) => setSpeed(s),
         setPaused: (p) => setPaused(p),
-        // Win probability hooks — called from GameSimController
         setPreGameWinProb: (prob) => {
-          const initial = [{ elapsedSeconds: 0, prob }];
+          const initial = [{ elapsedSeconds: 0, prob, homeScore: 0, awayScore: 0, homeRun: 0, awayRun: 0, clockDisplay: "Pre-game" }];
           winProbPointsRef.current = initial;
           setWinProbPoints(initial);
           setCurrentWinProb(prob);
         },
-        pushWinProb: (elapsedSeconds, prob) => {
-          const next = [...winProbPointsRef.current, { elapsedSeconds, prob }];
+        pushWinProb: (elapsedSeconds, prob, meta = {}) => {
+          const pt = { elapsedSeconds, prob, ...meta };
+          const next = [...winProbPointsRef.current, pt];
           winProbPointsRef.current = next;
           setWinProbPoints(next);
           setCurrentWinProb(prob);
@@ -28550,6 +28552,7 @@ function WatchGameModal({ isOpen, data, onClose }) {
       setFinalData(null);
       setWinProbPoints([]);
       setCurrentWinProb(null);
+      setTooltip(null);
       winProbPointsRef.current = [];
       if (playsRef.current) playsRef.current.innerHTML = "";
       if (leadersRef.current) leadersRef.current.innerHTML = "";
@@ -28572,25 +28575,82 @@ function WatchGameModal({ isOpen, data, onClose }) {
   const TOTAL_GAME_SECONDS = 2880;
   const probToY = (prob) => (1 - prob) * CHART_H;
   const elapsedToX = (s) => s / TOTAL_GAME_SECONDS * CHART_W;
+  const C_WIN = "#2D7A4F";
+  const C_LOSS = "#B5403A";
+  const C_EVEN = "#C0C0BA";
+  const lineColor = (p) => p > 0.55 ? C_WIN : p < 0.45 ? C_LOSS : C_EVEN;
   const buildSegments = (points) => {
     if (points.length < 2) return [];
-    const C_WIN = "#2D7A4F";
-    const C_LOSS = "#B5403A";
-    const C_EVEN = "#C0C0BA";
-    const color = (p) => p > 0.55 ? C_WIN : p < 0.45 ? C_LOSS : C_EVEN;
     const segs = [];
     let start = 0;
     for (let i2 = 1; i2 <= points.length; i2++) {
       const isLast = i2 === points.length;
-      if (isLast || color(points[i2].prob) !== color(points[start].prob)) {
+      if (isLast || lineColor(points[i2].prob) !== lineColor(points[start].prob)) {
         const pts = points.slice(start, i2);
-        segs.push({ color: color(points[start].prob), points: isLast ? pts : [...pts, points[i2]] });
+        segs.push({ color: lineColor(points[start].prob), points: isLast ? pts : [...pts, points[i2]] });
         start = i2 - 1;
       }
     }
     return segs;
   };
+  const RUN_THRESHOLD = 7;
+  const detectRuns = (points) => {
+    if (points.length < 3) return [];
+    const runs2 = [];
+    let runStart = null;
+    let runTeamIsUser = null;
+    let peakIdx = null;
+    let peakProb = null;
+    for (let i2 = 0; i2 < points.length; i2++) {
+      const pt = points[i2];
+      const userRun = userIsHome ? pt.homeRun ?? 0 : pt.awayRun ?? 0;
+      const oppRun = userIsHome ? pt.awayRun ?? 0 : pt.homeRun ?? 0;
+      if (userRun >= RUN_THRESHOLD) {
+        if (!runStart || !runTeamIsUser) {
+          runStart = i2;
+          runTeamIsUser = true;
+          peakIdx = i2;
+          peakProb = pt.prob;
+        }
+        if (pt.prob > (peakProb ?? 0)) {
+          peakIdx = i2;
+          peakProb = pt.prob;
+        }
+      } else if (oppRun >= RUN_THRESHOLD) {
+        if (!runStart || runTeamIsUser) {
+          runStart = i2;
+          runTeamIsUser = false;
+          peakIdx = i2;
+          peakProb = pt.prob;
+        }
+        if (pt.prob < (peakProb ?? 1)) {
+          peakIdx = i2;
+          peakProb = pt.prob;
+        }
+      } else {
+        if (runStart !== null && peakIdx !== null) {
+          const peak = points[peakIdx];
+          runTeamIsUser ? points[peakIdx].homeRun ?? points[peakIdx].awayRun ?? 0 : points[peakIdx].awayRun ?? points[peakIdx].homeRun ?? 0;
+          const storedRun = userIsHome ? runTeamIsUser ? peak.homeRun : peak.awayRun : runTeamIsUser ? peak.awayRun : peak.homeRun;
+          if ((storedRun ?? 0) >= RUN_THRESHOLD) {
+            runs2.push({
+              x: elapsedToX(peak.elapsedSeconds),
+              y: probToY(peak.prob),
+              label: `${storedRun}-0`,
+              isUser: runTeamIsUser
+            });
+          }
+        }
+        runStart = null;
+        runTeamIsUser = null;
+        peakIdx = null;
+        peakProb = null;
+      }
+    }
+    return runs2;
+  };
   const segments = buildSegments(winProbPoints);
+  const runs = detectRuns(winProbPoints);
   const lastPoint = winProbPoints[winProbPoints.length - 1];
   const cursorX = lastPoint ? elapsedToX(lastPoint.elapsedSeconds) : null;
   const cursorY = lastPoint ? probToY(lastPoint.prob) : null;
@@ -28598,15 +28658,52 @@ function WatchGameModal({ isOpen, data, onClose }) {
   const oppProb = userProb !== null ? 100 - userProb : null;
   const awayProb = userIsHome ? oppProb : userProb;
   const homeProb = userIsHome ? userProb : oppProb;
-  const probColor = (p) => {
+  const fmtProb = (p) => p !== null ? `${p}%` : "--";
+  const probColor = (p, isUser) => {
     if (p === null) return "var(--color-text-tertiary)";
-    const isUser = userIsHome ? p === homeProb : p === awayProb;
     if (!isUser) return "var(--color-text-secondary)";
     if (p > 55) return "var(--color-win)";
     if (p < 45) return "var(--color-loss)";
     return "var(--color-text-secondary)";
   };
-  const fmtProb = (p) => p !== null ? `${p}%` : "--";
+  const handleChartMouseMove = reactExports.useCallback((e) => {
+    if (!winProbPointsRef.current.length || !chartWrapRef.current) return;
+    const rect = chartWrapRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const chartFrac = mouseX / rect.width;
+    const targetSeconds = chartFrac * TOTAL_GAME_SECONDS;
+    const pts = winProbPointsRef.current;
+    let closest = pts[0];
+    let minDist = Infinity;
+    for (const pt of pts) {
+      const d = Math.abs(pt.elapsedSeconds - targetSeconds);
+      if (d < minDist) {
+        minDist = d;
+        closest = pt;
+      }
+    }
+    const ptX = closest.elapsedSeconds / TOTAL_GAME_SECONDS * rect.width;
+    const ptY = (1 - closest.prob) * CHART_H * (rect.height / (CHART_H + 20));
+    const userScore = userIsHome ? closest.homeScore : closest.awayScore;
+    const oppScore = userIsHome ? closest.awayScore : closest.homeScore;
+    const userProbPct = Math.round(closest.prob * 100);
+    setTooltip({
+      // Position tooltip above the line point, clamped to chart
+      left: Math.max(60, Math.min(ptX, rect.width - 80)),
+      top: ptY,
+      userProbPct,
+      userScore,
+      oppScore,
+      clockDisplay: closest.clockDisplay ?? "",
+      isUser: true
+    });
+  }, [userIsHome]);
+  const handleChartMouseLeave = reactExports.useCallback(() => setTooltip(null), []);
+  const gridVerticals = [];
+  for (let s = 360; s < TOTAL_GAME_SECONDS; s += 360) {
+    gridVerticals.push(s);
+  }
+  const gridHorizontals = [0.25, 0.75];
   return /* @__PURE__ */ jsxRuntimeExports.jsx(Modal, { isOpen, onClose: null, maxWidth: 1e3, zIndex: 1400, children: /* @__PURE__ */ jsxRuntimeExports.jsx(ModalBody, { style: { maxHeight: "95vh", overflow: "hidden", padding: 0 }, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.container, children: [
     playoffContext && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.contextBanner, children: playoffContext }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.scoreboard, children: [
@@ -28635,95 +28732,168 @@ function WatchGameModal({ isOpen, data, onClose }) {
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.winProbHeader, children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbTitle, children: "Win Probability" }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.winProbNumbers, children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { ...S.winProbPct, color: probColor(awayProb) }, children: fmtProb(awayProb) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { ...S.winProbPct, color: probColor(awayProb, !userIsHome) }, children: fmtProb(awayProb) }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbTeamLabel, children: awayName }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbDivider, children: "·" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbTeamLabel, children: homeName }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { ...S.winProbPct, color: probColor(homeProb) }, children: fmtProb(homeProb) })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { ...S.winProbPct, color: probColor(homeProb, userIsHome) }, children: fmtProb(homeProb) })
           ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          "svg",
+          "div",
           {
-            viewBox: `0 0 ${CHART_W} ${CHART_H + 20}`,
-            preserveAspectRatio: "none",
-            style: { width: "100%", height: CHART_H + 20, display: "block" },
+            ref: chartWrapRef,
+            style: S.chartWrap,
+            onMouseMove: handleChartMouseMove,
+            onMouseLeave: handleChartMouseLeave,
             children: [
-              [720, 1440, 2160].map((s, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "line",
+              /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "svg",
                 {
-                  x1: elapsedToX(s),
-                  y1: 0,
-                  x2: elapsedToX(s),
-                  y2: CHART_H,
-                  stroke: "#E8E7E3",
-                  strokeWidth: 1,
-                  strokeDasharray: "3,3"
-                },
-                i2
-              )),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "line",
-                {
-                  x1: 0,
-                  y1: CHART_H / 2,
-                  x2: CHART_W,
-                  y2: CHART_H / 2,
-                  stroke: "#E8E7E3",
-                  strokeWidth: 1.5
+                  viewBox: `-8 0 ${CHART_W + 16} ${CHART_H + 20}`,
+                  preserveAspectRatio: "none",
+                  style: { width: "100%", height: CHART_H + 20, display: "block", overflow: "visible" },
+                  children: [
+                    gridVerticals.map((s) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "line",
+                      {
+                        x1: elapsedToX(s),
+                        y1: 0,
+                        x2: elapsedToX(s),
+                        y2: CHART_H,
+                        stroke: "#ECEAE6",
+                        strokeWidth: 0.75
+                      },
+                      `gv-${s}`
+                    )),
+                    gridHorizontals.map((p) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "line",
+                      {
+                        x1: 0,
+                        y1: probToY(p),
+                        x2: CHART_W,
+                        y2: probToY(p),
+                        stroke: "#ECEAE6",
+                        strokeWidth: 0.75
+                      },
+                      `gh-${p}`
+                    )),
+                    [720, 1440, 2160].map((s, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "line",
+                      {
+                        x1: elapsedToX(s),
+                        y1: 0,
+                        x2: elapsedToX(s),
+                        y2: CHART_H,
+                        stroke: "#E0DDD8",
+                        strokeWidth: 1,
+                        strokeDasharray: "3,3"
+                      },
+                      `qb-${i2}`
+                    )),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "line",
+                      {
+                        x1: 0,
+                        y1: CHART_H / 2,
+                        x2: CHART_W,
+                        y2: CHART_H / 2,
+                        stroke: "#D8D5D0",
+                        strokeWidth: 1.5
+                      }
+                    ),
+                    segments.map((seg, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "polyline",
+                      {
+                        fill: "none",
+                        stroke: seg.color,
+                        strokeWidth: 2,
+                        strokeLinecap: "round",
+                        strokeLinejoin: "round",
+                        points: seg.points.map((p) => `${elapsedToX(p.elapsedSeconds).toFixed(1)},${probToY(p.prob).toFixed(1)}`).join(" ")
+                      },
+                      i2
+                    )),
+                    runs.map((run, i2) => /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "circle",
+                        {
+                          cx: run.x,
+                          cy: run.y,
+                          r: 3,
+                          fill: "none",
+                          stroke: run.isUser ? C_WIN : C_LOSS,
+                          strokeWidth: 1.5
+                        }
+                      ),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "text",
+                        {
+                          x: run.x,
+                          y: run.isUser ? run.y - 7 : run.y + 14,
+                          fontSize: 8,
+                          fontWeight: 600,
+                          fill: run.isUser ? C_WIN : C_LOSS,
+                          fontFamily: "DM Sans, sans-serif",
+                          textAnchor: "middle",
+                          children: run.label
+                        }
+                      )
+                    ] }, `run-${i2}`)),
+                    cursorX !== null && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "line",
+                        {
+                          x1: cursorX,
+                          y1: 2,
+                          x2: cursorX,
+                          y2: CHART_H - 2,
+                          stroke: "#1B4D3E",
+                          strokeWidth: 1.5,
+                          strokeDasharray: "2,3",
+                          opacity: 0.45
+                        }
+                      ),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: cursorX, cy: cursorY, r: 3.5, fill: "#1B4D3E" })
+                    ] }),
+                    [
+                      { s: 0, label: "0" },
+                      { s: 720, label: "Q2" },
+                      { s: 1440, label: "Q3" },
+                      { s: 2160, label: "Q4" },
+                      { s: 2880, label: "48" }
+                    ].map(({ s, label }) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "text",
+                      {
+                        x: elapsedToX(s),
+                        y: CHART_H + 14,
+                        fontSize: 9,
+                        fill: "#A0A09A",
+                        fontFamily: "DM Sans, sans-serif",
+                        textAnchor: "middle",
+                        children: label
+                      },
+                      label
+                    )),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: 5, y: 11, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "start", children: "Away" }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: 5, y: CHART_H - 3, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "start", children: "Home" }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: CHART_W - 5, y: 11, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "end", children: "Away" }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: CHART_W - 5, y: CHART_H - 3, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "end", children: "Home" })
+                  ]
                 }
               ),
-              segments.map((seg, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "polyline",
-                {
-                  fill: "none",
-                  stroke: seg.color,
-                  strokeWidth: 2,
-                  strokeLinecap: "round",
-                  strokeLinejoin: "round",
-                  points: seg.points.map((p) => `${elapsedToX(p.elapsedSeconds).toFixed(1)},${probToY(p.prob).toFixed(1)}`).join(" ")
-                },
-                i2
-              )),
-              cursorX !== null && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  "line",
-                  {
-                    x1: cursorX,
-                    y1: 2,
-                    x2: cursorX,
-                    y2: CHART_H - 2,
-                    stroke: "#1B4D3E",
-                    strokeWidth: 1.5,
-                    strokeDasharray: "2,3",
-                    opacity: 0.45
-                  }
-                ),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: cursorX, cy: cursorY, r: 3.5, fill: "#1B4D3E" })
-              ] }),
-              [
-                { s: 0, label: "0" },
-                { s: 720, label: "Q2" },
-                { s: 1440, label: "Q3" },
-                { s: 2160, label: "Q4" },
-                { s: 2880, label: "48" }
-              ].map(({ s, label }) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "text",
-                {
-                  x: elapsedToX(s),
-                  y: CHART_H + 14,
-                  fontSize: 9,
-                  fill: "#A0A09A",
-                  fontFamily: "DM Sans, sans-serif",
-                  textAnchor: "middle",
-                  children: label
-                },
-                label
-              )),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: 5, y: 11, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "start", children: "Away" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: 5, y: CHART_H - 3, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "start", children: "Home" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: CHART_W - 5, y: 11, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "end", children: "Away" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: CHART_W - 5, y: CHART_H - 3, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "end", children: "Home" })
+              tooltip && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+                ...S.tooltip,
+                left: tooltip.left,
+                top: Math.max(4, tooltip.top - 52)
+              }, children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.tooltipProb, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { color: tooltip.userProbPct > 55 ? C_WIN : tooltip.userProbPct < 45 ? C_LOSS : "#6B6B65" }, children: [
+                  tooltip.userProbPct,
+                  "%"
+                ] }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.tooltipScore, children: userIsHome ? `${tooltip.userScore}–${tooltip.oppScore}` : `${tooltip.oppScore}–${tooltip.userScore}` }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.tooltipClock, children: tooltip.clockDisplay })
+              ] })
             ]
           }
         )
@@ -28841,7 +29011,9 @@ const S = {
   },
   winProbStrip: {
     borderTop: "1px solid var(--color-border-subtle)",
-    paddingTop: 10
+    paddingTop: 10,
+    paddingLeft: 4,
+    paddingRight: 4
   },
   winProbHeader: {
     display: "flex",
@@ -28858,24 +29030,45 @@ const S = {
     letterSpacing: "0.08em",
     color: "var(--color-text-tertiary)"
   },
-  winProbNumbers: {
-    display: "flex",
-    alignItems: "center",
-    gap: 5
+  winProbNumbers: { display: "flex", alignItems: "center", gap: 5 },
+  winProbPct: { fontSize: 13, fontWeight: 700, fontFamily: "var(--font-mono)" },
+  winProbTeamLabel: { fontSize: 10, color: "var(--color-text-tertiary)" },
+  winProbDivider: { fontSize: 11, color: "var(--color-border)", margin: "0 3px" },
+  chartWrap: {
+    position: "relative",
+    cursor: "crosshair"
   },
-  winProbPct: {
-    fontSize: 13,
+  tooltip: {
+    position: "absolute",
+    transform: "translateX(-50%)",
+    background: "var(--color-bg-raised)",
+    border: "1px solid var(--color-border)",
+    borderRadius: 4,
+    padding: "4px 8px",
+    pointerEvents: "none",
+    zIndex: 10,
+    textAlign: "center",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
+    minWidth: 64,
+    whiteSpace: "nowrap"
+  },
+  tooltipProb: {
+    fontSize: 14,
     fontWeight: 700,
-    fontFamily: "var(--font-mono)"
+    fontFamily: "var(--font-mono)",
+    lineHeight: 1.2
   },
-  winProbTeamLabel: {
-    fontSize: 10,
-    color: "var(--color-text-tertiary)"
-  },
-  winProbDivider: {
+  tooltipScore: {
     fontSize: 11,
-    color: "var(--color-border)",
-    margin: "0 3px"
+    fontWeight: 600,
+    color: "var(--color-text)",
+    fontFamily: "var(--font-mono)",
+    lineHeight: 1.2
+  },
+  tooltipClock: {
+    fontSize: 9,
+    color: "var(--color-text-tertiary)",
+    lineHeight: 1.4
   },
   controls: {
     display: "flex",
@@ -37424,7 +37617,7 @@ class GameSimController {
     }
   }
   _updateWatchScoreboard() {
-    var _a2;
+    var _a2, _b2;
     if (!this._watchGame) return;
     const state = this._watchGame.getState();
     const refs = window._wgRefs;
@@ -37478,7 +37671,13 @@ class GameSimController {
         this._watchUserIsHome,
         this._watchPreGameProb ?? 0.5
       );
-      refs.pushWinProb(elapsedSeconds, prob);
+      refs.pushWinProb(elapsedSeconds, prob, {
+        homeScore: state.homeScore,
+        awayScore: state.awayScore,
+        homeRun: state.homeRun,
+        awayRun: state.awayRun,
+        clockDisplay: ((_b2 = state.clock) == null ? void 0 : _b2.display) ?? ""
+      });
     }
   }
   _onWatchGameEnd() {

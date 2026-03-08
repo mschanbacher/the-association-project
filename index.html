@@ -28490,6 +28490,9 @@ function WatchGameModal({ isOpen, data, onClose }) {
   const [paused, setPaused] = reactExports.useState(false);
   const [gameOver, setGameOver] = reactExports.useState(false);
   const [finalData, setFinalData] = reactExports.useState(null);
+  const [winProbPoints, setWinProbPoints] = reactExports.useState([]);
+  const [currentWinProb, setCurrentWinProb] = reactExports.useState(null);
+  const winProbPointsRef = reactExports.useRef([]);
   const homeScoreRef = reactExports.useRef(null);
   const awayScoreRef = reactExports.useRef(null);
   const clockRef = reactExports.useRef(null);
@@ -28519,7 +28522,20 @@ function WatchGameModal({ isOpen, data, onClose }) {
           setFinalData(resultData);
         },
         setSpeed: (s) => setSpeed(s),
-        setPaused: (p) => setPaused(p)
+        setPaused: (p) => setPaused(p),
+        // Win probability hooks — called from GameSimController
+        setPreGameWinProb: (prob) => {
+          const initial = [{ elapsedSeconds: 0, prob }];
+          winProbPointsRef.current = initial;
+          setWinProbPoints(initial);
+          setCurrentWinProb(prob);
+        },
+        pushWinProb: (elapsedSeconds, prob) => {
+          const next = [...winProbPointsRef.current, { elapsedSeconds, prob }];
+          winProbPointsRef.current = next;
+          setWinProbPoints(next);
+          setCurrentWinProb(prob);
+        }
       };
     }
     return () => {
@@ -28532,6 +28548,9 @@ function WatchGameModal({ isOpen, data, onClose }) {
       setPaused(false);
       setGameOver(false);
       setFinalData(null);
+      setWinProbPoints([]);
+      setCurrentWinProb(null);
+      winProbPointsRef.current = [];
       if (playsRef.current) playsRef.current.innerHTML = "";
       if (leadersRef.current) leadersRef.current.innerHTML = "";
     }
@@ -28547,7 +28566,47 @@ function WatchGameModal({ isOpen, data, onClose }) {
     (_a2 = window.watchGameTogglePause) == null ? void 0 : _a2.call(window);
   }, []);
   if (!isOpen || !data) return null;
-  const { homeName, awayName, playoffContext } = data;
+  const { homeName, awayName, playoffContext, userIsHome } = data;
+  const CHART_H = 130;
+  const CHART_W = 920;
+  const TOTAL_GAME_SECONDS = 2880;
+  const probToY = (prob) => (1 - prob) * CHART_H;
+  const elapsedToX = (s) => s / TOTAL_GAME_SECONDS * CHART_W;
+  const buildSegments = (points) => {
+    if (points.length < 2) return [];
+    const C_WIN = "#2D7A4F";
+    const C_LOSS = "#B5403A";
+    const C_EVEN = "#C0C0BA";
+    const color = (p) => p > 0.55 ? C_WIN : p < 0.45 ? C_LOSS : C_EVEN;
+    const segs = [];
+    let start = 0;
+    for (let i2 = 1; i2 <= points.length; i2++) {
+      const isLast = i2 === points.length;
+      if (isLast || color(points[i2].prob) !== color(points[start].prob)) {
+        const pts = points.slice(start, i2);
+        segs.push({ color: color(points[start].prob), points: isLast ? pts : [...pts, points[i2]] });
+        start = i2 - 1;
+      }
+    }
+    return segs;
+  };
+  const segments = buildSegments(winProbPoints);
+  const lastPoint = winProbPoints[winProbPoints.length - 1];
+  const cursorX = lastPoint ? elapsedToX(lastPoint.elapsedSeconds) : null;
+  const cursorY = lastPoint ? probToY(lastPoint.prob) : null;
+  const userProb = currentWinProb !== null ? Math.round(currentWinProb * 100) : null;
+  const oppProb = userProb !== null ? 100 - userProb : null;
+  const awayProb = userIsHome ? oppProb : userProb;
+  const homeProb = userIsHome ? userProb : oppProb;
+  const probColor = (p) => {
+    if (p === null) return "var(--color-text-tertiary)";
+    const isUser = userIsHome ? p === homeProb : p === awayProb;
+    if (!isUser) return "var(--color-text-secondary)";
+    if (p > 55) return "var(--color-win)";
+    if (p < 45) return "var(--color-loss)";
+    return "var(--color-text-secondary)";
+  };
+  const fmtProb = (p) => p !== null ? `${p}%` : "--";
   return /* @__PURE__ */ jsxRuntimeExports.jsx(Modal, { isOpen, onClose: null, maxWidth: 1e3, zIndex: 1400, children: /* @__PURE__ */ jsxRuntimeExports.jsx(ModalBody, { style: { maxHeight: "95vh", overflow: "hidden", padding: 0 }, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.container, children: [
     playoffContext && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.contextBanner, children: playoffContext }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.scoreboard, children: [
@@ -28571,6 +28630,103 @@ function WatchGameModal({ isOpen, data, onClose }) {
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.momentumLabel, children: "AWY" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.momentumTrack, children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: momentumRef, style: S.momentumBar }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.momentumLabel, children: "HME" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.winProbStrip, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.winProbHeader, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbTitle, children: "Win Probability" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.winProbNumbers, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { ...S.winProbPct, color: probColor(awayProb) }, children: fmtProb(awayProb) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbTeamLabel, children: awayName }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbDivider, children: "·" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbTeamLabel, children: homeName }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { ...S.winProbPct, color: probColor(homeProb) }, children: fmtProb(homeProb) })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "svg",
+          {
+            viewBox: `0 0 ${CHART_W} ${CHART_H + 20}`,
+            preserveAspectRatio: "none",
+            style: { width: "100%", height: CHART_H + 20, display: "block" },
+            children: [
+              [720, 1440, 2160].map((s, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "line",
+                {
+                  x1: elapsedToX(s),
+                  y1: 0,
+                  x2: elapsedToX(s),
+                  y2: CHART_H,
+                  stroke: "#E8E7E3",
+                  strokeWidth: 1,
+                  strokeDasharray: "3,3"
+                },
+                i2
+              )),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "line",
+                {
+                  x1: 0,
+                  y1: CHART_H / 2,
+                  x2: CHART_W,
+                  y2: CHART_H / 2,
+                  stroke: "#E8E7E3",
+                  strokeWidth: 1.5
+                }
+              ),
+              segments.map((seg, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "polyline",
+                {
+                  fill: "none",
+                  stroke: seg.color,
+                  strokeWidth: 2,
+                  strokeLinecap: "round",
+                  strokeLinejoin: "round",
+                  points: seg.points.map((p) => `${elapsedToX(p.elapsedSeconds).toFixed(1)},${probToY(p.prob).toFixed(1)}`).join(" ")
+                },
+                i2
+              )),
+              cursorX !== null && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "line",
+                  {
+                    x1: cursorX,
+                    y1: 2,
+                    x2: cursorX,
+                    y2: CHART_H - 2,
+                    stroke: "#1B4D3E",
+                    strokeWidth: 1.5,
+                    strokeDasharray: "2,3",
+                    opacity: 0.45
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: cursorX, cy: cursorY, r: 3.5, fill: "#1B4D3E" })
+              ] }),
+              [
+                { s: 0, label: "0" },
+                { s: 720, label: "Q2" },
+                { s: 1440, label: "Q3" },
+                { s: 2160, label: "Q4" },
+                { s: 2880, label: "48" }
+              ].map(({ s, label }) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "text",
+                {
+                  x: elapsedToX(s),
+                  y: CHART_H + 14,
+                  fontSize: 9,
+                  fill: "#A0A09A",
+                  fontFamily: "DM Sans, sans-serif",
+                  textAnchor: "middle",
+                  children: label
+                },
+                label
+              )),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: 5, y: 11, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "start", children: "Away" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: 5, y: CHART_H - 3, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "start", children: "Home" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: CHART_W - 5, y: 11, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "end", children: "Away" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("text", { x: CHART_W - 5, y: CHART_H - 3, fontSize: 9, fill: "#A0A09A", fontFamily: "DM Sans, sans-serif", textAnchor: "end", children: "Home" })
+            ]
+          }
+        )
       ] })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.controls, children: [
@@ -28641,7 +28797,7 @@ const S = {
   },
   scoreboard: {
     background: "var(--color-bg-raised)",
-    padding: "20px 24px 16px",
+    padding: "20px 24px 0",
     borderBottom: "1px solid var(--color-border)",
     flexShrink: 0
   },
@@ -28652,37 +28808,15 @@ const S = {
     gap: 48
   },
   teamScore: { textAlign: "center", minWidth: 160 },
-  teamLabel: {
-    fontSize: 10,
-    fontWeight: 600,
-    letterSpacing: "0.08em",
-    marginBottom: 2
-  },
-  teamName: {
-    fontSize: "var(--text-md)",
-    fontWeight: 600,
-    marginBottom: 4
-  },
-  score: {
-    fontSize: 48,
-    fontWeight: 700,
-    lineHeight: 1,
-    fontFamily: "var(--font-mono)"
-  },
+  teamLabel: { fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", marginBottom: 2 },
+  teamName: { fontSize: "var(--text-md)", fontWeight: 600, marginBottom: 4 },
+  score: { fontSize: 48, fontWeight: 700, lineHeight: 1, fontFamily: "var(--font-mono)" },
   clockArea: { textAlign: "center" },
-  clock: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: "var(--color-accent)",
-    fontFamily: "var(--font-mono)"
-  },
-  quarterScores: {
-    fontSize: "var(--text-xs)",
-    color: "var(--color-text-tertiary)",
-    marginTop: 4
-  },
+  clock: { fontSize: 18, fontWeight: 700, color: "var(--color-accent)", fontFamily: "var(--font-mono)" },
+  quarterScores: { fontSize: "var(--text-xs)", color: "var(--color-text-tertiary)", marginTop: 4 },
   momentumRow: {
     marginTop: 12,
+    marginBottom: 12,
     display: "flex",
     alignItems: "center",
     gap: 8,
@@ -28704,6 +28838,44 @@ const S = {
     transition: "left 0.3s, width 0.3s",
     left: "50%",
     width: 0
+  },
+  winProbStrip: {
+    borderTop: "1px solid var(--color-border-subtle)",
+    paddingTop: 10
+  },
+  winProbHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+    paddingLeft: 4,
+    paddingRight: 4
+  },
+  winProbTitle: {
+    fontSize: 10,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: "var(--color-text-tertiary)"
+  },
+  winProbNumbers: {
+    display: "flex",
+    alignItems: "center",
+    gap: 5
+  },
+  winProbPct: {
+    fontSize: 13,
+    fontWeight: 700,
+    fontFamily: "var(--font-mono)"
+  },
+  winProbTeamLabel: {
+    fontSize: 10,
+    color: "var(--color-text-tertiary)"
+  },
+  winProbDivider: {
+    fontSize: 11,
+    color: "var(--color-border)",
+    margin: "0 3px"
   },
   controls: {
     display: "flex",
@@ -28731,12 +28903,7 @@ const S = {
     fontFamily: "var(--font-body)",
     transition: "all 100ms ease"
   },
-  controlDivider: {
-    width: 1,
-    height: 14,
-    background: "var(--color-border)",
-    margin: "0 6px"
-  },
+  controlDivider: { width: 1, height: 14, background: "var(--color-border)", margin: "0 6px" },
   mainArea: {
     flex: 1,
     display: "grid",
@@ -28759,21 +28926,9 @@ const S = {
     textTransform: "uppercase",
     letterSpacing: "0.06em"
   },
-  playsFeed: {
-    flex: 1,
-    overflowY: "auto",
-    padding: "4px 0"
-  },
-  leadersPanel: {
-    display: "flex",
-    flexDirection: "column",
-    flexShrink: 0
-  },
-  leadersFeed: {
-    flex: 1,
-    overflowY: "auto",
-    padding: "8px 12px"
-  },
+  playsFeed: { flex: 1, overflowY: "auto", padding: "4px 0" },
+  leadersPanel: { display: "flex", flexDirection: "column", flexShrink: 0 },
+  leadersFeed: { flex: 1, overflowY: "auto", padding: "8px 12px" },
   gameOverBar: {
     padding: "16px 20px",
     textAlign: "center",
@@ -28781,12 +28936,7 @@ const S = {
     borderTop: "2px solid var(--color-accent)",
     flexShrink: 0
   },
-  finalText: {
-    fontSize: 18,
-    fontWeight: 700,
-    marginBottom: 12,
-    fontFamily: "var(--font-mono)"
-  }
+  finalText: { fontSize: 18, fontWeight: 700, marginBottom: 12, fontFamily: "var(--font-mono)" }
 };
 function BreakingNewsModal({ isOpen, data, onClose }) {
   if (!isOpen || !data) return null;
@@ -37203,17 +37353,31 @@ class GameSimController {
       isPlayoffs: false,
       tier: gameState.currentTier
     });
+    const userIsHome = homeTeam.id === gameState.userTeamId;
+    this._watchUserIsHome = userIsHome;
+    const preGameProb = GameSimController._calcPreGameWinProb(
+      userIsHome ? homeTeam : awayTeam,
+      userIsHome ? awayTeam : homeTeam
+    );
+    this._watchPreGameProb = preGameProb;
     if (window._reactShowWatchGame) {
       window._reactShowWatchGame({
         homeName: this._watchHomeName,
         awayName: this._watchAwayName,
         homeTeamFullName: (_a2 = this._watchHomeTeam) == null ? void 0 : _a2.name,
-        awayTeamFullName: (_b2 = this._watchAwayTeam) == null ? void 0 : _b2.name
+        awayTeamFullName: (_b2 = this._watchAwayTeam) == null ? void 0 : _b2.name,
+        userIsHome
       });
     }
     this._watchPaused = false;
     this._watchSpeed = 1;
     this.watchGameSetSpeed(1);
+    setTimeout(() => {
+      var _a3;
+      if ((_a3 = window._wgRefs) == null ? void 0 : _a3.setPreGameWinProb) {
+        window._wgRefs.setPreGameWinProb(preGameProb);
+      }
+    }, 50);
     this._startWatchTimer();
   }
   _startWatchTimer() {
@@ -37260,6 +37424,7 @@ class GameSimController {
     }
   }
   _updateWatchScoreboard() {
+    var _a2;
     if (!this._watchGame) return;
     const state = this._watchGame.getState();
     const refs = window._wgRefs;
@@ -37302,6 +37467,18 @@ class GameSimController {
         this._watchHomeName,
         this._watchAwayName
       );
+    }
+    if (refs == null ? void 0 : refs.pushWinProb) {
+      const q = state.quarter;
+      const secsLeft = ((_a2 = state.clock) == null ? void 0 : _a2.secondsLeft) ?? 0;
+      const elapsedSeconds = q <= 4 ? (q - 1) * 720 + (720 - secsLeft) : 2880 + (q - 5) * 300 + (300 - secsLeft);
+      const prob = GameSimController._calcLiveWinProb(
+        state.margin,
+        elapsedSeconds,
+        this._watchUserIsHome,
+        this._watchPreGameProb ?? 0.5
+      );
+      refs.pushWinProb(elapsedSeconds, prob);
     }
   }
   _onWatchGameEnd() {
@@ -39089,6 +39266,53 @@ class GameSimController {
         helpers.simulateGame(h, a);
       });
     }
+  }
+  // ── Win Probability Helpers ─────────────────────────────────────────────────
+  /**
+   * Pre-game win probability from roster rating differential.
+   * Uses top-8 rotation average of offRating and defRating.
+   * A ~5 rating point edge ≈ 60% pre-game win probability.
+   *
+   * @param {object} userTeam
+   * @param {object} oppTeam
+   * @returns {number} 0–1 win probability for user
+   */
+  static _calcPreGameWinProb(userTeam, oppTeam) {
+    const avgRating = (team) => {
+      const roster = (team.roster || []).slice(0, 8);
+      if (!roster.length) return 75;
+      return roster.reduce((sum, p) => {
+        const off = p.offRating || p.rating || 75;
+        const def = p.defRating || p.rating || 75;
+        return sum + (off + def) / 2;
+      }, 0) / roster.length;
+    };
+    const userRating = avgRating(userTeam);
+    const oppRating = avgRating(oppTeam);
+    const delta = userRating - oppRating;
+    return 1 / (1 + Math.exp(-0.15 * delta));
+  }
+  /**
+   * Live in-game win probability using score margin + time remaining.
+   * Approximates the ESPN/KenPom logistic model.
+   *
+   * Convention: returns probability that the USER'S team wins.
+   *
+   * @param {number} margin         - home score minus away score (GamePipeline convention)
+   * @param {number} elapsedSeconds - seconds elapsed in the game (0–2880)
+   * @param {boolean} userIsHome    - is the user's team the home team?
+   * @param {number} preGameProb    - pre-game win probability for user (0–1)
+   * @returns {number} 0–1 win probability for user
+   */
+  static _calcLiveWinProb(margin, elapsedSeconds, userIsHome, preGameProb) {
+    const TOTAL = 2880;
+    const remaining = Math.max(0, TOTAL - elapsedSeconds);
+    const userMargin = userIsHome ? margin : -margin;
+    const preGameAdj = (preGameProb - 0.5) * 8;
+    const adjustedMargin = userMargin + preGameAdj;
+    const timePressure = 1 / Math.sqrt(remaining / 60 + 0.5);
+    const raw = 1 / (1 + Math.exp(-0.42 * adjustedMargin * timePressure));
+    return Math.min(0.98, Math.max(0.02, raw));
   }
 }
 class FinanceController {

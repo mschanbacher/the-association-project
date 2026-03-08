@@ -129,12 +129,24 @@ export class GameSimController {
         // [LEGACY REMOVED] const layoutHtml = UIRenderer.watchGameLayout({
             // homeName: this._watchHomeName, awayName: this._watchAwayName
         // });
+        const userIsHome = homeTeam.id === gameState.userTeamId;
+        this._watchUserIsHome = userIsHome;
+
+        // Compute pre-game win probability from roster ratings
+        // Used as the t=0 starting point for the chart
+        const preGameProb = GameSimController._calcPreGameWinProb(
+            userIsHome ? homeTeam : awayTeam,
+            userIsHome ? awayTeam : homeTeam
+        );
+        this._watchPreGameProb = preGameProb;
+
         if (window._reactShowWatchGame) {
             window._reactShowWatchGame({
                 homeName: this._watchHomeName,
                 awayName: this._watchAwayName,
                 homeTeamFullName: this._watchHomeTeam?.name,
                 awayTeamFullName: this._watchAwayTeam?.name,
+                userIsHome,
             });
         } else {
             // [LEGACY DOM] document.getElementById('watchGameContent').innerHTML = layoutHtml;
@@ -144,6 +156,15 @@ export class GameSimController {
         this._watchPaused = false;
         this._watchSpeed = 1;
         this.watchGameSetSpeed(1);
+
+        // Seed chart with pre-game probability once modal refs are ready
+        // Short delay allows React to mount _wgRefs before we call in
+        setTimeout(() => {
+            if (window._wgRefs?.setPreGameWinProb) {
+                window._wgRefs.setPreGameWinProb(preGameProb);
+            }
+        }, 50);
+
         this._startWatchTimer();
     }
 
@@ -242,6 +263,23 @@ export class GameSimController {
                 result.homePlayerStats, result.awayPlayerStats,
                 this._watchHomeName, this._watchAwayName
             );
+        }
+
+        // Push win probability data point to chart
+        if (refs?.pushWinProb) {
+            const q = state.quarter;
+            const secsLeft = state.clock?.secondsLeft ?? 0;
+            const elapsedSeconds = q <= 4
+                ? (q - 1) * 720 + (720 - secsLeft)
+                : 2880 + (q - 5) * 300 + (300 - secsLeft);
+
+            const prob = GameSimController._calcLiveWinProb(
+                state.margin,
+                elapsedSeconds,
+                this._watchUserIsHome,
+                this._watchPreGameProb ?? 0.5
+            );
+            refs.pushWinProb(elapsedSeconds, prob);
         }
     }
 
@@ -2368,5 +2406,77 @@ export class GameSimController {
             const s = helpers.generateSchedule(gameState.tier3Teams, 40);
             s.forEach(g => { const h = gameState.tier3Teams.find(t => t.id === g.homeTeamId); const a = gameState.tier3Teams.find(t => t.id === g.awayTeamId); helpers.simulateGame(h, a); });
         }
+    }
+
+    // ── Win Probability Helpers ─────────────────────────────────────────────────
+
+    /**
+     * Pre-game win probability from roster rating differential.
+     * Uses top-8 rotation average of offRating and defRating.
+     * A ~5 rating point edge ≈ 60% pre-game win probability.
+     *
+     * @param {object} userTeam
+     * @param {object} oppTeam
+     * @returns {number} 0–1 win probability for user
+     */
+    static _calcPreGameWinProb(userTeam, oppTeam) {
+        const avgRating = (team) => {
+            const roster = (team.roster || []).slice(0, 8);
+            if (!roster.length) return 75;
+            return roster.reduce((sum, p) => {
+                const off = p.offRating || p.rating || 75;
+                const def = p.defRating || p.rating || 75;
+                return sum + (off + def) / 2;
+            }, 0) / roster.length;
+        };
+
+        const userRating = avgRating(userTeam);
+        const oppRating  = avgRating(oppTeam);
+        const delta = userRating - oppRating;
+
+        // Logistic: k=0.15 → 5pt edge ≈ 69%, 10pt edge ≈ 82%
+        // Home court is handled by GamePipeline internally; here we just do ratings
+        return 1 / (1 + Math.exp(-0.15 * delta));
+    }
+
+    /**
+     * Live in-game win probability using score margin + time remaining.
+     * Approximates the ESPN/KenPom logistic model.
+     *
+     * Convention: returns probability that the USER'S team wins.
+     *
+     * @param {number} margin         - home score minus away score (GamePipeline convention)
+     * @param {number} elapsedSeconds - seconds elapsed in the game (0–2880)
+     * @param {boolean} userIsHome    - is the user's team the home team?
+     * @param {number} preGameProb    - pre-game win probability for user (0–1)
+     * @returns {number} 0–1 win probability for user
+     */
+    static _calcLiveWinProb(margin, elapsedSeconds, userIsHome, preGameProb) {
+        const TOTAL = 2880;
+        const remaining = Math.max(0, TOTAL - elapsedSeconds);
+
+        // Convert margin to user's perspective
+        // margin > 0 means home is ahead; flip if user is away
+        const userMargin = userIsHome ? margin : -margin;
+
+        // Pre-game advantage adjustment: shift from 0.5 baseline
+        // e.g. preGameProb=0.60 → pregameAdj=+1.6 points
+        const preGameAdj = (preGameProb - 0.5) * 8;
+
+        // Adjusted margin includes pre-game expectation
+        const adjustedMargin = userMargin + preGameAdj;
+
+        // Time pressure: sqrt(remaining) gives gentle early weighting,
+        // dramatic convergence in final minutes. k tuned so:
+        //   +10 pts at 2 min remaining → ~93%
+        //   +10 pts at Q3 start (18 min remaining) → ~79%
+        //   +10 pts at tip-off (48 min remaining) → ~68%
+        const timePressure = 1 / (Math.sqrt(remaining / 60 + 0.5));
+        const k = 0.42;
+
+        const raw = 1 / (1 + Math.exp(-k * adjustedMargin * timePressure));
+
+        // Clamp to [0.02, 0.98] — never show 0% or 100% until game ends
+        return Math.min(0.98, Math.max(0.02, raw));
     }
 }

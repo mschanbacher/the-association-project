@@ -28625,61 +28625,44 @@ function WatchGameModal({ isOpen, data, onClose }) {
     }
     return segs;
   };
-  const RUN_THRESHOLD = 7;
+  const RUN_THRESHOLD = 10;
+  const RUN_Y_OFFSET = 5;
   const detectRuns = (points) => {
     if (points.length < 3) return [];
-    const runs2 = [];
-    let runStart = null;
-    let runTeamIsUser = null;
-    let peakIdx = null;
-    let peakProb = null;
+    const segments2 = [];
+    let activeRun = null;
     for (let i2 = 0; i2 < points.length; i2++) {
       const pt = points[i2];
-      const userRun = userIsHome ? pt.homeRun ?? 0 : pt.awayRun ?? 0;
-      const oppRun = userIsHome ? pt.awayRun ?? 0 : pt.homeRun ?? 0;
+      const homeRun = pt.homeRun ?? 0;
+      const awayRun = pt.awayRun ?? 0;
+      const userRun = userIsHome ? homeRun : awayRun;
+      const oppRun = userIsHome ? awayRun : homeRun;
       if (userRun >= RUN_THRESHOLD) {
-        if (!runStart || !runTeamIsUser) {
-          runStart = i2;
-          runTeamIsUser = true;
-          peakIdx = i2;
-          peakProb = pt.prob;
-        }
-        if (pt.prob > (peakProb ?? 0)) {
-          peakIdx = i2;
-          peakProb = pt.prob;
+        if (!activeRun || !activeRun.isUser) {
+          activeRun = { isUser: true, startSeconds: pt.elapsedSeconds, peakRun: userRun, endSeconds: pt.elapsedSeconds };
+        } else {
+          activeRun.peakRun = Math.max(activeRun.peakRun, userRun);
+          activeRun.endSeconds = pt.elapsedSeconds;
         }
       } else if (oppRun >= RUN_THRESHOLD) {
-        if (!runStart || runTeamIsUser) {
-          runStart = i2;
-          runTeamIsUser = false;
-          peakIdx = i2;
-          peakProb = pt.prob;
-        }
-        if (pt.prob < (peakProb ?? 1)) {
-          peakIdx = i2;
-          peakProb = pt.prob;
+        if (!activeRun || activeRun.isUser) {
+          if (activeRun == null ? void 0 : activeRun.isUser) {
+            segments2.push({ ...activeRun });
+          }
+          activeRun = { isUser: false, startSeconds: pt.elapsedSeconds, peakRun: oppRun, endSeconds: pt.elapsedSeconds };
+        } else {
+          activeRun.peakRun = Math.max(activeRun.peakRun, oppRun);
+          activeRun.endSeconds = pt.elapsedSeconds;
         }
       } else {
-        if (runStart !== null && peakIdx !== null) {
-          const peak = points[peakIdx];
-          runTeamIsUser ? points[peakIdx].homeRun ?? points[peakIdx].awayRun ?? 0 : points[peakIdx].awayRun ?? points[peakIdx].homeRun ?? 0;
-          const storedRun = userIsHome ? runTeamIsUser ? peak.homeRun : peak.awayRun : runTeamIsUser ? peak.awayRun : peak.homeRun;
-          if ((storedRun ?? 0) >= RUN_THRESHOLD) {
-            runs2.push({
-              x: elapsedToX(peak.elapsedSeconds),
-              y: probToY(peak.prob),
-              label: `${storedRun}-0`,
-              isUser: runTeamIsUser
-            });
-          }
+        if (activeRun) {
+          segments2.push({ ...activeRun });
+          activeRun = null;
         }
-        runStart = null;
-        runTeamIsUser = null;
-        peakIdx = null;
-        peakProb = null;
       }
     }
-    return runs2;
+    if (activeRun) segments2.push({ ...activeRun });
+    return segments2;
   };
   const segments = buildSegments(winProbPoints);
   const runs = detectRuns(winProbPoints);
@@ -28813,32 +28796,47 @@ function WatchGameModal({ isOpen, data, onClose }) {
                       },
                       i2
                     )),
-                    runs.map((run, i2) => /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { children: [
-                      /* @__PURE__ */ jsxRuntimeExports.jsx(
-                        "circle",
-                        {
-                          cx: run.x,
-                          cy: run.y,
-                          r: 3,
-                          fill: "none",
-                          stroke: run.isUser ? C_WIN : C_LOSS,
-                          strokeWidth: 1.5
-                        }
-                      ),
-                      /* @__PURE__ */ jsxRuntimeExports.jsx(
-                        "text",
-                        {
-                          x: run.x,
-                          y: run.isUser ? run.y - 7 : run.y + 14,
-                          fontSize: 8,
-                          fontWeight: 600,
-                          fill: run.isUser ? C_WIN : C_LOSS,
-                          fontFamily: "DM Sans, sans-serif",
-                          textAnchor: "middle",
-                          children: run.label
-                        }
-                      )
-                    ] }, `run-${i2}`)),
+                    runs.map((run, i2) => {
+                      const x1 = elapsedToX(run.startSeconds);
+                      const x2 = elapsedToX(run.endSeconds);
+                      const midX = (x1 + x2) / 2;
+                      const lineY = run.isUser ? CHART_H / 2 - RUN_Y_OFFSET : CHART_H / 2 + RUN_Y_OFFSET;
+                      const labelY = run.isUser ? lineY - 4 : lineY + 10;
+                      const color = run.isUser ? C_WIN : C_LOSS;
+                      return /* @__PURE__ */ jsxRuntimeExports.jsxs("g", { children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(
+                          "line",
+                          {
+                            x1,
+                            y1: lineY,
+                            x2,
+                            y2: lineY,
+                            stroke: color,
+                            strokeWidth: 2,
+                            strokeLinecap: "round",
+                            opacity: 0.85
+                          }
+                        ),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1, y1: lineY - 3, x2: x1, y2: lineY + 3, stroke: color, strokeWidth: 1.5, opacity: 0.85 }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: x2, y1: lineY - 3, x2, y2: lineY + 3, stroke: color, strokeWidth: 1.5, opacity: 0.85 }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                          "text",
+                          {
+                            x: midX,
+                            y: labelY,
+                            fontSize: 8,
+                            fontWeight: 600,
+                            fill: color,
+                            fontFamily: "DM Sans, sans-serif",
+                            textAnchor: "middle",
+                            children: [
+                              run.peakRun,
+                              "-0 run"
+                            ]
+                          }
+                        )
+                      ] }, `run-${i2}`);
+                    }),
                     cursorX !== null && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
                       /* @__PURE__ */ jsxRuntimeExports.jsx(
                         "line",

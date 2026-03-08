@@ -154,56 +154,59 @@ export function WatchGameModal({ isOpen, data, onClose }) {
   };
 
   // ── Run detection ──
-  // Scan points for scoring runs ≥ RUN_THRESHOLD from user team's perspective.
-  // A run is detected by watching homeRun/awayRun peaks — when a run resets
-  // (other team scores), label the peak. We label at the highest prob during the run.
-  const RUN_THRESHOLD = 7;
+  // Produces horizontal line segments pinned to the 50% axis.
+  // User runs sit just ABOVE the midline, opp runs sit just BELOW.
+  // Each segment spans the exact elapsed time of the run.
+  // Threshold: 10 pts. Labeled with "X-0 run" at the midpoint of the segment.
+  const RUN_THRESHOLD = 10;
+  const RUN_Y_OFFSET = 5; // px offset from 50% line
 
   const detectRuns = (points) => {
     if (points.length < 3) return [];
-    const runs = [];
+    const segments = [];
 
-    let runStart = null;  // index where current run began
-    let runTeamIsUser = null;
-    let peakIdx = null;
-    let peakProb = null;
+    // We track active run state: who is on a run and when it started
+    let activeRun = null; // { isUser, startSeconds, startPts (user pts at start), startOpp }
 
     for (let i = 0; i < points.length; i++) {
       const pt = points[i];
-      const userRun = userIsHome ? (pt.homeRun ?? 0) : (pt.awayRun ?? 0);
-      const oppRun  = userIsHome ? (pt.awayRun ?? 0) : (pt.homeRun ?? 0);
+      const homeRun = pt.homeRun ?? 0;
+      const awayRun = pt.awayRun ?? 0;
+      // From user perspective
+      const userRun = userIsHome ? homeRun : awayRun;
+      const oppRun  = userIsHome ? awayRun : homeRun;
 
-      // Detect user run
       if (userRun >= RUN_THRESHOLD) {
-        if (!runStart || !runTeamIsUser) { runStart = i; runTeamIsUser = true; peakIdx = i; peakProb = pt.prob; }
-        if (pt.prob > (peakProb ?? 0)) { peakIdx = i; peakProb = pt.prob; }
-      } else if (oppRun >= RUN_THRESHOLD) {
-        if (!runStart || runTeamIsUser) { runStart = i; runTeamIsUser = false; peakIdx = i; peakProb = pt.prob; }
-        if (pt.prob < (peakProb ?? 1)) { peakIdx = i; peakProb = pt.prob; }
-      } else {
-        // Run ended — emit if we had one
-        if (runStart !== null && peakIdx !== null) {
-          const peak = points[peakIdx];
-          const runLen = runTeamIsUser
-            ? (points[peakIdx].homeRun ?? points[peakIdx].awayRun ?? 0)
-            : (points[peakIdx].awayRun ?? points[peakIdx].homeRun ?? 0);
-          // Use the actual stored run value
-          const storedRun = userIsHome
-            ? (runTeamIsUser ? peak.homeRun : peak.awayRun)
-            : (runTeamIsUser ? peak.awayRun : peak.homeRun);
-          if ((storedRun ?? 0) >= RUN_THRESHOLD) {
-            runs.push({
-              x: elapsedToX(peak.elapsedSeconds),
-              y: probToY(peak.prob),
-              label: `${storedRun}-0`,
-              isUser: runTeamIsUser,
-            });
-          }
+        if (!activeRun || !activeRun.isUser) {
+          // Start of a new user run
+          activeRun = { isUser: true, startSeconds: pt.elapsedSeconds, peakRun: userRun, endSeconds: pt.elapsedSeconds };
+        } else {
+          activeRun.peakRun = Math.max(activeRun.peakRun, userRun);
+          activeRun.endSeconds = pt.elapsedSeconds;
         }
-        runStart = null; runTeamIsUser = null; peakIdx = null; peakProb = null;
+      } else if (oppRun >= RUN_THRESHOLD) {
+        if (!activeRun || activeRun.isUser) {
+          // Flush previous user run if any
+          if (activeRun?.isUser) {
+            segments.push({ ...activeRun });
+          }
+          activeRun = { isUser: false, startSeconds: pt.elapsedSeconds, peakRun: oppRun, endSeconds: pt.elapsedSeconds };
+        } else {
+          activeRun.peakRun = Math.max(activeRun.peakRun, oppRun);
+          activeRun.endSeconds = pt.elapsedSeconds;
+        }
+      } else {
+        // No run active — flush if we had one
+        if (activeRun) {
+          segments.push({ ...activeRun });
+          activeRun = null;
+        }
       }
     }
-    return runs;
+    // Flush trailing run
+    if (activeRun) segments.push({ ...activeRun });
+
+    return segments;
   };
 
   const segments = buildSegments(winProbPoints);
@@ -345,30 +348,45 @@ export function WatchGameModal({ isOpen, data, onClose }) {
                     />
                   ))}
 
-                  {/* Run annotations */}
-                  {runs.map((run, i) => (
-                    <g key={`run-${i}`}>
-                      {/* Small tick at the peak */}
-                      <circle
-                        cx={run.x} cy={run.y} r={3}
-                        fill="none"
-                        stroke={run.isUser ? C_WIN : C_LOSS}
-                        strokeWidth={1.5}
-                      />
-                      {/* Label — positioned above if user run, below if opp run */}
-                      <text
-                        x={run.x}
-                        y={run.isUser ? run.y - 7 : run.y + 14}
-                        fontSize={8}
-                        fontWeight={600}
-                        fill={run.isUser ? C_WIN : C_LOSS}
-                        fontFamily="DM Sans, sans-serif"
-                        textAnchor="middle"
-                      >
-                        {run.label}
-                      </text>
-                    </g>
-                  ))}
+                  {/* Run annotations — horizontal segments pinned to 50% axis */}
+                  {runs.map((run, i) => {
+                    const x1 = elapsedToX(run.startSeconds);
+                    const x2 = elapsedToX(run.endSeconds);
+                    const midX = (x1 + x2) / 2;
+                    // User runs sit just above midline, opp runs just below
+                    const lineY = run.isUser
+                      ? CHART_H / 2 - RUN_Y_OFFSET
+                      : CHART_H / 2 + RUN_Y_OFFSET;
+                    const labelY = run.isUser
+                      ? lineY - 4
+                      : lineY + 10;
+                    const color = run.isUser ? C_WIN : C_LOSS;
+                    return (
+                      <g key={`run-${i}`}>
+                        <line
+                          x1={x1} y1={lineY}
+                          x2={x2} y2={lineY}
+                          stroke={color}
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          opacity={0.85}
+                        />
+                        {/* End caps */}
+                        <line x1={x1} y1={lineY - 3} x2={x1} y2={lineY + 3} stroke={color} strokeWidth={1.5} opacity={0.85}/>
+                        <line x1={x2} y1={lineY - 3} x2={x2} y2={lineY + 3} stroke={color} strokeWidth={1.5} opacity={0.85}/>
+                        {/* Label at midpoint */}
+                        <text
+                          x={midX} y={labelY}
+                          fontSize={8} fontWeight={600}
+                          fill={color}
+                          fontFamily="DM Sans, sans-serif"
+                          textAnchor="middle"
+                        >
+                          {run.peakRun}-0 run
+                        </text>
+                      </g>
+                    );
+                  })}
 
                   {/* Current position cursor */}
                   {cursorX !== null && (

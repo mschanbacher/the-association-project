@@ -268,7 +268,8 @@ export class GameSimController {
         // Push win probability data point to chart
         if (refs?.pushWinProb) {
             const q = state.quarter;
-            const secsLeft = state.clock?.secondsLeft ?? 0;
+            // getState() exposes clock.minutesLeft (not secondsLeft)
+            const secsLeft = (state.clock?.minutesLeft ?? 0) * 60;
             const elapsedSeconds = q <= 4
                 ? (q - 1) * 720 + (720 - secsLeft)
                 : 2880 + (q - 5) * 300 + (300 - secsLeft);

@@ -37470,7 +37470,7 @@ class GameSimController {
     }
     if (refs == null ? void 0 : refs.pushWinProb) {
       const q = state.quarter;
-      const secsLeft = ((_a2 = state.clock) == null ? void 0 : _a2.secondsLeft) ?? 0;
+      const secsLeft = (((_a2 = state.clock) == null ? void 0 : _a2.minutesLeft) ?? 0) * 60;
       const elapsedSeconds = q <= 4 ? (q - 1) * 720 + (720 - secsLeft) : 2880 + (q - 5) * 300 + (300 - secsLeft);
       const prob = GameSimController._calcLiveWinProb(
         state.margin,

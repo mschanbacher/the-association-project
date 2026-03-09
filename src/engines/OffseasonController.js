@@ -179,6 +179,9 @@ export class OffseasonController {
         const P = OffseasonController.PHASES;
 
         console.log('🎬 advanceToNextSeason called with action:', action);
+        // PlayoffHub is the only postseason path — force true so stale saves
+        // with usePlayoffHub:false can never fall through to the legacy modal chain.
+        gameState._usePlayoffHub = true;
         this.setPhase(P.POSTSEASON);
 
         eventBus.emit(GameEvents.SEASON_ENDED, {

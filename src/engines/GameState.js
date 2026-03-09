@@ -972,8 +972,9 @@ class GameState {
         state._scoutingWatchList = data.scoutingWatchList || [];
         state._tradeHistory = data.tradeHistory || [];
         state._lastAiToAiTradeDate = data.lastAiToAiTradeDate || null;
-        // Feature flags — default false so old saves always use the legacy path
-        state._usePlayoffHub = data.usePlayoffHub === true;
+        // Feature flags — PlayoffHub is now the only postseason path; always true
+        // regardless of what old saves stored, so stale false values don't revert behavior.
+        state._usePlayoffHub = true;
         
         // v4: playoff state persistence (rehydrate team references)
         if (data._v >= 4 && (data.postseasonResults || data.championshipPlayoffData || data.t2PlayoffData || data.t3PlayoffData)) {

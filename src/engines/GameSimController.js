@@ -651,6 +651,12 @@ export class GameSimController {
             return;
         }
 
+        // Hub mode: sidebar reads _playoffWatch reactively — just refresh, no modal
+        if (window._reactPlayoffHubRefresh) {
+            window._reactPlayoffHubRefresh();
+            return;
+        }
+
         if (window._reactShowChampionship) {
             window._reactShowChampionship({
                 mode: 'series',
@@ -850,6 +856,65 @@ export class GameSimController {
         }
 
         this._completePlayoffSeries();
+    }
+
+    /**
+     * Sim exactly one game in the current _playoffWatch series.
+     * Called by window.simOnePlayoffGame (hub Game button).
+     */
+    simOnePlayoffGame() {
+        const { helpers } = this.ctx;
+        const pw = this._playoffWatch;
+        if (!pw) return;
+        if (pw.higherWins >= pw.gamesToWin || pw.lowerWins >= pw.gamesToWin) {
+            this._completePlayoffSeries();
+            return;
+        }
+
+        const isHigherHome = pw.homePattern[pw.gameNum];
+        const homeTeam = isHigherHome ? pw.higherSeed : pw.lowerSeed;
+        const awayTeam = isHigherHome ? pw.lowerSeed : pw.higherSeed;
+
+        const gameResult = helpers.getSimulationController().simulatePlayoffGame(homeTeam, awayTeam);
+        const higherSeedWon = (gameResult.winner.id === pw.higherSeed.id);
+        if (higherSeedWon) pw.higherWins++;
+        else pw.lowerWins++;
+
+        const userTeam = helpers.getUserTeam();
+        const userInSeries = (pw.higherSeed.id === userTeam.id || pw.lowerSeed.id === userTeam.id);
+        const gameEntry = {
+            gameNumber: pw.gameNum + 1,
+            homeTeam, awayTeam,
+            homeScore: gameResult.homeScore,
+            awayScore: gameResult.awayScore,
+            winner: higherSeedWon ? pw.higherSeed : pw.lowerSeed
+        };
+
+        if (userInSeries && gameResult.homePlayerStats && gameResult.awayPlayerStats) {
+            const mapStats = (stats) => (stats || [])
+                .filter(p => p.minutesPlayed > 0)
+                .sort((a, b) => b.minutesPlayed - a.minutesPlayed)
+                .map(p => ({
+                    name: p.playerName || p.name || 'Unknown', pos: p.position || '',
+                    min: p.minutesPlayed || 0, pts: p.points || 0,
+                    reb: p.rebounds || 0, ast: p.assists || 0,
+                    stl: p.steals || 0, blk: p.blocks || 0, to: p.turnovers || 0,
+                    pf: p.fouls || 0, starter: p.gamesStarted > 0,
+                    fgm: p.fieldGoalsMade || 0, fga: p.fieldGoalsAttempted || 0,
+                    tpm: p.threePointersMade || 0, tpa: p.threePointersAttempted || 0,
+                    ftm: p.freeThrowsMade || 0, fta: p.freeThrowsAttempted || 0, pm: p.plusMinus || 0
+                }));
+            gameEntry.boxScore = {
+                home: { city: homeTeam.city || '', name: homeTeam.name, score: gameResult.homeScore, players: mapStats(gameResult.homePlayerStats) },
+                away: { city: awayTeam.city || '', name: awayTeam.name, score: gameResult.awayScore, players: mapStats(gameResult.awayPlayerStats) },
+                quarterScores: gameResult.quarterScores || null
+            };
+        }
+
+        pw.games.push(gameEntry);
+        pw.gameNum++;
+
+        this._showPlayoffSeriesStatus();
     }
 
     _completePlayoffSeries() {
@@ -1278,7 +1343,13 @@ export class GameSimController {
             }
 
         } else if (action === 't2-championship') {
-            if (gameState.t2PlayoffData?.userDivBracket) return;
+            if (gameState.t2PlayoffData?.userDivBracket) {
+                // Already initialized — if _playoffWatch is null, restart the series watch
+                if (!this._playoffWatch) {
+                    this._startT2HubSeriesWatch();
+                }
+                return;
+            }
             const userTeam = helpers.getUserTeam();
             const t2Bracket = gameState.postseasonResults?.t2;
             if (!t2Bracket) return;
@@ -1293,6 +1364,8 @@ export class GameSimController {
                 userTeamId: userTeam.id,
                 interactiveResults: { divSemi1: null, divSemi2: null, divFinal: null, nationalRounds: [] }
             };
+            // Start the interactive series watch so sidebar shows Game/Watch/Series controls
+            this._startT2HubSeriesWatch();
 
         } else if (action === 't3-championship') {
             if (gameState.t3PlayoffData?.userBracket) return;
@@ -1303,6 +1376,97 @@ export class GameSimController {
             }
         }
         // 'stay' = user missed playoffs, nothing to initialize
+    }
+
+    /**
+     * Start the interactive series watch for T2 hub mode.
+     * Mirrors _showT2DivisionSemis but without opening any modal overlay.
+     * Hub sidebar reads _playoffWatch reactively for Game/Watch/Series controls.
+     */
+    _startT2HubSeriesWatch() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        if (!pd?.userDivBracket) return;
+
+        const db = pd.userDivBracket;
+        const userTeam = helpers.getUserTeam();
+
+        const userInSemi1 = (db.seed1?.id === userTeam.id || db.seed4?.id === userTeam.id);
+        const userInSemi2 = (db.seed2?.id === userTeam.id || db.seed3?.id === userTeam.id);
+
+        if (userInSemi1) {
+            if (!pd.interactiveResults.divSemi2)
+                pd.interactiveResults.divSemi2 = helpers.simulatePlayoffSeries(db.seed2, db.seed3, 3);
+            this.startPlayoffSeriesWatch(db.seed1, db.seed4, 3, (result) => {
+                pd.interactiveResults.divSemi1 = result;
+                pd.stage = 'division-semis-done';
+                this._advanceT2HubAfterSemi();
+            });
+        } else if (userInSemi2) {
+            if (!pd.interactiveResults.divSemi1)
+                pd.interactiveResults.divSemi1 = helpers.simulatePlayoffSeries(db.seed1, db.seed4, 3);
+            this.startPlayoffSeriesWatch(db.seed2, db.seed3, 3, (result) => {
+                pd.interactiveResults.divSemi2 = result;
+                pd.stage = 'division-semis-done';
+                this._advanceT2HubAfterSemi();
+            });
+        } else {
+            if (!pd.interactiveResults.divSemi1)
+                pd.interactiveResults.divSemi1 = helpers.simulatePlayoffSeries(db.seed1, db.seed4, 3);
+            if (!pd.interactiveResults.divSemi2)
+                pd.interactiveResults.divSemi2 = helpers.simulatePlayoffSeries(db.seed2, db.seed3, 3);
+            pd.stage = 'division-semis-done';
+            this._advanceT2HubAfterSemi();
+        }
+    }
+
+    _advanceT2HubAfterSemi() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const userTeam = helpers.getUserTeam();
+        const semi1 = pd.interactiveResults.divSemi1;
+        const semi2 = pd.interactiveResults.divSemi2;
+        if (!semi1 || !semi2) return;
+
+        const userEliminated = (semi1.loser?.id === userTeam.id || semi2.loser?.id === userTeam.id);
+        if (userEliminated) {
+            pd.stage = 'eliminated';
+            window._reactPlayoffHubRefresh?.();
+            return;
+        }
+
+        pd.stage = 'division-final';
+        const higher = semi1.winner;
+        const lower = semi2.winner;
+        const userInFinal = (higher?.id === userTeam.id || lower?.id === userTeam.id);
+
+        if (userInFinal) {
+            this.startPlayoffSeriesWatch(higher, lower, 3, (result) => {
+                pd.interactiveResults.divFinal = result;
+                pd.stage = 'division-final-done';
+                this._advanceT2HubAfterFinal();
+            });
+        } else {
+            pd.interactiveResults.divFinal = helpers.simulatePlayoffSeries(higher, lower, 3);
+            pd.stage = 'division-final-done';
+            this._advanceT2HubAfterFinal();
+        }
+    }
+
+    _advanceT2HubAfterFinal() {
+        const { gameState, helpers } = this.ctx;
+        const pd = gameState.t2PlayoffData;
+        const userTeam = helpers.getUserTeam();
+        const divFinal = pd.interactiveResults.divFinal;
+
+        if (divFinal.loser?.id === userTeam.id) {
+            pd.stage = 'eliminated';
+            window._reactPlayoffHubRefresh?.();
+            return;
+        }
+
+        pd.stage = 'national';
+        window._reactPlayoffHubRefresh?.();
     }
 
     /**

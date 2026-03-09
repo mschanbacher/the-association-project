@@ -63,6 +63,11 @@ class GameState {
         this._scoutingWatchList = [];           // User-curated scouting watch list
         this._tradeHistory = [];               // All trades (user + AI-AI) across seasons
         this._lastAiToAiTradeDate = null;      // Date string of last AI-AI trade check
+
+        // --- Feature flags (persistent so mid-offseason saves respect the flag they started with) ---
+        // _usePlayoffHub: when true, postseason routes to the new Playoff Hub screen instead of
+        // the legacy ChampionshipPlayoffModal chain. Flip to true once PlayoffHub is built & tested.
+        this._usePlayoffHub = false;
         this._pendingBreakingNews = null;       // Notable trade to show user
         
         // --- Persistent: playoff state (survives save/load during playoffs) ---
@@ -192,6 +197,9 @@ class GameState {
     // --- Persistent ---
     get offseasonPhase() { return this._offseasonPhase; }
     set offseasonPhase(value) { this._offseasonPhase = value; }
+
+    get usePlayoffHub() { return this._usePlayoffHub; }
+    set usePlayoffHub(value) { this._usePlayoffHub = !!value; }
     
     get retirementHistory() { return this._retirementHistory; }
     set retirementHistory(value) { this._retirementHistory = value; }
@@ -822,6 +830,8 @@ class GameState {
             scoutingWatchList: this._scoutingWatchList,
             tradeHistory: this._tradeHistory,
             lastAiToAiTradeDate: this._lastAiToAiTradeDate,
+            // Feature flags
+            usePlayoffHub: this._usePlayoffHub,
             // v4: playoff state persistence (dehydrated: team objects → {_ref: id}, boxScores stripped)
             postseasonResults: GameState._dehydrate(this._postseasonResults),
             championshipPlayoffData: GameState._dehydrate(this._championshipPlayoffData),
@@ -962,6 +972,8 @@ class GameState {
         state._scoutingWatchList = data.scoutingWatchList || [];
         state._tradeHistory = data.tradeHistory || [];
         state._lastAiToAiTradeDate = data.lastAiToAiTradeDate || null;
+        // Feature flags — default false so old saves always use the legacy path
+        state._usePlayoffHub = data.usePlayoffHub === true;
         
         // v4: playoff state persistence (rehydrate team references)
         if (data._v >= 4 && (data.postseasonResults || data.championshipPlayoffData || data.t2PlayoffData || data.t3PlayoffData)) {

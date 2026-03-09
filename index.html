@@ -30534,6 +30534,7 @@ class GameState {
     this._scoutingWatchList = [];
     this._tradeHistory = [];
     this._lastAiToAiTradeDate = null;
+    this._usePlayoffHub = false;
     this._pendingBreakingNews = null;
     this._postseasonResults = null;
     this._championshipPlayoffData = null;
@@ -30723,6 +30724,12 @@ class GameState {
   }
   set offseasonPhase(value) {
     this._offseasonPhase = value;
+  }
+  get usePlayoffHub() {
+    return this._usePlayoffHub;
+  }
+  set usePlayoffHub(value) {
+    this._usePlayoffHub = !!value;
   }
   get retirementHistory() {
     return this._retirementHistory;
@@ -31316,6 +31323,8 @@ class GameState {
       scoutingWatchList: this._scoutingWatchList,
       tradeHistory: this._tradeHistory,
       lastAiToAiTradeDate: this._lastAiToAiTradeDate,
+      // Feature flags
+      usePlayoffHub: this._usePlayoffHub,
       // v4: playoff state persistence (dehydrated: team objects → {_ref: id}, boxScores stripped)
       postseasonResults: GameState._dehydrate(this._postseasonResults),
       championshipPlayoffData: GameState._dehydrate(this._championshipPlayoffData),
@@ -31462,6 +31471,7 @@ class GameState {
     state._scoutingWatchList = data.scoutingWatchList || [];
     state._tradeHistory = data.tradeHistory || [];
     state._lastAiToAiTradeDate = data.lastAiToAiTradeDate || null;
+    state._usePlayoffHub = data.usePlayoffHub === true;
     if (data._v >= 4 && (data.postseasonResults || data.championshipPlayoffData || data.t2PlayoffData || data.t3PlayoffData)) {
       const teamLookup = {};
       for (const team of [...state._tier1Teams, ...state._tier2Teams, ...state._tier3Teams]) {
@@ -35477,7 +35487,17 @@ const _OffseasonController = class _OffseasonController {
         this.ctx.helpers.getGameSimController().showSeasonEnd();
         break;
       case P.POSTSEASON:
-        this.continueAfterPostseason();
+        if (this.ctx.gameState._usePlayoffHub && window._reactShowPlayoffHub) {
+          window._reactShowPlayoffHub({
+            action: this.ctx.gameState.userPlayoffResult || "stay",
+            postseasonResults: this.ctx.gameState.postseasonResults,
+            userTier: this.ctx.gameState.currentTier,
+            userTeamId: this.ctx.gameState.userTeamId,
+            onComplete: () => this.continueAfterPostseason()
+          });
+        } else {
+          this.continueAfterPostseason();
+        }
         break;
       case P.PROMO_REL:
         this.proceedToDraftOrDevelopment();
@@ -35526,7 +35546,6 @@ const _OffseasonController = class _OffseasonController {
   // Step 1: Season End → Postseason
   // ═══════════════════════════════════════════════════════════════════
   advanceToNextSeason(action) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     const { gameState, eventBus: eventBus2, GameEvents: GameEvents2, engines, helpers } = this.ctx;
     const P = _OffseasonController.PHASES;
     console.log("🎬 advanceToNextSeason called with action:", action);
@@ -35543,6 +35562,34 @@ const _OffseasonController = class _OffseasonController {
     console.log("🏆 Running full postseason via PlayoffEngine...");
     const postseasonResults = engines.PlayoffEngine.simulateFullPostseason(gameState);
     gameState.postseasonResults = postseasonResults;
+    if (gameState._usePlayoffHub) {
+      console.log("🏆 [PlayoffHub] Routing to new Playoff Hub screen...");
+      if (window._reactShowPlayoffHub) {
+        window._reactShowPlayoffHub({
+          action,
+          // 'championship' | 't2-championship' | 't3-championship' | 'stay'
+          postseasonResults,
+          userTier: gameState.currentTier,
+          userTeamId: gameState.userTeamId,
+          onComplete: () => this.continueAfterPostseason()
+        });
+      } else {
+        console.warn("⚠️ [PlayoffHub] _reactShowPlayoffHub not registered — falling through to legacy path");
+        this._legacyPlayoffFlow(action, postseasonResults);
+      }
+      return;
+    }
+    this._legacyPlayoffFlow(action, postseasonResults);
+  }
+  /**
+   * Legacy playoff modal chain — kept intact while PlayoffHub is built.
+   * Called by advanceToNextSeason() when _usePlayoffHub is false,
+   * and as a safety fallback if the hub component isn't mounted.
+   * DO NOT modify this method during PlayoffHub development.
+   */
+  _legacyPlayoffFlow(action, postseasonResults) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
+    const { gameState, engines, helpers } = this.ctx;
     if (action === "championship") {
       console.log("🏆 User qualifies for T1 Championship — entering interactive playoff flow...");
       const gameSim = helpers.getGameSimController();

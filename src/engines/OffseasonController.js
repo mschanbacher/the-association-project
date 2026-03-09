@@ -105,8 +105,20 @@ export class OffseasonController {
                 this.ctx.helpers.getGameSimController().showSeasonEnd();
                 break;
             case P.POSTSEASON:
-                // Postseason already ran; continue to promo/rel
-                this.continueAfterPostseason();
+                // If using the new hub and it's registered, resume into it.
+                // Otherwise fall through to the legacy path (continueAfterPostseason).
+                if (this.ctx.gameState._usePlayoffHub && window._reactShowPlayoffHub) {
+                    window._reactShowPlayoffHub({
+                        action: this.ctx.gameState.userPlayoffResult || 'stay',
+                        postseasonResults: this.ctx.gameState.postseasonResults,
+                        userTier: this.ctx.gameState.currentTier,
+                        userTeamId: this.ctx.gameState.userTeamId,
+                        onComplete: () => this.continueAfterPostseason(),
+                    });
+                } else {
+                    // Postseason already ran; continue to promo/rel
+                    this.continueAfterPostseason();
+                }
                 break;
             case P.PROMO_REL:
                 // Promo/rel already executed; skip to draft/development
@@ -185,6 +197,45 @@ export class OffseasonController {
         console.log('🏆 Running full postseason via PlayoffEngine...');
         const postseasonResults = engines.PlayoffEngine.simulateFullPostseason(gameState);
         gameState.postseasonResults = postseasonResults;
+
+        // ── FEATURE FLAG: Playoff Hub ──────────────────────────────────────────
+        // When _usePlayoffHub is true, route ALL postseason flows (interactive
+        // T1/T2/T3 brackets AND the static results summary) through the new
+        // PlayoffHub screen. The hub calls continueAfterPostseason() when done.
+        //
+        // When false (default), fall through to the legacy modal chain below.
+        // Flip gameState._usePlayoffHub = true once PlayoffHub is built & tested.
+        // ──────────────────────────────────────────────────────────────────────
+        if (gameState._usePlayoffHub) {
+            console.log('🏆 [PlayoffHub] Routing to new Playoff Hub screen...');
+            if (window._reactShowPlayoffHub) {
+                window._reactShowPlayoffHub({
+                    action,                  // 'championship' | 't2-championship' | 't3-championship' | 'stay'
+                    postseasonResults,
+                    userTier: gameState.currentTier,
+                    userTeamId: gameState.userTeamId,
+                    onComplete: () => this.continueAfterPostseason(),
+                });
+            } else {
+                console.warn('⚠️ [PlayoffHub] _reactShowPlayoffHub not registered — falling through to legacy path');
+                // Safety fallback: if hub isn't mounted yet, use legacy path
+                this._legacyPlayoffFlow(action, postseasonResults);
+            }
+            return;
+        }
+
+        // ── LEGACY PATH (flag is false) ────────────────────────────────────────
+        this._legacyPlayoffFlow(action, postseasonResults);
+    }
+
+    /**
+     * Legacy playoff modal chain — kept intact while PlayoffHub is built.
+     * Called by advanceToNextSeason() when _usePlayoffHub is false,
+     * and as a safety fallback if the hub component isn't mounted.
+     * DO NOT modify this method during PlayoffHub development.
+     */
+    _legacyPlayoffFlow(action, postseasonResults) {
+        const { gameState, engines, helpers } = this.ctx;
 
         // If user is in T1 championship playoffs, enter interactive round-by-round flow
         if (action === 'championship') {

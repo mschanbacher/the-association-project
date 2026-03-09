@@ -201,7 +201,36 @@ function MatchupCard({ higher, lower, higherWins, lowerWins, isUserSeries, futur
 }
 
 // ─── T1 Bracket (16-team, East/West conf) ────────────────────────────────────
-function T1Bracket({ playoffData, userTeamId }) {
+function T1Bracket({ playoffData, t1Results, userTeamId }) {
+  // If no interactive championship data but we have completed results, show those
+  if (!playoffData && t1Results?.rounds?.length) {
+    const roundNames = ['Round 1', 'Conf. Semis', 'Conf. Finals', 'Finals'];
+    return (
+      <div>
+        {t1Results.champion && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: 'var(--color-tier1-bg)', border: '1px solid var(--color-tier1)',
+            borderRadius: 'var(--radius-sm)', padding: '6px 12px', marginBottom: 16,
+            fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-tier1)',
+          }}>
+            T1 Champion: {t1Results.champion.name}
+          </div>
+        )}
+        {t1Results.rounds.map((round, ri) => (
+          <div key={ri} style={{ marginBottom: 20 }}>
+            <div style={{ ...S.label, marginBottom: 8 }}>{roundNames[ri] || `Round ${ri + 1}`}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {round.map((s, si) => (
+                <SeriesCard key={si} result={s.result} userTeamId={userTeamId} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (!playoffData) return (
     <div style={{ padding: 32, color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
       Championship bracket data not available.
@@ -469,39 +498,171 @@ function T1Bracket({ playoffData, userTeamId }) {
   );
 }
 
-// ─── Simple bracket for T2/T3 (4-team division view, spectator) ──────────────
-function SimpleBracket({ label, rounds, userTeamId }) {
-  if (!rounds || rounds.length === 0) {
+// ─── Shared series card using actual PlayoffEngine result shape ───────────────
+// result = { higherSeed, lowerSeed, winner, loser, higherWins, lowerWins }
+function SeriesCard({ result, userTeamId, label }) {
+  if (!result) {
     return (
-      <div style={{ padding: 32, color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
-        {label} playoff results will appear here after the postseason simulation runs.
+      <div style={{
+        background: 'var(--color-bg-raised)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-sm)',
+        width: 190, padding: '6px 8px', opacity: 0.45,
+        margin: '0 0 6px',
+      }}>
+        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>{label || 'TBD'}</div>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>— vs —</div>
+      </div>
+    );
+  }
+  const { higherSeed, lowerSeed, winner, higherWins, lowerWins } = result;
+  const isUser = higherSeed?.id === userTeamId || lowerSeed?.id === userTeamId;
+
+  const row = (team, wins, isWinner) => (
+    <div style={{
+      display: 'flex', alignItems: 'center', padding: '5px 8px', gap: 6,
+      borderBottom: '1px solid var(--color-border-subtle)',
+    }}>
+      {isUser && team?.id === userTeamId && (
+        <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--color-warning)', flexShrink: 0 }} />
+      )}
+      <span style={{
+        flex: 1, fontSize: 'var(--text-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        fontWeight: isWinner ? 'var(--weight-semibold)' : 'var(--weight-medium)',
+        color: isWinner ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+      }}>{team?.name || '?'}</span>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)',
+        color: isWinner ? 'var(--color-accent)' : 'var(--color-text-tertiary)', width: 14, textAlign: 'center',
+      }}>{wins}</span>
+    </div>
+  );
+
+  return (
+    <div style={{
+      background: isUser ? 'rgba(196,138,24,0.04)' : 'var(--color-bg-raised)',
+      border: isUser ? '1px solid rgba(196,138,24,0.35)' : '1px solid var(--color-border)',
+      borderRadius: 'var(--radius-sm)', width: 190, margin: '0 0 6px',
+    }}>
+      {label && <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', padding: '3px 8px 0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>}
+      {row(higherSeed, higherWins, winner?.id === higherSeed?.id)}
+      <div style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+        {row(lowerSeed, lowerWins, winner?.id === lowerSeed?.id)}
+      </div>
+    </div>
+  );
+}
+
+// ─── T2 Bracket: Division brackets + National Tournament ─────────────────────
+function T2Bracket({ t2, userTeamId }) {
+  const [view, setView] = useState('national'); // 'divisions' | 'national'
+
+  if (!t2) return (
+    <div style={{ padding: 32, color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+      Division playoff results will appear here after the postseason runs.
+    </div>
+  );
+
+  const TabBtn = ({ id, label }) => (
+    <button onClick={() => setView(id)} style={{
+      padding: '5px 12px', border: 'none', borderRadius: 'var(--radius-sm)',
+      background: view === id ? 'var(--color-accent)' : 'transparent',
+      color: view === id ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+      fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)',
+      fontWeight: view === id ? 'var(--weight-bold)' : 'var(--weight-medium)',
+      cursor: 'pointer',
+    }}>{label}</button>
+  );
+
+  if (view === 'divisions') {
+    return (
+      <div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          <TabBtn id="national" label="National Tournament" />
+          <TabBtn id="divisions" label="Division Brackets" />
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+          {(t2.divisionBrackets || []).map((db, i) => (
+            <div key={i} style={{ minWidth: 200 }}>
+              <div style={{ ...S.label, marginBottom: 8 }}>{db.division}</div>
+              {db.semi1Result && <SeriesCard result={db.semi1Result} userTeamId={userTeamId} label="Semifinal 1" />}
+              {db.semi2Result && <SeriesCard result={db.semi2Result} userTeamId={userTeamId} label="Semifinal 2" />}
+              {db.finalResult && <SeriesCard result={db.finalResult} userTeamId={userTeamId} label="Final" />}
+              {!db.semi1Result && !db.finalResult && (
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>No bracket data</div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
+  // National tournament view
+  const nat = t2.nationalBracket;
+  const natRoundNames = ['Round of 16', 'Quarterfinals', 'Semifinals', 'Championship'];
   return (
-    <div style={{ padding: 4 }}>
-      {rounds.map((round, ri) => (
-        <div key={ri} style={{ marginBottom: 24 }}>
-          <div style={{ ...S.label, marginBottom: 8 }}>{round.name}</div>
+    <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        <TabBtn id="national" label="National Tournament" />
+        <TabBtn id="divisions" label="Division Brackets" />
+      </div>
+      {t2.champion && (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          background: 'var(--color-tier2-bg)', border: '1px solid var(--color-tier2)',
+          borderRadius: 'var(--radius-sm)', padding: '6px 12px', marginBottom: 16,
+          fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-tier2)',
+        }}>
+          T2 Champion: {t2.champion.name}
+        </div>
+      )}
+      {(nat?.rounds || []).map((round, ri) => (
+        <div key={ri} style={{ marginBottom: 20 }}>
+          <div style={{ ...S.label, marginBottom: 8 }}>{natRoundNames[ri] || `Round ${ri + 1}`}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {(round.series || []).map((s, si) => {
-              const higher = s.higher || s.higherSeed;
-              const lower = s.lower || s.lowerSeed;
-              const res = s.result;
-              const isUser = higher?.id === userTeamId || lower?.id === userTeamId;
-              return (
-                <MatchupCard
-                  key={si}
-                  higher={higher} lower={lower}
-                  higherWins={res?.higherSeedWins ?? res?.higherWins ?? 0}
-                  lowerWins={res?.lowerSeedWins ?? res?.lowerWins ?? 0}
-                  isUserSeries={isUser}
-                  future={!res}
-                  done={!!res}
-                />
-              );
-            })}
+            {round.map((s, si) => (
+              <SeriesCard key={si} result={s.result} userTeamId={userTeamId} />
+            ))}
+          </div>
+        </div>
+      ))}
+      {!nat?.rounds?.length && (
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>National bracket not yet available.</div>
+      )}
+    </div>
+  );
+}
+
+// ─── T3 Bracket: Metro → Regional → National stages ──────────────────────────
+function T3Bracket({ t3, userTeamId }) {
+  if (!t3) return (
+    <div style={{ padding: 32, color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+      Metro playoff results will appear here after the postseason runs.
+    </div>
+  );
+
+  const stageNames = ['Metro Finals', 'Regional Round', 'Sweet 16', 'Quarterfinals', 'Semifinals', 'Championship'];
+
+  return (
+    <div>
+      {t3.champion && (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          background: 'var(--color-tier3-bg)', border: '1px solid var(--color-tier3)',
+          borderRadius: 'var(--radius-sm)', padding: '6px 12px', marginBottom: 16,
+          fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-tier3)',
+        }}>
+          T3 Champion: {t3.champion.name}
+        </div>
+      )}
+      {(t3.rounds || []).map((round, ri) => (
+        <div key={ri} style={{ marginBottom: 20 }}>
+          <div style={{ ...S.label, marginBottom: 8 }}>{stageNames[ri] || `Round ${ri + 1}`}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {round.map((s, si) => (
+              <SeriesCard key={si} result={s.result} userTeamId={userTeamId} />
+            ))}
           </div>
         </div>
       ))}
@@ -896,32 +1057,9 @@ export function PlayoffHub({ data, onClose }) {
     refresh?.();
   }, [refresh, data]);
 
-  // T2/T3 bracket data from postseasonResults
-  const t2Rounds = useMemo(() => {
-    const t2 = postseasonResults?.t2;
-    if (!t2?.rounds) return [];
-    return t2.rounds.map((round, i) => ({
-      name: `Round ${i + 1}`,
-      series: round.map(s => ({
-        higher: s.higher || s.higherSeed,
-        lower: s.lower || s.lowerSeed,
-        result: s.result || s,
-      })),
-    }));
-  }, [postseasonResults]);
-
-  const t3Rounds = useMemo(() => {
-    const t3 = postseasonResults?.t3;
-    if (!t3?.rounds) return [];
-    return t3.rounds.map((round, i) => ({
-      name: `Round ${i + 1}`,
-      series: round.map(s => ({
-        higher: s.higher || s.higherSeed,
-        lower: s.lower || s.lowerSeed,
-        result: s.result || s,
-      })),
-    }));
-  }, [postseasonResults]);
+  // T2/T3 data read directly from postseasonResults (correct shape from PlayoffEngine)
+  const t2Data = postseasonResults?.t2 || null;
+  const t3Data = postseasonResults?.t3 || null;
 
   if (!data) return null;
 
@@ -973,21 +1111,17 @@ export function PlayoffHub({ data, onClose }) {
         {/* Bracket area */}
         <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
           {activeTab === 1 && (
-            <T1Bracket playoffData={cpd} userTeamId={userTeamId} />
+            <T1Bracket
+              playoffData={cpd}
+              t1Results={postseasonResults?.t1}
+              userTeamId={userTeamId}
+            />
           )}
           {activeTab === 2 && (
-            <SimpleBracket
-              label="Division"
-              rounds={t2Rounds}
-              userTeamId={userTeamId}
-            />
+            <T2Bracket t2={t2Data} userTeamId={userTeamId} />
           )}
           {activeTab === 3 && (
-            <SimpleBracket
-              label="Metro"
-              rounds={t3Rounds}
-              userTeamId={userTeamId}
-            />
+            <T3Bracket t3={t3Data} userTeamId={userTeamId} />
           )}
         </div>
       </div>

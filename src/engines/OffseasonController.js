@@ -299,6 +299,8 @@ export class OffseasonController {
         const P = OffseasonController.PHASES;
 
         if (window._reactCloseChampionship) window._reactCloseChampionship();
+        // Close the PlayoffHub screen — we're now entering offseason flow
+        if (window._reactClosePlayoffHub) window._reactClosePlayoffHub();
         // [LEGACY DOM] document.getElementById('championshipPlayoffModal').classList.add('hidden');
         this.setPhase(P.PROMO_REL);
 

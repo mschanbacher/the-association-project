@@ -40,6 +40,7 @@ import { LotteryModal } from './screens/LotteryModal.jsx';
 import { UserDraftPickModal } from './screens/UserDraftPickModal.jsx';
 import { WatchGameModal } from './screens/WatchGameModal.jsx';
 import { BreakingNewsModal } from './screens/BreakingNewsModal.jsx';
+import { PlayoffHub } from './screens/PlayoffHub.jsx';
 
 function AppContent() {
   const { isReady, gameState, refresh } = useGame();
@@ -76,6 +77,7 @@ function AppContent() {
   const [draftPickData, setDraftPickData] = useState(null);
   const [watchGameData, setWatchGameData] = useState(null);
   const [breakingNewsData, setBreakingNewsData] = useState(null);
+  const [playoffHubData, setPlayoffHubData] = useState(null);
 
   // Hide the legacy game container elements once React takes over
   useEffect(() => {
@@ -149,6 +151,15 @@ function AppContent() {
     window._reactNavigate = (screen) => setActiveScreen(screen);
     window._reactShowBreakingNews = (data, resolve) => { setBreakingNewsData({ ...data, _resolve: resolve }); };
 
+    // Playoff Hub
+    window._reactShowPlayoffHub = (data) => setPlayoffHubData({ ...data });
+    window._reactClosePlayoffHub = () => setPlayoffHubData(null);
+    // Bridge to access GameSimController from React components
+    window._getGameSimController = () => {
+      const bridge = window._gameBridge;
+      return bridge?.helpers?.getGameSimController?.() || null;
+    };
+
     return () => {
       window.removeEventListener('reactShowPostGame', handlePostGame);
       window.removeEventListener('reactShowBoxScore', handleBoxScore);
@@ -196,6 +207,9 @@ function AppContent() {
       delete window._reactCloseWatchGame;
       delete window._reactNavigate;
       delete window._reactShowBreakingNews;
+      delete window._reactShowPlayoffHub;
+      delete window._reactClosePlayoffHub;
+      delete window._getGameSimController;
     };
   }, []);
 
@@ -260,11 +274,24 @@ function AppContent() {
     }}>
       <TopBar />
       <OffseasonTracker />
-      <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar activeScreen={activeScreen} onNavigate={setActiveScreen} />
-        <main style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
-          {screens[activeScreen] || screens.dashboard}
-        </main>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* Playoff Hub replaces sidebar + main during postseason */}
+        {playoffHubData ? (
+          <PlayoffHub
+            data={playoffHubData}
+            onClose={() => {
+              setPlayoffHubData(null);
+              playoffHubData?.onComplete?.();
+            }}
+          />
+        ) : (
+          <>
+            <Sidebar activeScreen={activeScreen} onNavigate={setActiveScreen} />
+            <main style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
+              {screens[activeScreen] || screens.dashboard}
+            </main>
+          </>
+        )}
       </div>
 
       {/* ── Modals ── */}

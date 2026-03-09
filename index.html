@@ -14717,7 +14717,7 @@ function NextGameWidget() {
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(Card, { padding: "md", style: { display: "flex", flexDirection: "column" }, children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(CardLabel, { children: "Next Game" }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "4px 0" }, children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(WinProbArc, { probability: winProb }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(WinProbArc$1, { probability: winProb }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginTop: 8 }, children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { textAlign: "center", flex: 1 }, children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "var(--text-md)", fontWeight: 600 }, children: userTeam.city || userTeam.name.split(" ")[0] }),
@@ -14895,7 +14895,7 @@ function SimGroupBtn({ label, onClick, disabled, border }) {
     }
   );
 }
-function WinProbArc({ probability, size = 140 }) {
+function WinProbArc$1({ probability, size = 140 }) {
   const pct = Math.round(probability * 100);
   const strokeWidth = 16;
   const radius = (size - strokeWidth) / 2;
@@ -27605,7 +27605,7 @@ function BracketViewerModal({ isOpen, data, onClose }) {
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(Modal, { isOpen, onClose, maxWidth: 1400, zIndex: 1400, children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(ModalHeader, { onClose, children: tier === 1 ? "Championship Playoffs" : tier === 2 ? "Tier 2 Playoffs" : "Tier 3 Playoffs" }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs(ModalBody, { style: { maxHeight: "85vh", overflowY: "auto", overflowX: "auto", padding: "var(--space-4)" }, children: [
-      tier === 1 && /* @__PURE__ */ jsxRuntimeExports.jsx(T1Bracket, { pd: playoffData, userId: userTeamId, active: activeInfo }),
+      tier === 1 && /* @__PURE__ */ jsxRuntimeExports.jsx(T1Bracket$1, { pd: playoffData, userId: userTeamId, active: activeInfo }),
       tier === 2 && /* @__PURE__ */ jsxRuntimeExports.jsx(T2Bracket, { pd: playoffData, userId: userTeamId, active: activeInfo }),
       tier === 3 && /* @__PURE__ */ jsxRuntimeExports.jsx(T3Bracket, { pd: playoffData, userId: userTeamId, active: activeInfo })
     ] })
@@ -27630,7 +27630,7 @@ function TeamCell({ team, seed, isWinner, isLoser, isUser }) {
     ] })
   ] });
 }
-function MatchupCard({ higher, lower, hSeed, lSeed, seriesResult, userId, activeInfo, seriesKey }) {
+function MatchupCard$1({ higher, lower, hSeed, lSeed, seriesResult, userId, activeInfo, seriesKey }) {
   var _a2, _b2, _c;
   const [expanded, setExpanded] = reactExports.useState(false);
   let isHigherWinner = false, isLowerWinner = false, scoreText = "", isUserSeries = false;
@@ -27767,7 +27767,7 @@ function Champion({ name, color }) {
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "var(--text-lg)", fontWeight: 700, color: color || "var(--color-tier1)" }, children: name })
   ] });
 }
-function T1Bracket({ pd, userId, active }) {
+function T1Bracket$1({ pd, userId, active }) {
   var _a2, _b2, _c, _d;
   const { eastTeams, westTeams, roundResults } = pd;
   const getSeriesResult = (round, conf, idx) => {
@@ -27784,7 +27784,7 @@ function T1Bracket({ pd, userId, active }) {
         /* @__PURE__ */ jsxRuntimeExports.jsx(RoundColumn, { label: "Round 1", children: r1Pairs.map(([hi, lo], i2) => {
           const s = getSeriesResult(0, confName, i2);
           return /* @__PURE__ */ jsxRuntimeExports.jsx(
-            MatchupCard,
+            MatchupCard$1,
             {
               higher: seeds[hi],
               lower: seeds[lo],
@@ -27803,7 +27803,7 @@ function T1Bracket({ pd, userId, active }) {
           const s = getSeriesResult(1, confName, i2);
           if (s) {
             return /* @__PURE__ */ jsxRuntimeExports.jsx(
-              MatchupCard,
+              MatchupCard$1,
               {
                 higher: (_a3 = s.result) == null ? void 0 : _a3.higherSeed,
                 lower: (_b3 = s.result) == null ? void 0 : _b3.lowerSeed,
@@ -27817,14 +27817,14 @@ function T1Bracket({ pd, userId, active }) {
               i2
             );
           }
-          return /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId }, i2);
+          return /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard$1, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId }, i2);
         }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(RoundColumn, { label: "Conf. Finals", children: (() => {
           var _a3, _b3;
           const s = getSeriesResult(2, confName, 0);
           if (s) {
             return /* @__PURE__ */ jsxRuntimeExports.jsx(
-              MatchupCard,
+              MatchupCard$1,
               {
                 higher: (_a3 = s.result) == null ? void 0 : _a3.higherSeed,
                 lower: (_b3 = s.result) == null ? void 0 : _b3.lowerSeed,
@@ -27837,7 +27837,7 @@ function T1Bracket({ pd, userId, active }) {
               }
             );
           }
-          return /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId });
+          return /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard$1, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId });
         })() })
       ] })
     ] });
@@ -27848,7 +27848,7 @@ function T1Bracket({ pd, userId, active }) {
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: "var(--space-4)" }, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(SectionHeader, { title: "Finals", color: "var(--color-tier1)" }),
       finalsResult ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-        MatchupCard,
+        MatchupCard$1,
         {
           higher: (_c = finalsResult.result) == null ? void 0 : _c.higherSeed,
           lower: (_d = finalsResult.result) == null ? void 0 : _d.lowerSeed,
@@ -27859,7 +27859,7 @@ function T1Bracket({ pd, userId, active }) {
           activeInfo: active,
           seriesKey: "t1-3-0"
         }
-      ) : /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId })
+      ) : /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard$1, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId })
     ] }),
     champion && /* @__PURE__ */ jsxRuntimeExports.jsx(Champion, { name: champion.name, color: "var(--color-tier1)" })
   ] });
@@ -27883,7 +27883,7 @@ function T2Bracket({ pd, userId, active }) {
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: styles.rounds, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs(RoundColumn, { label: "Semifinals", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx(
-          MatchupCard,
+          MatchupCard$1,
           {
             higher: db == null ? void 0 : db.seed1,
             lower: db == null ? void 0 : db.seed4,
@@ -27896,7 +27896,7 @@ function T2Bracket({ pd, userId, active }) {
           }
         ),
         /* @__PURE__ */ jsxRuntimeExports.jsx(
-          MatchupCard,
+          MatchupCard$1,
           {
             higher: db == null ? void 0 : db.seed2,
             lower: db == null ? void 0 : db.seed3,
@@ -27910,7 +27910,7 @@ function T2Bracket({ pd, userId, active }) {
         )
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(RoundColumn, { label: "Division Final", children: divFinal ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-        MatchupCard,
+        MatchupCard$1,
         {
           higher: divFinal.higherSeed,
           lower: divFinal.lowerSeed,
@@ -27922,7 +27922,7 @@ function T2Bracket({ pd, userId, active }) {
           seriesKey: "t2-div-divFinal"
         }
       ) : semi1 && semi2 ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-        MatchupCard,
+        MatchupCard$1,
         {
           higher: semi1.winner,
           lower: semi2.winner,
@@ -27931,14 +27931,14 @@ function T2Bracket({ pd, userId, active }) {
           userId,
           activeInfo: active
         }
-      ) : /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId }) })
+      ) : /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard$1, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId }) })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: "var(--space-6)" }, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(SectionHeader, { title: "National Tournament", color: "var(--color-text-secondary)" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: styles.rounds, children: roundNames.map((name, r) => {
         const roundData = natRounds[r] || null;
         return /* @__PURE__ */ jsxRuntimeExports.jsx(RoundColumn, { label: name, children: roundData ? roundData.filter((s) => s == null ? void 0 : s.result).map((s, idx) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-          MatchupCard,
+          MatchupCard$1,
           {
             higher: s.result.higherSeed,
             lower: s.result.lowerSeed,
@@ -27950,7 +27950,7 @@ function T2Bracket({ pd, userId, active }) {
             seriesKey: `t2-nat-${r}-${idx}`
           },
           idx
-        )) : Array.from({ length: stageCounts[r] }, (_, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId }, i2)) }, r);
+        )) : Array.from({ length: stageCounts[r] }, (_, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard$1, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId }, i2)) }, r);
       }) })
     ] }),
     champion && /* @__PURE__ */ jsxRuntimeExports.jsx(Champion, { name: champion.name, color: "var(--color-tier2)" })
@@ -27973,7 +27973,7 @@ function T3Bracket({ pd, userId, active }) {
     metro && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginBottom: "var(--space-4)" }, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: styles.stageLabel, children: "Metro Final (Bo3)" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
-        MatchupCard,
+        MatchupCard$1,
         {
           higher: metro.higherSeed,
           lower: metro.lowerSeed,
@@ -27989,7 +27989,7 @@ function T3Bracket({ pd, userId, active }) {
     !metro && pd.stage === "metro-final" && active && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginBottom: "var(--space-4)" }, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: styles.stageLabel, children: "Metro Final (Bo3)" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
-        MatchupCard,
+        MatchupCard$1,
         {
           higher: { id: active.higherId, name: active.higherName || "TBD", wins: 0, losses: 0 },
           lower: { id: active.lowerId, name: active.lowerName || "TBD", wins: 0, losses: 0 },
@@ -28016,7 +28016,7 @@ function T3Bracket({ pd, userId, active }) {
         var _a3, _b2;
         return (r == null ? void 0 : r.result) && (((_a3 = r.result.winner) == null ? void 0 : _a3.id) === userId || ((_b2 = r.result.loser) == null ? void 0 : _b2.id) === userId);
       }).map((r, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-        MatchupCard,
+        MatchupCard$1,
         {
           higher: r.result.higherSeed,
           lower: r.result.lowerSeed,
@@ -28032,7 +28032,7 @@ function T3Bracket({ pd, userId, active }) {
     ] }) : pd.stage === "regional" && active ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: styles.stageLabel, children: "Regional Round (Play-In, Bo3)" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
-        MatchupCard,
+        MatchupCard$1,
         {
           higher: { id: active.higherId, name: active.higherName || "TBD", wins: 0, losses: 0 },
           lower: { id: active.lowerId, name: active.lowerName || "TBD", wins: 0, losses: 0 },
@@ -28051,7 +28051,7 @@ function T3Bracket({ pd, userId, active }) {
         return /* @__PURE__ */ jsxRuntimeExports.jsx(RoundColumn, { label: stageNames[r], children: roundData && roundData.length > 0 ? roundData.filter(Boolean).map((s, idx) => {
           const res = s.result || s;
           return /* @__PURE__ */ jsxRuntimeExports.jsx(
-            MatchupCard,
+            MatchupCard$1,
             {
               higher: res.higherSeed,
               lower: res.lowerSeed,
@@ -28064,7 +28064,7 @@ function T3Bracket({ pd, userId, active }) {
             },
             idx
           );
-        }) : Array.from({ length: stageCounts[r] }, (_, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId }, i2)) }, r);
+        }) : Array.from({ length: stageCounts[r] }, (_, i2) => /* @__PURE__ */ jsxRuntimeExports.jsx(MatchupCard$1, { higher: null, lower: null, hSeed: "?", lSeed: "?", userId }, i2)) }, r);
       }) })
     ] }),
     champion && /* @__PURE__ */ jsxRuntimeExports.jsx(Champion, { name: champion.name, color: "var(--color-tier3)" })
@@ -28723,46 +28723,46 @@ function WatchGameModal({ isOpen, data, onClose }) {
     gridVerticals.push(s);
   }
   const gridHorizontals = [0.25, 0.75];
-  return /* @__PURE__ */ jsxRuntimeExports.jsx(Modal, { isOpen, onClose: null, maxWidth: 1e3, zIndex: 1400, children: /* @__PURE__ */ jsxRuntimeExports.jsx(ModalBody, { style: { maxHeight: "95vh", overflow: "hidden", padding: 0 }, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.container, children: [
-    playoffContext && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.contextBanner, children: playoffContext }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.scoreboard, children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.scoreRow, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.teamScore, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { ...S.teamLabel, color: "var(--color-away)" }, children: "AWAY" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.teamName, children: awayName }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: awayScoreRef, style: S.score, children: "0" })
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(Modal, { isOpen, onClose: null, maxWidth: 1e3, zIndex: 1400, children: /* @__PURE__ */ jsxRuntimeExports.jsx(ModalBody, { style: { maxHeight: "95vh", overflow: "hidden", padding: 0 }, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.container, children: [
+    playoffContext && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S$1.contextBanner, children: playoffContext }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.scoreboard, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.scoreRow, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.teamScore, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { ...S$1.teamLabel, color: "var(--color-away)" }, children: "AWAY" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S$1.teamName, children: awayName }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: awayScoreRef, style: S$1.score, children: "0" })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.clockArea, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: clockRef, style: S.clock, children: "Q1 12:00" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: quarterScoresRef, style: S.quarterScores })
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.clockArea, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: clockRef, style: S$1.clock, children: "Q1 12:00" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: quarterScoresRef, style: S$1.quarterScores })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.teamScore, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { ...S.teamLabel, color: "var(--color-home)" }, children: "HOME" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.teamName, children: homeName }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: homeScoreRef, style: { ...S.score, color: "var(--color-home)" }, children: "0" })
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.teamScore, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { ...S$1.teamLabel, color: "var(--color-home)" }, children: "HOME" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S$1.teamName, children: homeName }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: homeScoreRef, style: { ...S$1.score, color: "var(--color-home)" }, children: "0" })
         ] })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.momentumRow, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.momentumLabel, children: "AWY" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.momentumTrack, children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: momentumRef, style: S.momentumBar }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.momentumLabel, children: "HME" })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.momentumRow, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S$1.momentumLabel, children: "AWY" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S$1.momentumTrack, children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: momentumRef, style: S$1.momentumBar }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S$1.momentumLabel, children: "HME" })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.winProbStrip, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.winProbHeader, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbTitle, children: "Win Probability" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.winProbNumbers, children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { ...S.winProbPct, color: probColor(awayProb, !userIsHome) }, children: fmtProb(awayProb) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbTeamLabel, children: awayName }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbDivider, children: "·" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.winProbTeamLabel, children: homeName }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { ...S.winProbPct, color: probColor(homeProb, userIsHome) }, children: fmtProb(homeProb) })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.winProbStrip, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.winProbHeader, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S$1.winProbTitle, children: "Win Probability" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.winProbNumbers, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { ...S$1.winProbPct, color: probColor(awayProb, !userIsHome) }, children: fmtProb(awayProb) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S$1.winProbTeamLabel, children: awayName }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S$1.winProbDivider, children: "·" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S$1.winProbTeamLabel, children: homeName }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { ...S$1.winProbPct, color: probColor(homeProb, userIsHome) }, children: fmtProb(homeProb) })
           ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs(
           "div",
           {
             ref: chartWrapRef,
-            style: S.chartWrap,
+            style: S$1.chartWrap,
             onMouseMove: handleChartMouseMove,
             onMouseLeave: handleChartMouseLeave,
             children: [
@@ -28917,53 +28917,53 @@ function WatchGameModal({ isOpen, data, onClose }) {
                 }
               ),
               tooltip && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
-                ...S.tooltip,
+                ...S$1.tooltip,
                 left: tooltip.left,
                 top: Math.max(4, tooltip.top - 52)
               }, children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.tooltipProb, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { color: tooltip.userProbPct > 55 ? C_WIN : tooltip.userProbPct < 45 ? C_LOSS : "#6B6B65" }, children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S$1.tooltipProb, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { color: tooltip.userProbPct > 55 ? C_WIN : tooltip.userProbPct < 45 ? C_LOSS : "#6B6B65" }, children: [
                   tooltip.userProbPct,
                   "%"
                 ] }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.tooltipScore, children: userIsHome ? `${tooltip.userScore}–${tooltip.oppScore}` : `${tooltip.oppScore}–${tooltip.userScore}` }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.tooltipClock, children: tooltip.clockDisplay })
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S$1.tooltipScore, children: userIsHome ? `${tooltip.userScore}–${tooltip.oppScore}` : `${tooltip.oppScore}–${tooltip.userScore}` }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S$1.tooltipClock, children: tooltip.clockDisplay })
               ] })
             ]
           }
         )
       ] })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.controls, children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S.controlLabel, children: "Speed" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.controls, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: S$1.controlLabel, children: "Speed" }),
       [1, 3, 10, 999].map((s) => /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => handleSpeed(s), style: {
-        ...S.controlBtn,
+        ...S$1.controlBtn,
         background: speed === s ? "var(--color-accent)" : "transparent",
         color: speed === s ? "var(--color-text-inverse)" : "var(--color-text-secondary)",
         fontWeight: speed === s ? 600 : 400
       }, children: s === 999 ? "Max" : `${s}x` }, s)),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.controlDivider }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S$1.controlDivider }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: handlePause, style: {
-        ...S.controlBtn,
+        ...S$1.controlBtn,
         background: paused ? "var(--color-win)" : "transparent",
         color: paused ? "var(--color-text-inverse)" : "var(--color-text-secondary)"
       }, children: paused ? "Play" : "Pause" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
         var _a2;
         return (_a2 = window.watchGameSkip) == null ? void 0 : _a2.call(window);
-      }, style: S.controlBtn, children: "Skip" })
+      }, style: S$1.controlBtn, children: "Skip" })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.mainArea, children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.playsPanel, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.panelHeader, children: "Play-by-Play" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: playsRef, style: S.playsFeed })
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.mainArea, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.playsPanel, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S$1.panelHeader, children: "Play-by-Play" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: playsRef, style: S$1.playsFeed })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.leadersPanel, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.panelHeader, children: "Leaders" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: leadersRef, style: S.leadersFeed })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.leadersPanel, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S$1.panelHeader, children: "Leaders" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: leadersRef, style: S$1.leadersFeed })
       ] })
     ] }),
-    gameOver && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.gameOverBar, children: [
-      finalData && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.finalText, children: [
+    gameOver && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.gameOverBar, children: [
+      finalData && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S$1.finalText, children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { color: finalData.won ? "var(--color-win)" : "var(--color-loss)" }, children: finalData.won ? "VICTORY" : "DEFEAT" }),
         " — FINAL",
         finalData.isOvertime ? " (OT)" : "",
@@ -28979,7 +28979,7 @@ function WatchGameModal({ isOpen, data, onClose }) {
     ] })
   ] }) }) });
 }
-const S = {
+const S$1 = {
   container: {
     display: "flex",
     flexDirection: "column",
@@ -29226,6 +29226,845 @@ function TradeColumn({ teamName: teamName2, sends }) {
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "var(--text-sm)" }, children: sends })
   ] });
 }
+const S = {
+  // Layout
+  sidebar: {
+    width: 210,
+    background: "var(--color-bg-raised)",
+    borderRight: "1px solid var(--color-border)",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    flexShrink: 0
+  },
+  content: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    minWidth: 0
+  },
+  // Typography helpers
+  label: {
+    fontSize: "var(--text-2xs)",
+    fontWeight: "var(--weight-bold)",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: "var(--color-text-tertiary)",
+    marginBottom: 8
+  }
+};
+function WinProbArc({ probability, size = 150, label = "Win Prob." }) {
+  const pct = Math.round(probability * 100);
+  const strokeWidth = 15;
+  const radius = (size - strokeWidth) / 2;
+  const cx = size / 2;
+  const cy = size / 2 + 10;
+  const prob = Math.max(0.02, Math.min(0.98, probability));
+  const arcColor = pct >= 60 ? "var(--color-accent)" : pct >= 45 ? "var(--color-text-secondary)" : "var(--color-loss)";
+  const leftX = cx - radius, leftY = cy;
+  const topX = cx, topY = cy - radius;
+  const rightX = cx + radius, rightY = cy;
+  const angle = Math.PI * (1 - prob);
+  const fillX = cx + radius * Math.cos(angle);
+  const fillY = cy - radius * Math.sin(angle);
+  const fillPath = prob <= 0.5 ? `M ${leftX} ${leftY} A ${radius} ${radius} 0 0 1 ${fillX} ${fillY}` : `M ${leftX} ${leftY} A ${radius} ${radius} 0 0 1 ${topX} ${topY} A ${radius} ${radius} 0 0 1 ${fillX} ${fillY}`;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "relative", width: size, height: size / 2 + 24, margin: "0 auto" }, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: size, height: size / 2 + 24, viewBox: `0 0 ${size} ${size / 2 + 24}`, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("defs", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("pattern", { id: "phArcHatch", width: "6", height: "6", patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)", children: /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "0", y1: "0", x2: "0", y2: "6", stroke: arcColor, strokeWidth: "3", strokeOpacity: "0.25" }) }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "path",
+        {
+          d: `M ${leftX} ${leftY} A ${radius} ${radius} 0 0 1 ${topX} ${topY} A ${radius} ${radius} 0 0 1 ${rightX} ${rightY}`,
+          fill: "none",
+          stroke: "url(#phArcHatch)",
+          strokeWidth,
+          strokeLinecap: "butt"
+        }
+      ),
+      pct > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: fillPath, fill: "none", stroke: arcColor, strokeWidth, strokeLinecap: "butt" })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", left: 0, right: 0, bottom: 6, textAlign: "center" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+        fontSize: 26,
+        fontWeight: 700,
+        fontFamily: "var(--font-mono)",
+        color: arcColor,
+        lineHeight: 1
+      }, children: [
+        pct,
+        "%"
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: {
+        fontSize: 9,
+        color: "var(--color-text-tertiary)",
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        marginTop: 2
+      }, children: label })
+    ] })
+  ] });
+}
+function Btn({ children, variant = "ghost", onClick, disabled, style: style2 }) {
+  const base = {
+    padding: "6px 10px",
+    border: "none",
+    borderRadius: "var(--radius-sm)",
+    fontFamily: "var(--font-body)",
+    fontSize: "var(--text-xs)",
+    fontWeight: "var(--weight-medium)",
+    cursor: disabled ? "default" : "pointer",
+    opacity: disabled ? 0.4 : 1,
+    whiteSpace: "nowrap",
+    lineHeight: 1
+  };
+  const variants2 = {
+    primary: {
+      background: "var(--color-accent)",
+      color: "var(--color-text-inverse)",
+      fontWeight: "var(--weight-bold)"
+    },
+    ghost: {
+      background: "transparent",
+      color: "var(--color-text-secondary)",
+      border: "1px solid var(--color-border)"
+    },
+    warn: {
+      background: "var(--color-warning-bg)",
+      color: "var(--color-warning)",
+      border: "1px solid rgba(196,138,24,0.3)"
+    }
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    "button",
+    {
+      onClick: disabled ? void 0 : onClick,
+      style: { ...base, ...variants2[variant], ...style2 },
+      children
+    }
+  );
+}
+function MatchupCard({ higher, lower, higherWins, lowerWins, isUserSeries, future, done }) {
+  const higherWon = done && higherWins > lowerWins;
+  const lowerWon = done && lowerWins > higherWins;
+  const teamRow = (team, wins, isWinner, isElim, isUser) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+    display: "flex",
+    alignItems: "center",
+    padding: "6px 8px",
+    gap: 6,
+    borderBottom: "1px solid var(--color-border-subtle)"
+  }, children: [
+    isUser,
+    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: {
+      flex: 1,
+      fontSize: "var(--text-sm)",
+      color: future ? "var(--color-text-tertiary)" : isWinner ? "var(--color-accent)" : isElim ? "var(--color-text-tertiary)" : "var(--color-text)",
+      fontWeight: isWinner ? "var(--weight-semibold)" : "var(--weight-medium)",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }, children: (team == null ? void 0 : team.name) || "—" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: {
+      fontSize: "var(--text-sm)",
+      fontWeight: "var(--weight-bold)",
+      fontFamily: "var(--font-mono)",
+      width: 14,
+      textAlign: "center",
+      color: isWinner ? "var(--color-accent)" : isElim ? "var(--color-text-tertiary)" : future ? "var(--color-text-tertiary)" : "var(--color-text)"
+    }, children: future ? "—" : wins })
+  ] });
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+    background: isUserSeries ? "rgba(196,138,24,0.04)" : "var(--color-bg-raised)",
+    border: isUserSeries ? "1px solid rgba(196,138,24,0.35)" : "1px solid var(--color-border)",
+    borderRadius: "var(--radius-sm)",
+    width: 190,
+    margin: "0 10px 6px",
+    opacity: future ? 0.45 : done ? 0.78 : 1
+  }, children: [
+    teamRow(higher, higherWins, higherWon, lowerWon, false),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { borderTop: "1px solid var(--color-border-subtle)" }, children: teamRow(lower, lowerWins, lowerWon, higherWon, false) })
+  ] });
+}
+function T1Bracket({ playoffData, userTeamId }) {
+  var _a2, _b2;
+  if (!playoffData) return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { padding: 32, color: "var(--color-text-tertiary)", fontSize: "var(--text-sm)" }, children: "Championship bracket data not available." });
+  const { eastTeams = [], westTeams = [], roundResults = [], currentRound = 1 } = playoffData;
+  const getRoundSeries = (round) => {
+    if (round > roundResults.length) return null;
+    return roundResults[round - 1];
+  };
+  const r1East = eastTeams.length >= 8 ? [
+    { higher: eastTeams[0], lower: eastTeams[7], conf: "East" },
+    { higher: eastTeams[1], lower: eastTeams[6], conf: "East" },
+    { higher: eastTeams[2], lower: eastTeams[5], conf: "East" },
+    { higher: eastTeams[3], lower: eastTeams[4], conf: "East" }
+  ] : [];
+  const r1West = westTeams.length >= 8 ? [
+    { higher: westTeams[0], lower: westTeams[7], conf: "West" },
+    { higher: westTeams[1], lower: westTeams[6], conf: "West" },
+    { higher: westTeams[2], lower: westTeams[5], conf: "West" },
+    { higher: westTeams[3], lower: westTeams[4], conf: "West" }
+  ] : [];
+  const r1Results = getRoundSeries(1) || [];
+  const r2Results = getRoundSeries(2) || [];
+  const r3Results = getRoundSeries(3) || [];
+  const r4Results = getRoundSeries(4) || [];
+  const isUserSeries = (higher, lower) => (higher == null ? void 0 : higher.id) === userTeamId || (lower == null ? void 0 : lower.id) === userTeamId;
+  const seriesRecord = (results, conf, idx) => {
+    var _a3, _b3, _c, _d;
+    const s = results.filter((r) => r && r.conf === conf)[idx];
+    if (!s) return { higherWins: 0, lowerWins: 0, done: false };
+    return {
+      higherWins: ((_a3 = s.result) == null ? void 0 : _a3.higherSeedWins) ?? ((_b3 = s.result) == null ? void 0 : _b3.higherWins) ?? 0,
+      lowerWins: ((_c = s.result) == null ? void 0 : _c.lowerSeedWins) ?? ((_d = s.result) == null ? void 0 : _d.lowerWins) ?? 0,
+      done: true
+    };
+  };
+  const Arrow = ({ dir = "›" }) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 16,
+    color: "var(--color-border)",
+    fontSize: 14,
+    flexShrink: 0
+  }, children: dir });
+  const RoundCol = ({ label, children, paddingTop = 0 }) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column" }, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { ...S.label, padding: "0 10px", marginBottom: 10 }, children: label }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { paddingTop }, children })
+  ] });
+  const Spacer = ({ h }) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { height: h } });
+  const r1WestCards = r1West.map((m, i2) => {
+    const rec = r1Results.length > 0 ? seriesRecord(r1Results, "West", i2) : { higherWins: 0, lowerWins: 0, done: false };
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(React$2.Fragment, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        MatchupCard,
+        {
+          higher: m.higher,
+          lower: m.lower,
+          higherWins: rec.higherWins,
+          lowerWins: rec.lowerWins,
+          isUserSeries: isUserSeries(m.higher, m.lower),
+          future: r1Results.length === 0 && currentRound > 1,
+          done: rec.done
+        }
+      ),
+      i2 < r1West.length - 1 && /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 4 })
+    ] }, i2);
+  });
+  const r1EastCards = r1East.map((m, i2) => {
+    const rec = r1Results.length > 0 ? seriesRecord(r1Results, "East", i2) : { higherWins: 0, lowerWins: 0, done: false };
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(React$2.Fragment, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        MatchupCard,
+        {
+          higher: m.higher,
+          lower: m.lower,
+          higherWins: rec.higherWins,
+          lowerWins: rec.lowerWins,
+          isUserSeries: isUserSeries(m.higher, m.lower),
+          future: r1Results.length === 0 && currentRound > 1,
+          done: rec.done
+        }
+      ),
+      i2 < r1East.length - 1 && /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 4 })
+    ] }, i2);
+  });
+  const getWinnersFromRound = (results, conf) => {
+    if (!results.length) return [null, null];
+    return results.filter((r) => r && r.conf === conf).map((r) => {
+      var _a3;
+      return ((_a3 = r.result) == null ? void 0 : _a3.winner) || null;
+    });
+  };
+  const r2WestWinners = getWinnersFromRound(r2Results, "West");
+  const r2EastWinners = getWinnersFromRound(r2Results, "East");
+  getWinnersFromRound(r3Results, "West");
+  getWinnersFromRound(r3Results, "East");
+  const r1WestWinners = getWinnersFromRound(r1Results, "West");
+  const r1EastWinners = getWinnersFromRound(r1Results, "East");
+  const semiWestMatchups = r1WestWinners[0] ? [
+    { higher: r1WestWinners[0], lower: r1WestWinners[3] || r1WestWinners[1], conf: "West" },
+    { higher: r1WestWinners[1] || r1WestWinners[2], lower: r1WestWinners[2] || r1WestWinners[3], conf: "West" }
+  ] : [null, null];
+  const semiEastMatchups = r1EastWinners[0] ? [
+    { higher: r1EastWinners[0], lower: r1EastWinners[3] || r1EastWinners[1], conf: "East" },
+    { higher: r1EastWinners[1] || r1EastWinners[2], lower: r1EastWinners[2] || r1EastWinners[3], conf: "East" }
+  ] : [null, null];
+  const finalsWest = r2WestWinners[0] || null;
+  const finalsEast = r2EastWinners[0] || null;
+  const champion = ((_b2 = (_a2 = r4Results[0]) == null ? void 0 : _a2.result) == null ? void 0 : _b2.winner) || null;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "flex-start", gap: 0, minWidth: 860 }, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx(RoundCol, { label: "Round 1 · West", children: r1WestCards }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", flexDirection: "column", paddingTop: 26, alignItems: "center", width: 16 }, children: [0, 1, 2, 3].map((i2) => /* @__PURE__ */ jsxRuntimeExports.jsxs(React$2.Fragment, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Arrow, {}),
+      i2 < 3 && /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 62 })
+    ] }, i2)) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(RoundCol, { label: "Conf. Semis · West", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 28 }),
+      semiWestMatchups.map((m, i2) => /* @__PURE__ */ jsxRuntimeExports.jsxs(React$2.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          MatchupCard,
+          {
+            higher: (m == null ? void 0 : m.higher) || null,
+            lower: (m == null ? void 0 : m.lower) || null,
+            higherWins: m ? seriesRecord(r2Results, "West", i2).higherWins : 0,
+            lowerWins: m ? seriesRecord(r2Results, "West", i2).lowerWins : 0,
+            isUserSeries: m ? isUserSeries(m.higher, m.lower) : false,
+            future: !m || r2Results.length === 0,
+            done: m ? seriesRecord(r2Results, "West", i2).done : false
+          }
+        ),
+        i2 < 1 && /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 62 })
+      ] }, i2))
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", paddingTop: 66, alignItems: "center", width: 16 }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Arrow, {}),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 96 }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Arrow, {})
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(RoundCol, { label: "Conf. Finals · West", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 96 }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        MatchupCard,
+        {
+          higher: finalsWest || r2WestWinners[0] || null,
+          lower: r2WestWinners[1] || null,
+          higherWins: seriesRecord(r3Results, "West", 0).higherWins,
+          lowerWins: seriesRecord(r3Results, "West", 0).lowerWins,
+          isUserSeries: finalsWest ? isUserSeries(finalsWest, r2WestWinners[1]) : false,
+          future: !finalsWest,
+          done: seriesRecord(r3Results, "West", 0).done
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "0 10px",
+      paddingTop: 198,
+      gap: 6
+    }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Arrow, {}),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: {
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        color: "var(--color-tier1)",
+        background: "var(--color-tier1-bg)",
+        padding: "3px 10px",
+        borderRadius: 2
+      }, children: champion ? `${champion.name}` : "Finals" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Arrow, { dir: "‹" })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(RoundCol, { label: "Conf. Finals · East", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 96 }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        MatchupCard,
+        {
+          higher: finalsEast || r2EastWinners[0] || null,
+          lower: r2EastWinners[1] || null,
+          higherWins: seriesRecord(r3Results, "East", 0).higherWins,
+          lowerWins: seriesRecord(r3Results, "East", 0).lowerWins,
+          isUserSeries: finalsEast ? isUserSeries(finalsEast, r2EastWinners[1]) : false,
+          future: !finalsEast,
+          done: seriesRecord(r3Results, "East", 0).done
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", paddingTop: 66, alignItems: "center", width: 16 }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Arrow, { dir: "‹" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 96 }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Arrow, { dir: "‹" })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(RoundCol, { label: "Conf. Semis · East", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 28 }),
+      semiEastMatchups.map((m, i2) => /* @__PURE__ */ jsxRuntimeExports.jsxs(React$2.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          MatchupCard,
+          {
+            higher: (m == null ? void 0 : m.higher) || null,
+            lower: (m == null ? void 0 : m.lower) || null,
+            higherWins: m ? seriesRecord(r2Results, "East", i2).higherWins : 0,
+            lowerWins: m ? seriesRecord(r2Results, "East", i2).lowerWins : 0,
+            isUserSeries: m ? isUserSeries(m.higher, m.lower) : false,
+            future: !m || r2Results.length === 0,
+            done: m ? seriesRecord(r2Results, "East", i2).done : false
+          }
+        ),
+        i2 < 1 && /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 62 })
+      ] }, i2))
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", flexDirection: "column", paddingTop: 26, alignItems: "center", width: 16 }, children: [0, 1, 2, 3].map((i2) => /* @__PURE__ */ jsxRuntimeExports.jsxs(React$2.Fragment, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Arrow, { dir: "‹" }),
+      i2 < 3 && /* @__PURE__ */ jsxRuntimeExports.jsx(Spacer, { h: 62 })
+    ] }, i2)) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(RoundCol, { label: "Round 1 · East", children: r1EastCards })
+  ] });
+}
+function SimpleBracket({ label, rounds, userTeamId }) {
+  if (!rounds || rounds.length === 0) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { padding: 32, color: "var(--color-text-tertiary)", fontSize: "var(--text-sm)" }, children: [
+      label,
+      " bracket data not available."
+    ] });
+  }
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { padding: 4 }, children: rounds.map((round, ri) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginBottom: 24 }, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { ...S.label, marginBottom: 8 }, children: round.name }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 }, children: (round.series || []).map((s, si) => {
+      const higher = s.higher || s.higherSeed;
+      const lower = s.lower || s.lowerSeed;
+      const res = s.result;
+      const isUser = (higher == null ? void 0 : higher.id) === userTeamId || (lower == null ? void 0 : lower.id) === userTeamId;
+      return /* @__PURE__ */ jsxRuntimeExports.jsx(
+        MatchupCard,
+        {
+          higher,
+          lower,
+          higherWins: (res == null ? void 0 : res.higherSeedWins) ?? (res == null ? void 0 : res.higherWins) ?? 0,
+          lowerWins: (res == null ? void 0 : res.lowerSeedWins) ?? (res == null ? void 0 : res.lowerWins) ?? 0,
+          isUserSeries: isUser,
+          future: !res,
+          done: !!res
+        },
+        si
+      );
+    }) })
+  ] }, ri)) });
+}
+function PlayoffSidebar({ hubData, onSimGame, onWatch, onSimSeries, onSimToChampionship }) {
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+  const { gameState } = useGame();
+  const { userTeamId } = hubData;
+  const ctrl = (_a2 = window._getGameSimController) == null ? void 0 : _a2.call(window);
+  const pw = ctrl == null ? void 0 : ctrl._playoffWatch;
+  const cpd = ((_b2 = gameState == null ? void 0 : gameState._raw) == null ? void 0 : _b2.championshipPlayoffData) || (gameState == null ? void 0 : gameState.championshipPlayoffData);
+  const userTeam = gameState == null ? void 0 : gameState.userTeam;
+  const isUserInSeries = pw && (((_c = pw.higherSeed) == null ? void 0 : _c.id) === userTeamId || ((_d = pw.lowerSeed) == null ? void 0 : _d.id) === userTeamId);
+  const higher = pw == null ? void 0 : pw.higherSeed;
+  const lower = pw == null ? void 0 : pw.lowerSeed;
+  const higherWins = (pw == null ? void 0 : pw.higherWins) ?? 0;
+  const lowerWins = (pw == null ? void 0 : pw.lowerWins) ?? 0;
+  const bestOf = (pw == null ? void 0 : pw.bestOf) ?? 7;
+  const games = (pw == null ? void 0 : pw.games) ?? [];
+  const gamesToWin = (pw == null ? void 0 : pw.gamesToWin) ?? 4;
+  const seriesOver = higherWins >= gamesToWin || lowerWins >= gamesToWin;
+  const userIsHigher = (higher == null ? void 0 : higher.id) === userTeamId;
+  const opponent = userIsHigher ? lower : higher;
+  const userWins = userIsHigher ? higherWins : lowerWins;
+  const oppWins = userIsHigher ? lowerWins : higherWins;
+  const seriesProb = reactExports.useMemo(() => {
+    if (!userTeam || !opponent) return 0.5;
+    const avgRating = (team) => {
+      const roster = (team.roster || []).slice(0, 8);
+      if (!roster.length) return 75;
+      return roster.reduce((sum, p) => {
+        const off = p.offRating || p.rating || 75;
+        const def = p.defRating || p.rating || 75;
+        return sum + (off + def) / 2;
+      }, 0) / roster.length;
+    };
+    const delta = avgRating(userTeam) - avgRating(opponent);
+    const seriesAdj = (userWins - oppWins) * 0.05;
+    return Math.max(0.05, Math.min(0.95, 1 / (1 + Math.exp(-0.15 * delta)) + seriesAdj));
+  }, [userTeam, opponent, userWins, oppWins]);
+  const roundName = (cpd == null ? void 0 : cpd._pendingRoundName) || ((cpd == null ? void 0 : cpd.currentRound) ? `Round ${cpd.currentRound}` : "Playoffs");
+  const nextGameNum = ((pw == null ? void 0 : pw.gameNum) ?? 0) + 1;
+  const otherSeriesList = reactExports.useMemo(() => {
+    if (!(cpd == null ? void 0 : cpd.roundResults)) return [];
+    const currentRoundResults = cpd.roundResults[cpd.currentRound - 1] || [];
+    return currentRoundResults.filter((s) => s && s.result).filter((s) => {
+      var _a3, _b3;
+      const h = (_a3 = s.result) == null ? void 0 : _a3.higherSeed;
+      const l = (_b3 = s.result) == null ? void 0 : _b3.lowerSeed;
+      return (h == null ? void 0 : h.id) !== userTeamId && (l == null ? void 0 : l.id) !== userTeamId;
+    }).map((s) => {
+      var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i2;
+      return {
+        name: `${((_b3 = (_a3 = s.result) == null ? void 0 : _a3.higherSeed) == null ? void 0 : _b3.name) || "?"} vs ${((_d2 = (_c2 = s.result) == null ? void 0 : _c2.lowerSeed) == null ? void 0 : _d2.name) || "?"}`,
+        higherWins: ((_e2 = s.result) == null ? void 0 : _e2.higherSeedWins) ?? ((_f2 = s.result) == null ? void 0 : _f2.higherWins) ?? 0,
+        lowerWins: ((_g2 = s.result) == null ? void 0 : _g2.lowerSeedWins) ?? ((_h2 = s.result) == null ? void 0 : _h2.lowerWins) ?? 0,
+        winner: (_i2 = s.result) == null ? void 0 : _i2.winner,
+        conf: s.conf
+      };
+    });
+  }, [cpd, userTeamId]);
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.sidebar, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { padding: "14px 14px 12px", borderBottom: "1px solid var(--color-border)" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.label, children: isUserInSeries && !seriesOver ? "Your Series" : "Playoffs" }),
+      isUserInSeries ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "var(--text-sm)", fontWeight: 700, lineHeight: 1.25, marginBottom: 2 }, children: [
+          userTeam == null ? void 0 : userTeam.name,
+          " vs ",
+          opponent == null ? void 0 : opponent.name
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "var(--text-xs)", color: "var(--color-text-secondary)", marginBottom: 10 }, children: [
+          roundName,
+          " · Best of ",
+          bestOf
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          marginBottom: 4
+        }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: {
+            fontSize: "var(--text-xs)",
+            color: "var(--color-text-secondary)",
+            flex: 1,
+            textAlign: "right",
+            fontWeight: 600
+          }, children: ((_f = (_e = userTeam == null ? void 0 : userTeam.city) == null ? void 0 : _e.slice(0, 3)) == null ? void 0 : _f.toUpperCase()) || ((_h = (_g = userTeam == null ? void 0 : userTeam.name) == null ? void 0 : _g.slice(0, 3)) == null ? void 0 : _h.toUpperCase()) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { textAlign: "center" }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+              fontSize: 22,
+              fontWeight: 700,
+              fontFamily: "var(--font-mono)",
+              color: "var(--color-text)",
+              lineHeight: 1
+            }, children: [
+              userWins,
+              " – ",
+              oppWins
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: 9, color: "var(--color-text-tertiary)", marginTop: 1 }, children: "SERIES" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: {
+            fontSize: "var(--text-xs)",
+            color: "var(--color-text-secondary)",
+            flex: 1,
+            textAlign: "left",
+            fontWeight: 600
+          }, children: ((_j = (_i = opponent == null ? void 0 : opponent.city) == null ? void 0 : _i.slice(0, 3)) == null ? void 0 : _j.toUpperCase()) || ((_l = (_k = opponent == null ? void 0 : opponent.name) == null ? void 0 : _k.slice(0, 3)) == null ? void 0 : _l.toUpperCase()) })
+        ] }),
+        !seriesOver && /* @__PURE__ */ jsxRuntimeExports.jsx(WinProbArc, { probability: seriesProb, size: 150, label: "Series Win Prob." }),
+        seriesOver && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+          textAlign: "center",
+          padding: "10px 0 6px",
+          fontSize: "var(--text-sm)",
+          fontWeight: 700,
+          color: userWins > oppWins ? "var(--color-win)" : "var(--color-loss)"
+        }, children: [
+          userWins > oppWins ? "Series Won" : "Series Lost",
+          " · ",
+          userWins,
+          "–",
+          oppWins
+        ] }),
+        !seriesOver && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: 5, marginTop: 4 }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 4 }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(Btn, { variant: "primary", onClick: onSimGame, style: { flex: 1 }, children: [
+              "Game ",
+              nextGameNum > games.length + 1 ? "" : `${nextGameNum}`,
+              " ›"
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Btn, { variant: "ghost", onClick: onWatch, style: { flex: 1 }, children: "Watch" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Btn, { variant: "ghost", onClick: onSimSeries, style: { flex: 1 }, children: "Series" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Btn, { variant: "warn", onClick: onSimToChampionship, style: { width: "100%" }, children: "Sim to Championship" })
+        ] }),
+        seriesOver && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", flexDirection: "column", gap: 5, marginTop: 4 }, children: /* @__PURE__ */ jsxRuntimeExports.jsx(Btn, { variant: "warn", onClick: onSimToChampionship, style: { width: "100%" }, children: "Sim to Championship" }) })
+      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: {
+          fontSize: "var(--text-sm)",
+          color: "var(--color-text-secondary)",
+          marginBottom: 12,
+          lineHeight: 1.5
+        }, children: "Your team is not in the playoffs this season." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Btn, { variant: "warn", onClick: onSimToChampionship, style: { width: "100%" }, children: "Sim to Championship" })
+      ] })
+    ] }),
+    isUserInSeries && games.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { padding: "10px 14px", borderBottom: "1px solid var(--color-border)" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.label, children: "Game Log" }),
+      games.map((g, i2) => {
+        var _a3, _b3;
+        const userWon = ((_a3 = g.winner) == null ? void 0 : _a3.id) === userTeamId;
+        const homeIsUser = ((_b3 = g.homeTeam) == null ? void 0 : _b3.id) === userTeamId;
+        const userScore = homeIsUser ? g.homeScore : g.awayScore;
+        const oppScore = homeIsUser ? g.awayScore : g.homeScore;
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "4px 0",
+          borderBottom: i2 < games.length - 1 ? "1px solid var(--color-border-subtle)" : "none"
+        }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { fontSize: 10, color: "var(--color-text-tertiary)", width: 38 }, children: [
+            "Gm ",
+            g.gameNumber
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: {
+            flex: 1,
+            fontSize: 11,
+            fontWeight: 600,
+            fontFamily: "var(--font-mono)"
+          }, children: [
+            userScore,
+            " – ",
+            oppScore
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: {
+            fontSize: 10,
+            fontWeight: 700,
+            width: 14,
+            textAlign: "center",
+            color: userWon ? "var(--color-win)" : "var(--color-loss)"
+          }, children: userWon ? "W" : "L" })
+        ] }, i2);
+      }),
+      !seriesOver && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "4px 6px",
+        margin: "2px -6px 0",
+        background: "rgba(196,138,24,0.06)",
+        borderRadius: 2
+      }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { fontSize: 10, color: "var(--color-text-tertiary)", width: 38 }, children: [
+          "Gm ",
+          nextGameNum
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { flex: 1, fontSize: 11, color: "var(--color-warning)", fontWeight: 600 }, children: [
+          "Next · ",
+          ((_m = pw == null ? void 0 : pw.homePattern) == null ? void 0 : _m[pw == null ? void 0 : pw.gameNum]) === (userTeamId === (higher == null ? void 0 : higher.id)) ? "Home" : "Away"
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 12, color: "var(--color-warning)" }, children: "›" })
+      ] })
+    ] }),
+    otherSeriesList.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { padding: "10px 14px", flex: 1, overflowY: "auto" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: S.label, children: "Other Series" }),
+      otherSeriesList.map((s, i2) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "3px 0"
+      }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 11, color: "var(--color-text-secondary)" }, children: s.name }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: {
+          fontSize: 11,
+          fontWeight: 700,
+          fontFamily: "var(--font-mono)",
+          color: s.winner ? "var(--color-win)" : "var(--color-text)"
+        }, children: [
+          s.higherWins,
+          "–",
+          s.lowerWins
+        ] })
+      ] }, i2))
+    ] })
+  ] });
+}
+const TIER_LABELS = { 1: ["T1", "Championship"], 2: ["T2", "Division"], 3: ["T3", "Metro"] };
+const BADGE_COLORS = {
+  1: { bg: "var(--color-tier1-bg)", color: "var(--color-tier1)" },
+  2: { bg: "var(--color-tier2-bg)", color: "var(--color-tier2)" },
+  3: { bg: "var(--color-tier3-bg)", color: "var(--color-tier3)" }
+};
+function TierTab({ tier, active, onClick }) {
+  const [badge, label] = TIER_LABELS[tier];
+  const bc = BADGE_COLORS[tier];
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+    "button",
+    {
+      onClick,
+      style: {
+        height: 44,
+        padding: "0 16px",
+        border: "none",
+        borderBottom: active ? "2px solid var(--color-accent)" : "2px solid transparent",
+        background: "transparent",
+        fontFamily: "var(--font-body)",
+        fontSize: "var(--text-xs)",
+        fontWeight: active ? "var(--weight-semibold)" : "var(--weight-medium)",
+        color: active ? "var(--color-accent)" : "var(--color-text-secondary)",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexShrink: 0
+      },
+      children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: {
+          fontSize: 9,
+          fontWeight: 700,
+          padding: "1px 5px",
+          borderRadius: 2,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          background: bc.bg,
+          color: bc.color
+        }, children: badge }),
+        label
+      ]
+    }
+  );
+}
+function StatusBar({ cpd }) {
+  var _a2, _b2;
+  if (!cpd) return null;
+  const currentRound = cpd.currentRound || 1;
+  const roundResults = cpd.roundResults || [];
+  const seriesDone = roundResults.reduce((sum, r) => sum + (r ? r.filter(Boolean).length : 0), 0);
+  const totalSeries = 15;
+  const roundNames = ["Round 1", "Conference Semifinals", "Conference Finals", "Finals"];
+  const roundName = roundNames[currentRound - 1] || `Round ${currentRound}`;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+    background: "var(--color-bg-raised)",
+    borderBottom: "1px solid var(--color-border)",
+    padding: "0 20px",
+    height: 36,
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexShrink: 0
+  }, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: {
+      width: 5,
+      height: 5,
+      borderRadius: "50%",
+      background: "var(--color-tier1)",
+      flexShrink: 0
+    } }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { fontSize: "var(--text-xs)", fontWeight: "var(--weight-medium)" }, children: [
+      roundName,
+      " in progress"
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { fontSize: "var(--text-xs)", color: "var(--color-text-tertiary)", marginLeft: "auto" }, children: [
+      "Season ",
+      ((_b2 = (_a2 = cpd.eastTeams) == null ? void 0 : _a2[0]) == null ? void 0 : _b2.wins) !== void 0 ? "" : "",
+      seriesDone,
+      " of ",
+      totalSeries,
+      " series complete"
+    ] })
+  ] });
+}
+function PlayoffHub({ data, onClose }) {
+  var _a2;
+  const { gameState, refresh } = useGame();
+  const [activeTab, setActiveTab] = reactExports.useState((data == null ? void 0 : data.userTier) || 1);
+  const { userTeamId, onComplete, postseasonResults } = data || {};
+  const cpd = ((_a2 = gameState == null ? void 0 : gameState._raw) == null ? void 0 : _a2.championshipPlayoffData) || (gameState == null ? void 0 : gameState.championshipPlayoffData);
+  reactExports.useEffect(() => {
+    if (data == null ? void 0 : data.userTier) setActiveTab(data.userTier);
+  }, [data == null ? void 0 : data.userTier]);
+  const handleSimGame = reactExports.useCallback(() => {
+    if (window.simOnePlayoffGame) {
+      window.simOnePlayoffGame();
+    } else if (window.simRestOfPlayoffSeries) {
+      window.simRestOfPlayoffSeries();
+    }
+    refresh == null ? void 0 : refresh();
+  }, [refresh]);
+  const handleWatch = reactExports.useCallback(() => {
+    var _a3;
+    (_a3 = window.watchPlayoffGame) == null ? void 0 : _a3.call(window);
+  }, []);
+  const handleSimSeries = reactExports.useCallback(() => {
+    var _a3;
+    (_a3 = window.simRestOfPlayoffSeries) == null ? void 0 : _a3.call(window);
+    refresh == null ? void 0 : refresh();
+  }, [refresh]);
+  const handleSimToChampionship = reactExports.useCallback(() => {
+    var _a3, _b2, _c;
+    if (window.simRestOfPlayoffSeries && ((_b2 = (_a3 = window._getGameSimController) == null ? void 0 : _a3.call(window)) == null ? void 0 : _b2._playoffWatch)) {
+      window.simRestOfPlayoffSeries();
+    }
+    (_c = window.simAllChampionshipRounds) == null ? void 0 : _c.call(window);
+    refresh == null ? void 0 : refresh();
+  }, [refresh]);
+  const t2Rounds = reactExports.useMemo(() => {
+    const t2 = postseasonResults == null ? void 0 : postseasonResults.t2;
+    if (!(t2 == null ? void 0 : t2.rounds)) return [];
+    return t2.rounds.map((round, i2) => ({
+      name: `Round ${i2 + 1}`,
+      series: round.map((s) => ({
+        higher: s.higher || s.higherSeed,
+        lower: s.lower || s.lowerSeed,
+        result: s.result || s
+      }))
+    }));
+  }, [postseasonResults]);
+  const t3Rounds = reactExports.useMemo(() => {
+    const t3 = postseasonResults == null ? void 0 : postseasonResults.t3;
+    if (!(t3 == null ? void 0 : t3.rounds)) return [];
+    return t3.rounds.map((round, i2) => ({
+      name: `Round ${i2 + 1}`,
+      series: round.map((s) => ({
+        higher: s.higher || s.higherSeed,
+        lower: s.lower || s.lowerSeed,
+        result: s.result || s
+      }))
+    }));
+  }, [postseasonResults]);
+  if (!data) return null;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+    display: "flex",
+    flex: 1,
+    overflow: "hidden",
+    minHeight: 0
+  }, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      PlayoffSidebar,
+      {
+        hubData: data,
+        onSimGame: handleSimGame,
+        onWatch: handleWatch,
+        onSimSeries: handleSimSeries,
+        onSimToChampionship: handleSimToChampionship
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: S.content, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+        background: "var(--color-bg-raised)",
+        borderBottom: "1px solid var(--color-border)",
+        padding: "0 20px",
+        height: 44,
+        display: "flex",
+        alignItems: "center",
+        gap: 0,
+        flexShrink: 0
+      }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: {
+          fontSize: "var(--text-sm)",
+          fontWeight: "var(--weight-bold)",
+          marginRight: 16,
+          paddingRight: 16,
+          borderRight: "1px solid var(--color-border)"
+        }, children: "Playoffs" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(TierTab, { tier: 1, active: activeTab === 1, onClick: () => setActiveTab(1) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(TierTab, { tier: 2, active: activeTab === 2, onClick: () => setActiveTab(2) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(TierTab, { tier: 3, active: activeTab === 3, onClick: () => setActiveTab(3) })
+      ] }),
+      activeTab === 1 && /* @__PURE__ */ jsxRuntimeExports.jsx(StatusBar, { cpd }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { flex: 1, overflow: "auto", padding: "16px 20px" }, children: [
+        activeTab === 1 && /* @__PURE__ */ jsxRuntimeExports.jsx(T1Bracket, { playoffData: cpd, userTeamId }),
+        activeTab === 2 && /* @__PURE__ */ jsxRuntimeExports.jsx(
+          SimpleBracket,
+          {
+            label: "Division",
+            rounds: t2Rounds,
+            userTeamId
+          }
+        ),
+        activeTab === 3 && /* @__PURE__ */ jsxRuntimeExports.jsx(
+          SimpleBracket,
+          {
+            label: "Metro",
+            rounds: t3Rounds,
+            userTeamId
+          }
+        )
+      ] })
+    ] })
+  ] });
+}
 function AppContent() {
   var _a2;
   const { isReady, gameState, refresh } = useGame();
@@ -29260,6 +30099,7 @@ function AppContent() {
   const [draftPickData, setDraftPickData] = reactExports.useState(null);
   const [watchGameData, setWatchGameData] = reactExports.useState(null);
   const [breakingNewsData, setBreakingNewsData] = reactExports.useState(null);
+  const [playoffHubData, setPlayoffHubData] = reactExports.useState(null);
   reactExports.useEffect(() => {
     if (isReady && (gameState == null ? void 0 : gameState.userTeam)) {
       const gc = document.getElementById("gameContainer");
@@ -29333,6 +30173,13 @@ function AppContent() {
     window._reactShowBreakingNews = (data, resolve) => {
       setBreakingNewsData({ ...data, _resolve: resolve });
     };
+    window._reactShowPlayoffHub = (data) => setPlayoffHubData({ ...data });
+    window._reactClosePlayoffHub = () => setPlayoffHubData(null);
+    window._getGameSimController = () => {
+      var _a3, _b2;
+      const bridge = window._gameBridge;
+      return ((_b2 = (_a3 = bridge == null ? void 0 : bridge.helpers) == null ? void 0 : _a3.getGameSimController) == null ? void 0 : _b2.call(_a3)) || null;
+    };
     return () => {
       window.removeEventListener("reactShowPostGame", handlePostGame);
       window.removeEventListener("reactShowBoxScore", handleBoxScore);
@@ -29380,6 +30227,9 @@ function AppContent() {
       delete window._reactCloseWatchGame;
       delete window._reactNavigate;
       delete window._reactShowBreakingNews;
+      delete window._reactShowPlayoffHub;
+      delete window._reactClosePlayoffHub;
+      delete window._getGameSimController;
     };
   }, []);
   const handlePostGameBoxScore = reactExports.useCallback(() => {
@@ -29433,10 +30283,20 @@ function AppContent() {
   }, children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(TopBar, {}),
     /* @__PURE__ */ jsxRuntimeExports.jsx(OffseasonTracker, {}),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flex: 1 }, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", flex: 1, overflow: "hidden" }, children: playoffHubData ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+      PlayoffHub,
+      {
+        data: playoffHubData,
+        onClose: () => {
+          var _a3;
+          setPlayoffHubData(null);
+          (_a3 = playoffHubData == null ? void 0 : playoffHubData.onComplete) == null ? void 0 : _a3.call(playoffHubData);
+        }
+      }
+    ) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(Sidebar, { activeScreen, onNavigate: setActiveScreen }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("main", { style: { flex: 1, minWidth: 0, overflow: "auto" }, children: screens[activeScreen] || screens.dashboard })
-    ] }),
+    ] }) }),
     /* @__PURE__ */ jsxRuntimeExports.jsx(
       PostGameModal,
       {

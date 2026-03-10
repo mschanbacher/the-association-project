@@ -6,10 +6,12 @@ export default defineConfig({
   plugins: [react(), viteSingleFile()],
   build: {
     outDir: 'dist',
+    emptyOutDir: true,
     // Inline all assets into a single HTML file
     assetsInlineLimit: Infinity,
     cssCodeSplit: false,
     rollupOptions: {
+      input: 'index.html',
       output: {
         // Single chunk
         manualChunks: undefined,
@@ -17,7 +19,6 @@ export default defineConfig({
       }
     },
     // Don't minify during development for easier debugging
-    // Change to true for release builds
     minify: false,
   },
   // Dev server config

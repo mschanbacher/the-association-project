@@ -3,6 +3,101 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import './styles/design-system.css';
 
+// ═══════════════════════════════════════════════════════════════════
+// Import ALL modules from main.js and expose on window
+// This ensures Vite bundles them and _initGame can access them
+// ═══════════════════════════════════════════════════════════════════
+import {
+  PlayerAttributes,
+  CoachEngine,
+  GameState,
+  FinanceEngine, METRO_POPULATIONS, getMetroPopulation, populationToMarketSize,
+  GameEngine,
+  GamePipeline,
+  CalendarEngine,
+  EventBus, GameEvents, eventBus,
+  StorageEngine,
+  UIRenderer,
+  ChemistryEngine,
+  InjuryEngine,
+  FatigueEngine,
+  SalaryCapEngine,
+  PlayerDevelopmentEngine,
+  LeagueManager,
+  DivisionManager, CITY_TO_DIVISIONS,
+  StatEngine,
+  TeamFactory,
+  DraftEngine,
+  TradeEngine,
+  FreeAgencyEngine,
+  PlayoffEngine,
+  GMMode,
+  ScoutingEngine,
+  OwnerEngine,
+  UIHelpers,
+  BasketballMath,
+  // Controllers
+  SimulationController,
+  GameSimController,
+  OffseasonController,
+  DashboardController,
+  RosterController,
+  TradeController,
+  DraftController,
+  FreeAgencyController,
+  FinanceController,
+  CoachManagementController,
+  SaveLoadController,
+} from '../main.js';
+
+// Expose all modules on window for _initGame to access
+Object.assign(window, {
+  PlayerAttributes,
+  CoachEngine,
+  GameState,
+  FinanceEngine, METRO_POPULATIONS, getMetroPopulation, populationToMarketSize,
+  GameEngine,
+  GamePipeline,
+  CalendarEngine,
+  EventBus, GameEvents, eventBus,
+  StorageEngine,
+  UIRenderer,
+  ChemistryEngine,
+  InjuryEngine,
+  FatigueEngine,
+  SalaryCapEngine,
+  PlayerDevelopmentEngine,
+  LeagueManager,
+  DivisionManager,
+  _CTD: CITY_TO_DIVISIONS,
+  getFatiguePenalty: (fatigue) => FatigueEngine.getPenalty(fatigue),
+  StatEngine,
+  TeamFactory,
+  DraftEngine,
+  TradeEngine,
+  FreeAgencyEngine,
+  PlayoffEngine,
+  GMMode,
+  ScoutingEngine,
+  OwnerEngine,
+  UIHelpers,
+  BasketballMath,
+  // Controllers
+  SimulationController,
+  GameSimController,
+  OffseasonController,
+  DashboardController,
+  RosterController,
+  TradeController,
+  DraftController,
+  FreeAgencyController,
+  FinanceController,
+  CoachManagementController,
+  SaveLoadController,
+});
+
+console.log('🏀 Modules loaded via Vite bundle');
+
 /**
  * Mount the React app into #react-root.
  * Called after the existing game code has initialized.
@@ -22,5 +117,10 @@ export function mountReactApp() {
   return reactRoot;
 }
 
-// Auto-mount when module loads
-mountReactApp();
+// Initialize: load storage, then mount React, then init game
+StorageEngine.init().then(() => {
+  mountReactApp();
+  if (typeof window._initGame === 'function') {
+    window._initGame();
+  }
+});

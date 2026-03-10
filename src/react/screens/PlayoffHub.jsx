@@ -116,9 +116,11 @@ function PlayoffSidebar({
   onSimGame, onWatch, onSimSeries, onSimToChampionship,
   // New props for eliminated users
   userInPlayoffs, userEliminated, onSimDay, onSimRound,
+  // Playoffs complete
+  playoffsComplete, onViewResults,
 }) {
-  const showActiveControls = isUserInSeries && !seriesOver;
-  const showEliminatedControls = !userInPlayoffs || userEliminated;
+  const showActiveControls = isUserInSeries && !seriesOver && !playoffsComplete;
+  const showEliminatedControls = (!userInPlayoffs || userEliminated) && !playoffsComplete;
   
   return (
     <div style={{
@@ -216,7 +218,7 @@ function PlayoffSidebar({
       )}
 
       {/* Controls - User won series, waiting for next round */}
-      {seriesOver && userWins > oppWins && !showEliminatedControls && (
+      {seriesOver && userWins > oppWins && !showEliminatedControls && !playoffsComplete && (
         <SbSection>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8, textAlign: 'center' }}>
             Waiting for next round...
@@ -227,6 +229,23 @@ function PlayoffSidebar({
           </div>
           <Btn variant="sim" onClick={onSimToChampionship} style={{ width: '100%', flex: 'none', padding: '7px 0' }}>
             Sim to Championship ›
+          </Btn>
+        </SbSection>
+      )}
+
+      {/* Playoffs Complete - View Results */}
+      {playoffsComplete && (
+        <SbSection>
+          <div style={{ textAlign: 'center', padding: '8px 0', marginBottom: 8 }}>
+            <div style={{ fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', color: 'var(--color-text-tertiary)', marginBottom: 6 }}>
+              PLAYOFFS COMPLETE
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+              All series have concluded
+            </div>
+          </div>
+          <Btn variant="primary" onClick={onViewResults} style={{ width: '100%', padding: '10px 0' }}>
+            View Results →
           </Btn>
         </SbSection>
       )}
@@ -780,6 +799,192 @@ export function PlayoffHub({ data, onClose }) {
     setTimeout(() => refresh?.(), 100);
   }, [refresh]);
 
+  const handleViewResults = useCallback(() => {
+    console.log('📊 View Results clicked');
+    
+    // Build data for PlayoffEndModal
+    const gs = gameState?._raw || window.gameState;
+    const postseason = gs?.postseasonResults;
+    
+    // Get user result
+    const getUserPlayoffResult = () => {
+      if (!liveUserInPlayoffs) {
+        return { round: 'Did not qualify', eliminated: true };
+      }
+      
+      // Check if user won championship
+      const t1Champion = postseason?.t1?.champion;
+      if (t1Champion?.id === userTeamId) {
+        return { isChampion: true, round: 'Finals' };
+      }
+      
+      // Find what round user was eliminated
+      const schedule = gs?.playoffSchedule;
+      if (!schedule?.bySeries) return { round: 'Unknown', eliminated: true };
+      
+      // Find user's series and determine outcome
+      for (const [seriesId, games] of Object.entries(schedule.bySeries)) {
+        const firstGame = games[0];
+        if (!firstGame) continue;
+        
+        const userInSeries = firstGame.higherSeedId === userTeamId || firstGame.lowerSeedId === userTeamId;
+        if (!userInSeries) continue;
+        
+        // Check if series is complete and user lost
+        let userWins = 0, oppWins = 0;
+        for (const g of games) {
+          if (g.played && g.result?.winner) {
+            if (g.result.winner.id === userTeamId) userWins++;
+            else oppWins++;
+          }
+        }
+        
+        const bestOf = firstGame.bestOf || 7;
+        const winsNeeded = Math.ceil(bestOf / 2);
+        
+        if (oppWins >= winsNeeded) {
+          const opponent = firstGame.higherSeedId === userTeamId 
+            ? (firstGame.awayTeam || firstGame.lowerSeed)
+            : (firstGame.homeTeam || firstGame.higherSeed);
+          return {
+            round: firstGame.round || 'Playoffs',
+            eliminated: true,
+            record: `${userWins}-${oppWins}`,
+            opponent: opponent?.name || 'Unknown'
+          };
+        }
+      }
+      
+      return { round: 'Unknown', eliminated: true };
+    };
+    
+    // Calculate playoff records for champions
+    const getPlayoffRecord = (tier) => {
+      const schedule = gs?.playoffSchedule;
+      const champion = postseason?.[`t${tier}`]?.champion;
+      if (!schedule?.games || !champion) return null;
+      
+      let wins = 0, losses = 0;
+      for (const game of schedule.games) {
+        if (game.tier !== tier || !game.played || !game.result) continue;
+        if (game.result.winner?.id === champion.id) wins++;
+        else if (game.homeTeamId === champion.id || game.awayTeamId === champion.id) losses++;
+      }
+      return `${wins}-${losses}`;
+    };
+    
+    // Get awards from gameState (should be calculated at season end)
+    const getAwards = (tier) => {
+      const awards = gs?.[`tier${tier}Awards`] || {};
+      return {
+        mvp: awards.mvp ? {
+          name: awards.mvp.name,
+          team: awards.mvp.teamName || 'Unknown',
+          stats: formatPlayerStats(awards.mvp)
+        } : null,
+        dpoy: awards.dpoy ? {
+          name: awards.dpoy.name,
+          team: awards.dpoy.teamName || 'Unknown',
+          stats: formatDefStats(awards.dpoy)
+        } : null,
+        roy: awards.roy ? {
+          name: awards.roy.name,
+          team: awards.roy.teamName || 'Unknown',
+          stats: formatPlayerStats(awards.roy)
+        } : null,
+        sixthMan: awards.sixthMan ? {
+          name: awards.sixthMan.name,
+          team: awards.sixthMan.teamName || 'Unknown',
+          stats: formatPlayerStats(awards.sixthMan)
+        } : null,
+        mostImproved: awards.mostImproved ? {
+          name: awards.mostImproved.name,
+          team: awards.mostImproved.teamName || 'Unknown',
+          stats: awards.mostImproved.improvement ? `+${awards.mostImproved.improvement.toFixed(1)} PPG` : ''
+        } : null,
+        allLeagueFirst: (awards.allLeagueFirst || []).map(p => ({
+          name: p.name,
+          team: p.teamAbbrev || p.teamName?.slice(0, 3).toUpperCase() || '',
+          position: p.position || p.pos || '—'
+        })),
+        allLeagueSecond: (awards.allLeagueSecond || []).map(p => ({
+          name: p.name,
+          team: p.teamAbbrev || p.teamName?.slice(0, 3).toUpperCase() || '',
+          position: p.position || p.pos || '—'
+        })),
+      };
+    };
+    
+    const formatPlayerStats = (player) => {
+      if (!player?.seasonStats) return '';
+      const s = player.seasonStats;
+      const gp = s.gamesPlayed || 1;
+      const ppg = (s.points / gp).toFixed(1);
+      const rpg = (s.rebounds / gp).toFixed(1);
+      const apg = (s.assists / gp).toFixed(1);
+      return `${ppg} PPG · ${rpg} RPG · ${apg} APG`;
+    };
+    
+    const formatDefStats = (player) => {
+      if (!player?.seasonStats) return '';
+      const s = player.seasonStats;
+      const gp = s.gamesPlayed || 1;
+      const bpg = (s.blocks / gp).toFixed(1);
+      const spg = (s.steals / gp).toFixed(1);
+      return `${bpg} BPG · ${spg} SPG`;
+    };
+    
+    const modalData = {
+      season: gs?.currentSeason || gs?.season || '—',
+      userTeam: userTeam,
+      userResult: getUserPlayoffResult(),
+      champions: {
+        t1: postseason?.t1?.champion ? { ...postseason.t1.champion, playoffRecord: getPlayoffRecord(1) } : null,
+        t2: postseason?.t2?.champion ? { ...postseason.t2.champion, playoffRecord: getPlayoffRecord(2) } : null,
+        t3: postseason?.t3?.champion ? { ...postseason.t3.champion, playoffRecord: getPlayoffRecord(3) } : null,
+      },
+      awards: {
+        t1: getAwards(1),
+        t2: getAwards(2),
+        t3: getAwards(3),
+      },
+      promoted: {
+        toT1: (postseason?.promoted?.toT1 || []).map((t, i) => ({
+          name: t.name,
+          reason: i === 0 ? 'T2 Champion' : i === 1 ? 'Runner-Up' : 'Best Record'
+        })),
+        toT2: (postseason?.promoted?.toT2 || []).map((t, i) => ({
+          name: t.name,
+          reason: i === 0 ? 'T3 Champion' : i === 1 ? 'Runner-Up' : '3rd Place'
+        })),
+      },
+      relegated: {
+        fromT1: (postseason?.relegated?.fromT1 || []).map(t => ({
+          name: t.name,
+          wins: t.wins,
+          losses: t.losses
+        })),
+        fromT2: (postseason?.relegated?.fromT2 || []).map(t => ({
+          name: t.name,
+          wins: t.wins,
+          losses: t.losses
+        })),
+      },
+    };
+    
+    // Set up callback for when user clicks "Begin Offseason"
+    window._playoffEndContinueCallback = () => {
+      // Close PlayoffHub and trigger offseason
+      if (window._reactClosePlayoffHub) window._reactClosePlayoffHub();
+      const offseasonCtrl = window._getGameSimController?.()?.ctx?.helpers?.getOffseasonController?.();
+      if (offseasonCtrl) {
+        offseasonCtrl.continueAfterPostseason();
+      }
+    };
+    
+    window._reactShowPlayoffEnd?.(modalData);
+  }, [gameState, userTeam, userTeamId, liveUserInPlayoffs]);
+
   if (!data) return null;
 
   const tierCtx = { 1: 'T1 · 30 teams · Conference format', 2: 'T2 · 86 teams · Single bracket', 3: 'T3 · 144 teams · Single bracket' };
@@ -816,6 +1021,9 @@ export function PlayoffHub({ data, onClose }) {
         userEliminated={userSeriesState.complete && userSeriesState.winner?.id !== userTeamId}
         onSimDay={handleSimDay}
         onSimRound={handleSimRound}
+        // Playoffs complete
+        playoffsComplete={livePlayoffData?.completed}
+        onViewResults={handleViewResults}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Top bar */}

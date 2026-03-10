@@ -41,6 +41,7 @@ import { UserDraftPickModal } from './screens/UserDraftPickModal.jsx';
 import { WatchGameModal } from './screens/WatchGameModal.jsx';
 import { BreakingNewsModal } from './screens/BreakingNewsModal.jsx';
 import { PlayoffHub } from './screens/PlayoffHub.jsx';
+import { PlayoffEndModal } from './screens/PlayoffEndModal.jsx';
 
 function AppContent() {
   const { isReady, gameState, refresh } = useGame();
@@ -78,6 +79,7 @@ function AppContent() {
   const [watchGameData, setWatchGameData] = useState(null);
   const [breakingNewsData, setBreakingNewsData] = useState(null);
   const [playoffHubData, setPlayoffHubData] = useState(null);
+  const [playoffEndData, setPlayoffEndData] = useState(null);
 
   // Hide the legacy game container elements once React takes over
   useEffect(() => {
@@ -164,6 +166,8 @@ function AppContent() {
       setPlayoffHubData({ ...data });
     };
     window._reactClosePlayoffHub = () => setPlayoffHubData(null);
+    window._reactShowPlayoffEnd = (data) => setPlayoffEndData({ ...data });
+    window._reactClosePlayoffEnd = () => setPlayoffEndData(null);
     // Bridge to access GameSimController from React components
     window._getGameSimController = () => {
       const bridge = window._gameBridge;
@@ -219,6 +223,8 @@ function AppContent() {
       delete window._reactShowBreakingNews;
       delete window._reactShowPlayoffHub;
       delete window._reactClosePlayoffHub;
+      delete window._reactShowPlayoffEnd;
+      delete window._reactClosePlayoffEnd;
       delete window._getGameSimController;
     };
   }, []);
@@ -495,6 +501,14 @@ function AppContent() {
           const resolve = breakingNewsData?._resolve;
           setBreakingNewsData(null);
           if (resolve) resolve();
+        }}
+      />
+      <PlayoffEndModal
+        isOpen={!!playoffEndData}
+        data={playoffEndData}
+        onBeginOffseason={() => {
+          setPlayoffEndData(null);
+          window._playoffEndContinueCallback?.();
         }}
       />
     </div>

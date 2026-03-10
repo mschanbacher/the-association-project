@@ -3057,17 +3057,16 @@ export class GameSimController {
         // Build postseasonResults for offseason flow compatibility
         this._buildPostseasonResults();
         
+        // Mark playoffs as completed
+        gameState.playoffData.completed = true;
+        
         helpers.saveGameState();
         if (window._reactPlayoffHubRefresh) window._reactPlayoffHubRefresh();
         
-        // Directly trigger offseason transition
-        console.log('🏁 Playoffs complete - triggering offseason transition');
-        const offseasonCtrl = helpers.getOffseasonController?.();
-        if (offseasonCtrl) {
-            // Close PlayoffHub and continue to offseason
-            if (window._reactClosePlayoffHub) window._reactClosePlayoffHub();
-            offseasonCtrl.continueAfterPostseason();
-        }
+        // Don't immediately trigger offseason - let user view results first
+        // The PlayoffHub will show "View Results" button which opens PlayoffEndModal
+        // When user clicks "Begin Offseason" in that modal, it will trigger offseason
+        console.log('🏁 Playoffs complete - View Results button will appear in PlayoffHub');
     }
 
     /**

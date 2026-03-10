@@ -2842,8 +2842,15 @@ export class GameSimController {
             return;
         }
         
-        // Find the next date with games to play
-        const nextDate = engines.PlayoffEngine.getNextPlayoffGameDate(schedule, gameState.currentDate);
+        console.log('🏀 simPlayoffDay called, currentDate:', gameState.currentDate);
+        
+        // Find the next date with games to play (on or after current date)
+        // Pass a date one day before current to include current date in search
+        const searchFrom = engines.PlayoffEngine._addDays(gameState.currentDate, -1);
+        const nextDate = engines.PlayoffEngine.getNextPlayoffGameDate(schedule, searchFrom);
+        
+        console.log('🏀 Next playoff game date:', nextDate);
+        
         if (!nextDate) {
             console.log('✅ All playoff games complete');
             this._checkPlayoffsComplete();
@@ -2852,7 +2859,16 @@ export class GameSimController {
         
         // Get all necessary games on this date
         const gamesToday = engines.PlayoffEngine.getPlayoffGamesOnDate(schedule, nextDate);
-        console.log(`🏀 Simulating ${gamesToday.length} playoff games on ${nextDate}`);
+        console.log(`🏀 Found ${gamesToday.length} games on ${nextDate}:`, gamesToday.map(g => g.id));
+        
+        if (gamesToday.length === 0) {
+            console.log('⚠️ No necessary games found on', nextDate);
+            // Try advancing to find next date with actual games
+            gameState.currentDate = engines.PlayoffEngine._addDays(nextDate, 1);
+            helpers.saveGameState();
+            if (window._reactPlayoffHubRefresh) window._reactPlayoffHubRefresh();
+            return;
+        }
         
         for (const game of gamesToday) {
             this._simOneScheduledGame(game);
@@ -3423,38 +3439,139 @@ export class GameSimController {
             return state.complete ? state.winner : null;
         };
         
+        const getRunnerUp = (tier) => {
+            const finalsId = `t${tier}-finals`;
+            const state = engines.PlayoffEngine.getSeriesState(schedule, finalsId);
+            return state.complete ? state.loser : null;
+        };
+        
+        const getThirdPlace = (tier) => {
+            const thirdId = `t${tier}-3rd-place`;
+            const state = engines.PlayoffEngine.getSeriesState(schedule, thirdId);
+            return state.complete ? state.winner : null;
+        };
+        
+        const getThirdPlaceLoser = (tier) => {
+            const thirdId = `t${tier}-3rd-place`;
+            const state = engines.PlayoffEngine.getSeriesState(schedule, thirdId);
+            return state.complete ? state.loser : null;
+        };
+        
         const t1Champion = getChampion(1);
         const t2Champion = getChampion(2);
         const t3Champion = getChampion(3);
         
-        // Build results structure compatible with offseason flow
-        gameState.postseasonResults = {
+        // Build basic results structure
+        const results = {
             t1: {
                 champion: t1Champion,
-                runnerUp: t1Champion ? engines.PlayoffEngine.getSeriesState(schedule, 't1-finals').loser : null,
+                runnerUp: getRunnerUp(1),
                 completed: !!t1Champion
             },
             t2: {
                 champion: t2Champion,
-                runnerUp: t2Champion ? engines.PlayoffEngine.getSeriesState(schedule, 't2-finals').loser : null,
-                thirdPlaceWinner: engines.PlayoffEngine.getSeriesState(schedule, 't2-3rd-place').winner,
+                runnerUp: getRunnerUp(2),
+                thirdPlaceWinner: getThirdPlace(2),
+                thirdPlaceLoser: getThirdPlaceLoser(2),
                 completed: !!t2Champion
             },
             t3: {
                 champion: t3Champion,
-                runnerUp: t3Champion ? engines.PlayoffEngine.getSeriesState(schedule, 't3-finals').loser : null,
-                thirdPlaceWinner: engines.PlayoffEngine.getSeriesState(schedule, 't3-3rd-place').winner,
+                runnerUp: getRunnerUp(3),
+                thirdPlaceWinner: getThirdPlace(3),
+                thirdPlaceLoser: getThirdPlaceLoser(3),
                 completed: !!t3Champion
             },
-            // Promotion/relegation will be calculated in offseason flow
             promoted: { toT1: [], toT2: [] },
             relegated: { fromT1: [], fromT2: [] }
         };
         
+        // Calculate promotion (T2 → T1)
+        // T2 promotion: champion, runner-up, 3rd place winner (or best record if not in top 3)
+        if (t2Champion) {
+            const t2Sorted = [...gameState.tier2Teams].sort((a, b) => {
+                if (b.wins !== a.wins) return b.wins - a.wins;
+                return b.pointDiff - a.pointDiff;
+            });
+            const bestRecord = t2Sorted[0];
+            
+            const promoted = [];
+            // Best regular season record always promoted
+            promoted.push(bestRecord);
+            
+            // Champion if different from best record
+            if (t2Champion.id !== bestRecord.id) {
+                promoted.push(t2Champion);
+            }
+            
+            // Fill remaining from playoff finishers
+            const finishOrder = [
+                t2Champion,
+                results.t2.runnerUp,
+                results.t2.thirdPlaceWinner,
+                results.t2.thirdPlaceLoser
+            ].filter(t => t != null);
+            
+            for (const team of finishOrder) {
+                if (promoted.length >= 3) break;
+                if (!promoted.find(p => p.id === team.id)) {
+                    promoted.push(team);
+                }
+            }
+            
+            // Fallback to regular season if needed
+            while (promoted.length < 3) {
+                for (const team of t2Sorted) {
+                    if (!promoted.find(p => p.id === team.id)) {
+                        promoted.push(team);
+                        break;
+                    }
+                }
+            }
+            
+            results.promoted.toT1 = promoted;
+        }
+        
+        // Calculate promotion (T3 → T2)
+        // T3 promotion: champion, runner-up, 3rd place winner
+        if (t3Champion) {
+            const promoted = [];
+            if (t3Champion) promoted.push(t3Champion);
+            if (results.t3.runnerUp) promoted.push(results.t3.runnerUp);
+            if (results.t3.thirdPlaceWinner) promoted.push(results.t3.thirdPlaceWinner);
+            results.promoted.toT2 = promoted;
+        }
+        
+        // Calculate relegation (T1 → T2)
+        // Bottom 3 teams by regular season record
+        if (gameState.tier1Teams) {
+            const t1Sorted = [...gameState.tier1Teams].sort((a, b) => {
+                if (a.wins !== b.wins) return a.wins - b.wins; // Worst first
+                return a.pointDiff - b.pointDiff;
+            });
+            results.relegated.fromT1 = t1Sorted.slice(0, 3);
+        }
+        
+        // Calculate relegation (T2 → T3)
+        // Bottom 3 teams by regular season record
+        if (gameState.tier2Teams) {
+            const t2Sorted = [...gameState.tier2Teams].sort((a, b) => {
+                if (a.wins !== b.wins) return a.wins - b.wins; // Worst first
+                return a.pointDiff - b.pointDiff;
+            });
+            results.relegated.fromT2 = t2Sorted.slice(0, 3);
+        }
+        
+        gameState.postseasonResults = results;
+        
         console.log('📊 Built postseasonResults:', {
             t1Champion: t1Champion?.name,
             t2Champion: t2Champion?.name,
-            t3Champion: t3Champion?.name
+            t3Champion: t3Champion?.name,
+            promotedToT1: results.promoted.toT1.map(t => t.name),
+            promotedToT2: results.promoted.toT2.map(t => t.name),
+            relegatedFromT1: results.relegated.fromT1.map(t => t.name),
+            relegatedFromT2: results.relegated.fromT2.map(t => t.name)
         });
     }
 

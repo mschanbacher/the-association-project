@@ -588,6 +588,10 @@ export function PlayoffHub({ data, onClose }) {
   const liveUserInPlayoffs = gameState?._raw?.userInPlayoffs ?? gameState?.userInPlayoffs ?? propsUserInPlayoffs;
   const liveUserSeriesId = gameState?._raw?.userSeriesId || gameState?.userSeriesId || propsUserSeriesId;
 
+  // Debug: count played games in user's series
+  const debugUserSeriesGames = livePlayoffSchedule?.bySeries?.[liveUserSeriesId] || [];
+  const debugPlayedCount = debugUserSeriesGames.filter(g => g.played).length;
+
   console.log('═══════════════════════════════════════════════════════════');
   console.log('🏀 PlayoffHub RENDER');
   console.log('🏀 userTeamId:', userTeamId);
@@ -597,6 +601,8 @@ export function PlayoffHub({ data, onClose }) {
   console.log('🏀 currentDate:', liveCurrentDate);
   console.log('🏀 playoffData:', livePlayoffData ? 'EXISTS' : 'NULL');
   console.log('🏀 playoffSchedule:', livePlayoffSchedule ? `${livePlayoffSchedule.games?.length} games` : 'NULL');
+  console.log('🏀 DEBUG userSeries played games:', debugPlayedCount, '/', debugUserSeriesGames.length);
+  console.log('🏀 DEBUG gameState source:', gameState?._raw?.playoffSchedule ? '_raw' : gameState?.playoffSchedule ? 'snapshot' : 'props');
   console.log('═══════════════════════════════════════════════════════════');
 
   // User's team object

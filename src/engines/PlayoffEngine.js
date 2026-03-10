@@ -1150,12 +1150,19 @@ export class PlayoffEngine {
         const seriesGames = playoffSchedule.bySeries[seriesId] || [];
         const playedGames = seriesGames.filter(g => g.played);
         
-        if (playedGames.length === 0) {
+        // Get bestOf from first game in series (even if not played yet)
+        const firstGame = seriesGames[0];
+        const bestOf = firstGame?.bestOf || 7;
+        const winsNeeded = Math.ceil(bestOf / 2);
+        
+        if (seriesGames.length === 0) {
             return {
                 seriesId,
                 gamesPlayed: 0,
                 higherSeedWins: 0,
                 lowerSeedWins: 0,
+                bestOf,
+                winsNeeded,
                 leader: null,
                 complete: false,
                 winner: null,
@@ -1163,11 +1170,8 @@ export class PlayoffEngine {
             };
         }
         
-        const firstGame = seriesGames[0];
         const higherSeedId = firstGame.higherSeedId;
         const lowerSeedId = firstGame.lowerSeedId;
-        const bestOf = firstGame.bestOf;
-        const winsNeeded = Math.ceil(bestOf / 2);
         
         let higherSeedWins = 0;
         let lowerSeedWins = 0;

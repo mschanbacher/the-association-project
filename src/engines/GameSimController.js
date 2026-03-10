@@ -3023,12 +3023,13 @@ export class GameSimController {
         console.log('🏆 Simulating all remaining playoff games...');
         
         let iterations = 0;
+        let gamesSimmed = 0;
         while (iterations < 1000) { // Safety limit
             iterations++;
             
             const nextDate = engines.PlayoffEngine.getNextPlayoffGameDate(schedule, null);
             if (!nextDate) {
-                console.log('✅ All playoff games complete');
+                console.log(`✅ All playoff games complete after ${gamesSimmed} games`);
                 break;
             }
             
@@ -3041,6 +3042,7 @@ export class GameSimController {
             
             for (const game of gamesToday) {
                 this._simOneScheduledGame(game);
+                gamesSimmed++;
             }
             
             gameState.currentDate = nextDate;
@@ -3058,8 +3060,14 @@ export class GameSimController {
         helpers.saveGameState();
         if (window._reactPlayoffHubRefresh) window._reactPlayoffHubRefresh();
         
-        // Trigger completion callback
-        this._checkPlayoffsComplete();
+        // Directly trigger offseason transition
+        console.log('🏁 Playoffs complete - triggering offseason transition');
+        const offseasonCtrl = helpers.getOffseasonController?.();
+        if (offseasonCtrl) {
+            // Close PlayoffHub and continue to offseason
+            if (window._reactClosePlayoffHub) window._reactClosePlayoffHub();
+            offseasonCtrl.continueAfterPostseason();
+        }
     }
 
     /**

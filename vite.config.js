@@ -1,17 +1,22 @@
 import { defineConfig } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export default defineConfig({
   plugins: [react(), viteSingleFile()],
+  root: resolve(__dirname, 'src'),
   build: {
-    outDir: 'dist',
+    outDir: resolve(__dirname, 'dist'),
     emptyOutDir: true,
     // Inline all assets into a single HTML file
     assetsInlineLimit: Infinity,
     cssCodeSplit: false,
     rollupOptions: {
-      input: 'index.html',
       output: {
         // Single chunk
         manualChunks: undefined,

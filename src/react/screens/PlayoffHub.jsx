@@ -873,65 +873,63 @@ export function PlayoffHub({ data, onClose }) {
       return `${wins}-${losses}`;
     };
     
-    // Get awards from gameState (should be calculated at season end)
+    // Get awards from gameState._seasonEndData (calculated at season end)
     const getAwards = (tier) => {
-      const awards = gs?.[`tier${tier}Awards`] || {};
+      const tierKey = `tier${tier}`;
+      const awards = gs?._seasonEndData?.awards?.[tierKey] || {};
+      
+      const formatStats = (p) => {
+        if (!p) return '';
+        const ppg = p.ppg?.toFixed(1) || '0.0';
+        const rpg = p.rpg?.toFixed(1) || '0.0';
+        const apg = p.apg?.toFixed(1) || '0.0';
+        return `${ppg} PPG · ${rpg} RPG · ${apg} APG`;
+      };
+      
+      const formatDefStats = (p) => {
+        if (!p) return '';
+        const bpg = p.bpg?.toFixed(1) || '0.0';
+        const spg = p.spg?.toFixed(1) || '0.0';
+        return `${bpg} BPG · ${spg} SPG`;
+      };
+      
       return {
         mvp: awards.mvp ? {
           name: awards.mvp.name,
-          team: awards.mvp.teamName || 'Unknown',
-          stats: formatPlayerStats(awards.mvp)
+          team: awards.mvp.team || 'Unknown',
+          stats: formatStats(awards.mvp)
         } : null,
         dpoy: awards.dpoy ? {
           name: awards.dpoy.name,
-          team: awards.dpoy.teamName || 'Unknown',
+          team: awards.dpoy.team || 'Unknown',
           stats: formatDefStats(awards.dpoy)
         } : null,
         roy: awards.roy ? {
           name: awards.roy.name,
-          team: awards.roy.teamName || 'Unknown',
-          stats: formatPlayerStats(awards.roy)
+          team: awards.roy.team || 'Unknown',
+          stats: formatStats(awards.roy)
         } : null,
         sixthMan: awards.sixthMan ? {
           name: awards.sixthMan.name,
-          team: awards.sixthMan.teamName || 'Unknown',
-          stats: formatPlayerStats(awards.sixthMan)
+          team: awards.sixthMan.team || 'Unknown',
+          stats: formatStats(awards.sixthMan)
         } : null,
         mostImproved: awards.mostImproved ? {
           name: awards.mostImproved.name,
-          team: awards.mostImproved.teamName || 'Unknown',
-          stats: awards.mostImproved.improvement ? `+${awards.mostImproved.improvement.toFixed(1)} PPG` : ''
+          team: awards.mostImproved.team || 'Unknown',
+          stats: formatStats(awards.mostImproved)
         } : null,
         allLeagueFirst: (awards.allLeagueFirst || []).map(p => ({
           name: p.name,
-          team: p.teamAbbrev || p.teamName?.slice(0, 3).toUpperCase() || '',
-          position: p.position || p.pos || '—'
+          team: p.team?.slice(0, 3).toUpperCase() || '',
+          position: p.position || '—'
         })),
         allLeagueSecond: (awards.allLeagueSecond || []).map(p => ({
           name: p.name,
-          team: p.teamAbbrev || p.teamName?.slice(0, 3).toUpperCase() || '',
-          position: p.position || p.pos || '—'
+          team: p.team?.slice(0, 3).toUpperCase() || '',
+          position: p.position || '—'
         })),
       };
-    };
-    
-    const formatPlayerStats = (player) => {
-      if (!player?.seasonStats) return '';
-      const s = player.seasonStats;
-      const gp = s.gamesPlayed || 1;
-      const ppg = (s.points / gp).toFixed(1);
-      const rpg = (s.rebounds / gp).toFixed(1);
-      const apg = (s.assists / gp).toFixed(1);
-      return `${ppg} PPG · ${rpg} RPG · ${apg} APG`;
-    };
-    
-    const formatDefStats = (player) => {
-      if (!player?.seasonStats) return '';
-      const s = player.seasonStats;
-      const gp = s.gamesPlayed || 1;
-      const bpg = (s.blocks / gp).toFixed(1);
-      const spg = (s.steals / gp).toFixed(1);
-      return `${bpg} BPG · ${spg} SPG`;
     };
     
     const modalData = {

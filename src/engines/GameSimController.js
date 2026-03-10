@@ -3238,6 +3238,160 @@ export class GameSimController {
                 }
             }
         }
+        
+        // Handle T2 division → national tournament transition
+        this._checkT2NationalTournamentSeeding();
+        
+        // Handle T3 metro → regional → sweet16 transitions
+        this._checkT3TournamentSeeding();
+        
+        // Handle 3rd place games (losers of semis)
+        this._checkThirdPlaceGames();
+    }
+    
+    /**
+     * Check if all T2 division finals are complete and seed national tournament.
+     */
+    _checkT2NationalTournamentSeeding() {
+        const { gameState, engines } = this.ctx;
+        const schedule = gameState.playoffSchedule;
+        
+        // Find all division final series
+        const divFinalSeries = Object.keys(schedule.bySeries).filter(id => 
+            id.startsWith('t2-div-') && id.endsWith('-final')
+        );
+        
+        // Check if all are complete
+        const divWinners = [];
+        for (const seriesId of divFinalSeries) {
+            const state = engines.PlayoffEngine.getSeriesState(schedule, seriesId);
+            if (!state.complete) return; // Not all complete yet
+            if (state.winner) divWinners.push(state.winner);
+        }
+        
+        // All division finals complete - seed national tournament round 1
+        if (divWinners.length >= 8) {
+            // Sort by regular season record for seeding
+            divWinners.sort((a, b) => (b.wins - a.wins) || (b.pointDiff - a.pointDiff));
+            
+            // Seed 1v16, 2v15, ... (but we only have 11 divisions so 11 teams)
+            // For now, just populate the first 8 slots
+            const natR1Series = Object.keys(schedule.bySeries).filter(id => 
+                id.startsWith('t2-nat-r1-')
+            ).sort();
+            
+            for (let i = 0; i < Math.min(8, natR1Series.length); i++) {
+                const highSeed = divWinners[i];
+                const lowSeed = divWinners[divWinners.length - 1 - i];
+                if (highSeed && lowSeed) {
+                    this._populateSeriesWithTeams(natR1Series[i], highSeed, lowSeed);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Check T3 tournament seeding (metro → regional → sweet16).
+     */
+    _checkT3TournamentSeeding() {
+        const { gameState, engines } = this.ctx;
+        const schedule = gameState.playoffSchedule;
+        
+        // T3 has a more complex structure - metro finals → regional → sweet16 → etc
+        // For now, we'll check if series are ready and populate them
+        
+        // Check metro finals
+        const metroFinals = Object.keys(schedule.bySeries).filter(id => 
+            id.startsWith('t3-metro-') && id.endsWith('-final')
+        );
+        
+        const metroWinners = [];
+        for (const seriesId of metroFinals) {
+            const state = engines.PlayoffEngine.getSeriesState(schedule, seriesId);
+            if (state.complete && state.winner) {
+                metroWinners.push({ winner: state.winner, seriesId });
+            }
+        }
+        
+        // Populate regional matchups as metro finals complete
+        // This is simplified - actual logic would need proper regional assignments
+        const regionalSeries = Object.keys(schedule.bySeries).filter(id => 
+            id.startsWith('t3-regional-')
+        ).sort();
+        
+        // Try to populate any empty regional slots
+        for (const { winner } of metroWinners) {
+            for (const regSeriesId of regionalSeries) {
+                const games = schedule.bySeries[regSeriesId];
+                if (games && games[0] && (!games[0].homeTeamId || !games[0].awayTeamId)) {
+                    this._populateSeriesWithTeam(regSeriesId, winner, null);
+                    break;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Check if semi-final losers need to go to 3rd place game.
+     */
+    _checkThirdPlaceGames() {
+        const { gameState, engines } = this.ctx;
+        const schedule = gameState.playoffSchedule;
+        
+        // T2 3rd place
+        const t2Sf1 = engines.PlayoffEngine.getSeriesState(schedule, 't2-nat-sf-1');
+        const t2Sf2 = engines.PlayoffEngine.getSeriesState(schedule, 't2-nat-sf-2');
+        if (t2Sf1.complete && t2Sf2.complete && t2Sf1.loser && t2Sf2.loser) {
+            const thirdPlace = schedule.bySeries['t2-3rd-place'];
+            if (thirdPlace && thirdPlace[0] && !thirdPlace[0].homeTeamId) {
+                this._populateSeriesWithTeams('t2-3rd-place', t2Sf1.loser, t2Sf2.loser);
+            }
+        }
+        
+        // T3 3rd place
+        const t3Sf1 = engines.PlayoffEngine.getSeriesState(schedule, 't3-sf-1');
+        const t3Sf2 = engines.PlayoffEngine.getSeriesState(schedule, 't3-sf-2');
+        if (t3Sf1.complete && t3Sf2.complete && t3Sf1.loser && t3Sf2.loser) {
+            const thirdPlace = schedule.bySeries['t3-3rd-place'];
+            if (thirdPlace && thirdPlace[0] && !thirdPlace[0].homeTeamId) {
+                this._populateSeriesWithTeams('t3-3rd-place', t3Sf1.loser, t3Sf2.loser);
+            }
+        }
+    }
+    
+    /**
+     * Populate a series with both teams (for known matchups).
+     */
+    _populateSeriesWithTeams(seriesId, higherSeed, lowerSeed) {
+        const { gameState } = this.ctx;
+        const schedule = gameState.playoffSchedule;
+        const games = schedule.bySeries[seriesId];
+        
+        if (!games || !games.length) return;
+        
+        // Determine home court pattern based on bestOf
+        const bestOf = games[0].bestOf || 7;
+        const homePattern = bestOf === 7
+            ? [higherSeed, higherSeed, lowerSeed, lowerSeed, higherSeed, lowerSeed, higherSeed]
+            : bestOf === 5
+            ? [higherSeed, higherSeed, lowerSeed, lowerSeed, higherSeed]
+            : [higherSeed, lowerSeed, higherSeed];
+        
+        for (let i = 0; i < games.length; i++) {
+            const game = games[i];
+            const home = homePattern[i] || higherSeed;
+            const away = home.id === higherSeed.id ? lowerSeed : higherSeed;
+            
+            game.higherSeedId = higherSeed.id;
+            game.lowerSeedId = lowerSeed.id;
+            game.homeTeamId = home.id;
+            game.awayTeamId = away.id;
+            game.homeTeam = home;
+            game.awayTeam = away;
+            game.placeholder = false;
+        }
+        
+        console.log(`📋 Populated ${seriesId}: ${higherSeed.name} vs ${lowerSeed.name}`);
     }
 
     /**
@@ -3268,8 +3422,70 @@ export class GameSimController {
             }
         }
         
-        // T2 and T3 have more complex multi-stage brackets
-        // For now, return null and let the bracket display handle it
+        if (tier === 't2') {
+            // T2: DivSemi → DivFinal → NatRound1 → NatQuarter → NatSemi → Finals
+            // t2-div-{division}-s1 or t2-div-{division}-s2 → t2-div-{division}-final
+            if (parts[1] === 'div' && (parts[3] === 's1' || parts[3] === 's2')) {
+                const divId = parts[2];
+                return `t2-div-${divId}-final`;
+            }
+            // Division final winners go to national tournament
+            // We'll populate national round 1 as division finals complete
+            // t2-div-{division}-final → t2-nat-r1-{slot}
+            // This mapping will be handled in _updateBracketsAfterGames
+            if (parts[1] === 'div' && parts[3] === 'final') {
+                // Return null - we handle national tournament seeding specially
+                return null;
+            }
+            // National tournament progression
+            // t2-nat-r1-{n} → t2-nat-qf-{n/2}
+            if (parts[1] === 'nat' && parts[2] === 'r1') {
+                const matchNum = parseInt(parts[3]);
+                const qfNum = Math.ceil(matchNum / 2);
+                return `t2-nat-qf-${qfNum}`;
+            }
+            // t2-nat-qf-{n} → t2-nat-sf-{n/2}
+            if (parts[1] === 'nat' && parts[2] === 'qf') {
+                const matchNum = parseInt(parts[3]);
+                const sfNum = Math.ceil(matchNum / 2);
+                return `t2-nat-sf-${sfNum}`;
+            }
+            // t2-nat-sf-{n} → t2-finals
+            if (parts[1] === 'nat' && parts[2] === 'sf') {
+                return 't2-finals';
+            }
+        }
+        
+        if (tier === 't3') {
+            // T3: MetroFinal → Regional → Sweet16 → Quarters → Semis → Finals
+            // t3-metro-{metro}-final → t3-regional-{region}-{slot}
+            if (parts[1] === 'metro') {
+                // Metro finals winners go to regional, but we handle seeding specially
+                return null;
+            }
+            // t3-regional-{region}-{n} → t3-sweet16-{n}
+            if (parts[1] === 'regional') {
+                // Regional winners advance to Sweet 16
+                return null; // Handle seeding specially
+            }
+            // t3-sweet16-{n} → t3-qf-{n/2}
+            if (parts[1] === 'sweet16') {
+                const matchNum = parseInt(parts[2]);
+                const qfNum = Math.ceil(matchNum / 2);
+                return `t3-qf-${qfNum}`;
+            }
+            // t3-qf-{n} → t3-sf-{n/2}
+            if (parts[1] === 'qf') {
+                const matchNum = parseInt(parts[2]);
+                const sfNum = Math.ceil(matchNum / 2);
+                return `t3-sf-${sfNum}`;
+            }
+            // t3-sf-{n} → t3-finals (losers go to 3rd place)
+            if (parts[1] === 'sf') {
+                return 't3-finals';
+            }
+        }
+        
         return null;
     }
 

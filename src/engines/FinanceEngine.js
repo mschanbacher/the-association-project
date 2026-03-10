@@ -564,7 +564,10 @@ export const FinanceEngine = {
             });
             
             // Add released players to free agent pool
-            if (releasedPlayers.length > 0 && window.gameState.freeAgents) {
+            if (releasedPlayers.length > 0) {
+                // Ensure freeAgents array exists
+                if (!window.gameState) window.gameState = {};
+                if (!window.gameState.freeAgents) window.gameState.freeAgents = [];
                 window.gameState.freeAgents.push(...releasedPlayers);
             }
             

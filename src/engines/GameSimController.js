@@ -3460,19 +3460,24 @@ export class GameSimController {
         
         if (tier === 't2') {
             // T2: DivSemi → DivFinal → NatRound1 → NatQuarter → NatSemi → Finals
-            // t2-div-{division}-s1 or t2-div-{division}-s2 → t2-div-{division}-final
-            if (parts[1] === 'div' && (parts[3] === 's1' || parts[3] === 's2')) {
-                const divId = parts[2];
-                return `t2-div-${divId}-final`;
+            // Series IDs: t2-div-{division-with-hyphens}-s1/s2/final
+            // e.g., t2-div-great-lakes-s1 → parts = ['t2', 'div', 'great', 'lakes', 's1']
+            
+            if (parts[1] === 'div') {
+                const suffix = parts[parts.length - 1]; // Last element: s1, s2, or final
+                const divIdParts = parts.slice(2, -1); // Everything between 'div' and suffix
+                const divId = divIdParts.join('-');
+                
+                if (suffix === 's1' || suffix === 's2') {
+                    return `t2-div-${divId}-final`;
+                }
+                if (suffix === 'final') {
+                    // Division final winners go to national tournament
+                    // This is handled specially in _checkT2NationalTournamentSeeding
+                    return null;
+                }
             }
-            // Division final winners go to national tournament
-            // We'll populate national round 1 as division finals complete
-            // t2-div-{division}-final → t2-nat-r1-{slot}
-            // This mapping will be handled in _updateBracketsAfterGames
-            if (parts[1] === 'div' && parts[3] === 'final') {
-                // Return null - we handle national tournament seeding specially
-                return null;
-            }
+            
             // National tournament progression
             // t2-nat-r1-{n} → t2-nat-qf-{n/2}
             if (parts[1] === 'nat' && parts[2] === 'r1') {
@@ -3595,11 +3600,11 @@ export class GameSimController {
         
         if (tier === 't2') {
             // T2 Division: s1 (1v4) winner is higher seed than s2 (2v3) winner
-            if (parts[1] === 'div' && parts[3] === 's1') {
-                return true;
-            }
-            if (parts[1] === 'div' && parts[3] === 's2') {
-                return false;
+            // Handle multi-word division names: t2-div-great-lakes-s1
+            if (parts[1] === 'div') {
+                const suffix = parts[parts.length - 1];
+                if (suffix === 's1') return true;
+                if (suffix === 's2') return false;
             }
         }
         

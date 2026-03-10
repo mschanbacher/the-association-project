@@ -3327,44 +3327,104 @@ export class GameSimController {
     }
     
     /**
-     * Check T3 tournament seeding (metro → regional → sweet16).
+     * Check T3 tournament seeding (metro → regional → sweet16 → qf → sf → finals).
      */
     _checkT3TournamentSeeding() {
         const { gameState, engines } = this.ctx;
         const schedule = gameState.playoffSchedule;
         
-        // T3 has a more complex structure - metro finals → regional → sweet16 → etc
-        // For now, we'll check if series are ready and populate them
+        if (!schedule?.bySeries) return;
         
-        // Check metro finals
-        const metroFinals = Object.keys(schedule.bySeries).filter(id => 
-            id.startsWith('t3-metro-') && id.endsWith('-final')
+        // T3 Structure:
+        // Stage 1: Metro Finals (24 series) - t3-metro-{divId}
+        // Stage 2: Regional (8 series) - lower-ranked metro winners play in
+        // Stage 3: Sweet 16 (8 series) - top 8 metro winners + regional winners
+        // Stage 4: QF, SF, Finals
+        
+        // Check all metro finals for completion
+        const metroSeries = Object.keys(schedule.bySeries).filter(id => 
+            id.startsWith('t3-metro-')
         );
         
-        const metroWinners = [];
-        for (const seriesId of metroFinals) {
+        const metroResults = [];
+        for (const seriesId of metroSeries) {
             const state = engines.PlayoffEngine.getSeriesState(schedule, seriesId);
             if (state.complete && state.winner) {
-                metroWinners.push({ winner: state.winner, seriesId });
+                metroResults.push({ winner: state.winner, loser: state.loser, seriesId });
             }
         }
         
-        // Populate regional matchups as metro finals complete
-        // This is simplified - actual logic would need proper regional assignments
+        // Check if regional round is seeded
         const regionalSeries = Object.keys(schedule.bySeries).filter(id => 
             id.startsWith('t3-regional-')
         ).sort();
         
-        // Try to populate any empty regional slots
-        for (const { winner } of metroWinners) {
-            for (const regSeriesId of regionalSeries) {
-                const games = schedule.bySeries[regSeriesId];
-                if (games && games[0] && (!games[0].homeTeamId || !games[0].awayTeamId)) {
-                    this._populateSeriesWithTeam(regSeriesId, winner, null);
-                    break;
+        const firstRegional = schedule.bySeries[regionalSeries[0]]?.[0];
+        const regionalSeeded = firstRegional?.homeTeamId != null;
+        
+        // Seed regional round once all metro finals are complete
+        if (metroResults.length === metroSeries.length && metroSeries.length > 0 && !regionalSeeded) {
+            console.log(`📊 T3 Metro Finals complete: ${metroResults.length} winners`);
+            
+            // Sort metro winners by regular season record
+            metroResults.sort((a, b) => (b.winner.wins - a.winner.wins) || (b.winner.pointDiff - a.winner.pointDiff));
+            
+            // Top 8 get byes to Sweet 16, teams 9-24 go to Regional round
+            // Regional: 9v24, 10v23, 11v22, 12v21, 13v20, 14v19, 15v18, 16v17
+            const byeTeams = metroResults.slice(0, 8).map(r => r.winner);
+            const regionalTeams = metroResults.slice(8).map(r => r.winner);
+            
+            // Seed regional round (8 series)
+            for (let i = 0; i < Math.min(8, regionalSeries.length, Math.floor(regionalTeams.length / 2)); i++) {
+                const highSeed = regionalTeams[i];
+                const lowSeed = regionalTeams[regionalTeams.length - 1 - i];
+                if (highSeed && lowSeed && highSeed.id !== lowSeed.id) {
+                    this._populateSeriesWithTeams(regionalSeries[i], highSeed, lowSeed);
+                }
+            }
+            
+            // Store bye teams for Sweet 16 seeding
+            gameState._t3ByeTeams = byeTeams;
+        }
+        
+        // Check if Sweet 16 needs seeding
+        const sweet16Series = Object.keys(schedule.bySeries).filter(id => 
+            id.startsWith('t3-sweet16-')
+        ).sort();
+        
+        const firstSweet16 = schedule.bySeries[sweet16Series[0]]?.[0];
+        const sweet16Seeded = firstSweet16?.homeTeamId != null;
+        
+        // Check regional completion
+        const regionalResults = [];
+        for (const seriesId of regionalSeries) {
+            const state = engines.PlayoffEngine.getSeriesState(schedule, seriesId);
+            if (state.complete && state.winner) {
+                regionalResults.push(state.winner);
+            }
+        }
+        
+        // Seed Sweet 16 once all regionals complete
+        if (regionalResults.length === regionalSeries.length && regionalSeries.length > 0 && !sweet16Seeded) {
+            console.log(`📊 T3 Regional complete: ${regionalResults.length} winners`);
+            
+            const byeTeams = gameState._t3ByeTeams || [];
+            // Sort regional winners by record
+            regionalResults.sort((a, b) => (b.wins - a.wins) || (b.pointDiff - a.pointDiff));
+            
+            // Sweet 16: Bye team 1 vs Regional winner 8, etc.
+            for (let i = 0; i < Math.min(8, sweet16Series.length); i++) {
+                const byeTeam = byeTeams[i];
+                const regionalWinner = regionalResults[regionalResults.length - 1 - i];
+                if (byeTeam && regionalWinner) {
+                    this._populateSeriesWithTeams(sweet16Series[i], byeTeam, regionalWinner);
                 }
             }
         }
+        
+        // Sweet 16 → QF advancement (handled by _getNextSeriesId)
+        // QF → SF advancement (handled by _getNextSeriesId)
+        // SF → Finals advancement (handled by _getNextSeriesId)
     }
     
     /**
@@ -3605,6 +3665,19 @@ export class GameSimController {
                 const suffix = parts[parts.length - 1];
                 if (suffix === 's1') return true;
                 if (suffix === 's2') return false;
+            }
+            // T2 National: lower numbered series winner is higher seed
+            if (parts[1] === 'nat') {
+                const matchNum = parseInt(parts[3]);
+                return matchNum % 2 === 1; // Odd series (1,3,5,7) winners are higher seeds
+            }
+        }
+        
+        if (tier === 't3') {
+            // T3: lower numbered series winner is higher seed
+            if (parts[1] === 'sweet16' || parts[1] === 'qf' || parts[1] === 'sf') {
+                const matchNum = parseInt(parts[2]);
+                return matchNum % 2 === 1; // Odd series winners are higher seeds
             }
         }
         

@@ -5,11 +5,331 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%23F04E2C'/></svg>">
     <title>The Association Project</title>
-  <script type="module" crossorigin>var __defProp = Object.defineProperty;
+  <style rel="stylesheet" crossorigin>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+
+/* ═══════════════════════════════════════════════════════════════
+   The Association Project — Design System
+   Dieter Rams: Less But Better
+   Sharp geometry · Tight spacing · Team identity through color
+
+   VISUAL LANGUAGE PRINCIPLES
+   ─────────────────────────────────────────────────────────────
+   NO EMOJIS — ever. Emojis are decorative clutter and conflict
+   with the Dieter Rams aesthetic of purposeful restraint.
+   Use typographic symbols (→ · — ×) or geometric SVG marks
+   when a visual indicator is needed. Status and achievement
+   are communicated through color, weight, and layout — not icons.
+
+   ICONOGRAPHY — use only when a text label alone is insufficient.
+   Prefer simple geometric SVG shapes (circles, lines, polygons)
+   over pictographic icon sets. Every mark must earn its place.
+   ═══════════════════════════════════════════════════════════════ */
+
+
+:root {
+  /* ── Surfaces ── */
+  --color-bg:             #F7F6F3;
+  --color-bg-raised:      #FFFFFF;
+  --color-bg-sunken:      #F0EFEC;
+  --color-bg-hover:       #F5F3F0;
+  --color-bg-active:      #EDEAE6;
+  --color-bg-overlay:     rgba(0, 0, 0, 0.4);
+
+  /* ── Borders ── */
+  --color-border:         #E8E7E3;
+  --color-border-subtle:  #F0EFEC;
+  --color-divider:        #E8E7E3;
+
+  /* ── Text — three levels only ── */
+  --color-text:           #1C1C1C;
+  --color-text-secondary: #6B6B65;
+  --color-text-tertiary:  #A0A09A;
+  --color-text-inverse:   #FFFFFF;
+
+  /* ── Team Accent ──
+     These are set dynamically via JS when a team is selected.
+     Defaults are a neutral warm tone for pre-game-load states. */
+  --color-accent:         #1B4D3E;
+  --color-accent-hover:   #164035;
+  --color-accent-bg:      rgba(27, 77, 62, 0.07);
+  --color-accent-border:  rgba(27, 77, 62, 0.15);
+  --color-accent-secondary: #C4915C;
+
+  /* ── Semantic ── */
+  --color-win:            #2D7A4F;
+  --color-win-bg:         #e8f5ee;
+  --color-loss:           #B5403A;
+  --color-loss-bg:        #fde8e8;
+  --color-info:           #3574c4;
+  --color-info-bg:        #e8f0fa;
+  --color-warning:        #c48a18;
+  --color-warning-bg:     #fdf5e4;
+
+  /* ── Tier Colors ── */
+  --color-tier1:          #d4a843;
+  --color-tier1-bg:       #fdf8ec;
+  --color-tier2:          #8a8a8a;
+  --color-tier2-bg:       #f5f5f5;
+  --color-tier3:          #b37340;
+  --color-tier3-bg:       #faf2ea;
+
+  /* ── Watch Game ── */
+  --color-home:           #4ecdc4;
+  --color-away:           #ff6b6b;
+  --color-highlight-bg:   rgba(255, 215, 0, 0.08);
+
+  /* ── Data Viz (revenue charts, brackets) ── */
+  --color-chart-1:        #5a7be8;
+  --color-chart-2:        #d97a2e;
+  --color-chart-3:        #9060b8;
+  --color-chart-4:        #c4a42a;
+
+  /* Shot zone colors — used in Scoring Profile zone chart */
+  --color-zone-rim:       #4A7A6A;   /* teal-green: close, high value */
+  --color-zone-mid:       #8A8A7E;   /* neutral gray: often inefficient zone */
+  --color-zone-three:     #1B4D3E;   /* deep accent green: spacing premium */
+
+  /* ── Rating Colors ── */
+  --color-rating-elite:   #1B4D3E;
+  --color-rating-good:    #4A7A6A;
+  --color-rating-avg:     #8A8A7E;
+  --color-rating-below:   #B5403A;
+  --color-rating-poor:    #B5403A;
+
+  /* ── Typography ── */
+  --font-body:            'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:            'JetBrains Mono', 'SF Mono', monospace;
+
+  --text-xs:    0.6875rem;  /* 11px */
+  --text-sm:    0.8125rem;  /* 13px */
+  --text-base:  0.875rem;   /* 14px */
+  --text-md:    1rem;       /* 16px */
+  --text-lg:    1.125rem;   /* 18px */
+  --text-xl:    1.375rem;   /* 22px */
+  --text-2xl:   1.5rem;     /* 24px */
+  --text-3xl:   1.625rem;   /* 26px */
+
+  --leading-tight:  1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  --weight-normal:  400;
+  --weight-medium:  500;
+  --weight-semi:    600;
+  --weight-bold:    700;
+
+  /* ── Spacing — tight 8px rhythm ── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --gap:      8px;  /* standard inter-card gap */
+
+  /* ── Radius — zero. Sharp geometry. ── */
+  --radius-sm:  0;
+  --radius-md:  0;
+  --radius-lg:  0;
+  --radius-xl:  0;
+  --radius-full: 0;
+
+  /* ── Shadows — barely visible ── */
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.03);
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md:  0 2px 8px rgba(0,0,0,0.05);
+  --shadow-lg:  0 4px 16px rgba(0,0,0,0.06);
+  --shadow-xl:  0 8px 32px rgba(0,0,0,0.08);
+
+  /* ── Transitions ── */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --duration-fast:   100ms;
+  --duration-normal: 160ms;
+  --duration-slow:   280ms;
+
+  /* ── Layout ── */
+  --sidebar-width:   200px;
+  --topbar-height:   52px;
+  --content-max:     1080px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Base Styles
+   ═══════════════════════════════════════════════════════════════ */
+
+
+#react-root {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+
+#react-root *,
+#react-root *::before,
+#react-root *::after {
+  box-sizing: border-box;
+}
+
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Animations — restrained
+   ═══════════════════════════════════════════════════════════════ */
+
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+
+.animate-fade-in   { animation: fadeIn var(--duration-normal) var(--ease-out) both; }
+
+
+.animate-slide-up  { animation: slideUp var(--duration-slow) var(--ease-out) both; }
+
+
+.animate-slide-down { animation: slideDown var(--duration-slow) var(--ease-out) both; }
+
+
+.animate-scale-in  { animation: scaleIn var(--duration-slow) var(--ease-out) both; }
+
+
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+
+
+.stagger > *:nth-child(2) { animation-delay: 30ms; }
+
+
+.stagger > *:nth-child(3) { animation-delay: 60ms; }
+
+
+.stagger > *:nth-child(4) { animation-delay: 90ms; }
+
+
+.stagger > *:nth-child(5) { animation-delay: 120ms; }
+
+
+.stagger > *:nth-child(6) { animation-delay: 150ms; }
+
+
+.stagger > *:nth-child(7) { animation-delay: 180ms; }
+
+
+.stagger > *:nth-child(8) { animation-delay: 210ms; }
+
+
+/* ─── Stat Tooltip ──────────────────────────────────────────── */
+
+
+.stat-tooltip {
+  position: fixed;
+  background: var(--color-bg-raised);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: 7px 11px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.55;
+  max-width: 220px;
+  white-space: pre-wrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+  pointer-events: none;
+  z-index: 9999;
+  transform: translateX(-50%);
+  animation: fadeIn var(--duration-fast) var(--ease-out) both;
+}
+
+
+.stat-tooltip-trigger {
+  cursor: default;
+  border-bottom: 1px dotted var(--color-text-tertiary);
+}</style>
+  <script type="module" crossorigin>(function polyfill() {
+  const relList = document.createElement("link").relList;
+  if (relList && relList.supports && relList.supports("modulepreload")) {
+    return;
+  }
+  for (const link of document.querySelectorAll('link[rel="modulepreload"]')) {
+    processPreload(link);
+  }
+  new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type !== "childList") {
+        continue;
+      }
+      for (const node of mutation.addedNodes) {
+        if (node.tagName === "LINK" && node.rel === "modulepreload")
+          processPreload(node);
+      }
+    }
+  }).observe(document, { childList: true, subtree: true });
+  function getFetchOpts(link) {
+    const fetchOpts = {};
+    if (link.integrity) fetchOpts.integrity = link.integrity;
+    if (link.referrerPolicy) fetchOpts.referrerPolicy = link.referrerPolicy;
+    if (link.crossOrigin === "use-credentials")
+      fetchOpts.credentials = "include";
+    else if (link.crossOrigin === "anonymous") fetchOpts.credentials = "omit";
+    else fetchOpts.credentials = "same-origin";
+    return fetchOpts;
+  }
+  function processPreload(link) {
+    if (link.ep)
+      return;
+    link.ep = true;
+    const fetchOpts = getFetchOpts(link);
+    fetch(link.href, fetchOpts);
+  }
+})();
+var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
-(function polyfill() {
+(function polyfill2() {
   const relList = document.createElement("link").relList;
   if (relList && relList.supports && relList.supports("modulepreload")) {
     return;
@@ -46392,7 +46712,7 @@ class GameSimController {
     return Math.min(0.98, Math.max(0.02, raw));
   }
 }
-const _OffseasonController = class _OffseasonController {
+const _OffseasonController = class _OffseasonController2 {
   /**
    * @param {Object} ctx - Context with all dependencies
    */
@@ -46416,7 +46736,7 @@ const _OffseasonController = class _OffseasonController {
    */
   setPhase(phase) {
     const { gameState: gameState2, engines, helpers } = this.ctx;
-    const P = _OffseasonController.PHASES;
+    const P = _OffseasonController2.PHASES;
     gameState2.offseasonPhase = phase;
     const seasonDates = engines.CalendarEngine.getSeasonDates(gameState2.seasonStartYear || gameState2.currentSeason);
     const phaseToDate = {
@@ -46448,7 +46768,7 @@ const _OffseasonController = class _OffseasonController {
   resumeOffseason() {
     const { gameState: gameState2 } = this.ctx;
     const phase = gameState2.offseasonPhase;
-    const P = _OffseasonController.PHASES;
+    const P = _OffseasonController2.PHASES;
     console.log(`🔄 Resuming offseason from phase: ${phase}`);
     switch (phase) {
       case P.SEASON_ENDED:
@@ -46508,7 +46828,7 @@ const _OffseasonController = class _OffseasonController {
   isInOffseason() {
     const { gameState: gameState2 } = this.ctx;
     const phase = gameState2.offseasonPhase;
-    return phase && phase !== _OffseasonController.PHASES.NONE;
+    return phase && phase !== _OffseasonController2.PHASES.NONE;
   }
   // ═══════════════════════════════════════════════════════════════════
   // Step 1: Season End → Postseason
@@ -46516,7 +46836,7 @@ const _OffseasonController = class _OffseasonController {
   advanceToNextSeason(action) {
     var _a2, _b2;
     const { gameState: gameState2, eventBus: eventBus2, GameEvents: GameEvents2, engines, helpers } = this.ctx;
-    const P = _OffseasonController.PHASES;
+    const P = _OffseasonController2.PHASES;
     console.log("═══════════════════════════════════════════════════════════");
     console.log("🎬 [DIAG] advanceToNextSeason ENTRY");
     console.log("🎬 [DIAG] action:", action);
@@ -46621,7 +46941,7 @@ const _OffseasonController = class _OffseasonController {
   // ═══════════════════════════════════════════════════════════════════
   continueAfterPostseason() {
     const { gameState: gameState2, eventBus: eventBus2, GameEvents: GameEvents2, engines, helpers } = this.ctx;
-    const P = _OffseasonController.PHASES;
+    const P = _OffseasonController2.PHASES;
     if (window._reactCloseChampionship) window._reactCloseChampionship();
     if (window._reactClosePlayoffHub) window._reactClosePlayoffHub();
     this.setPhase(P.PROMO_REL);
@@ -46873,7 +47193,7 @@ const _OffseasonController = class _OffseasonController {
   // ═══════════════════════════════════════════════════════════════════
   proceedToDraftOrDevelopment() {
     const { gameState: gameState2, eventBus: eventBus2, GameEvents: GameEvents2, helpers } = this.ctx;
-    const P = _OffseasonController.PHASES;
+    const P = _OffseasonController2.PHASES;
     eventBus2.emit(GameEvents2.OFFSEASON_STARTED, { season: gameState2.season });
     if (gameState2.currentTier === 1) {
       console.log("🎓 Step 3: User is in Tier 1, running draft...");
@@ -46890,7 +47210,7 @@ const _OffseasonController = class _OffseasonController {
   // ═══════════════════════════════════════════════════════════════════
   proceedToPlayerDevelopment() {
     const { gameState: gameState2, eventBus: eventBus2, GameEvents: GameEvents2 } = this.ctx;
-    const P = _OffseasonController.PHASES;
+    const P = _OffseasonController2.PHASES;
     if (this.playerDevelopmentInProgress) {
       console.warn("⚠️ Player development already in progress, skipping duplicate call");
       return;
@@ -47243,7 +47563,7 @@ const _OffseasonController = class _OffseasonController {
   // ═══════════════════════════════════════════════════════════════════
   startFreeAgencyPeriod() {
     const { gameState: gameState2, eventBus: eventBus2, GameEvents: GameEvents2, helpers } = this.ctx;
-    const P = _OffseasonController.PHASES;
+    const P = _OffseasonController2.PHASES;
     this.setPhase(P.FREE_AGENCY);
     console.log("🤝 Free Agency Period Starting...");
     eventBus2.emit(GameEvents2.FREE_AGENCY_STARTED, {
@@ -47294,7 +47614,7 @@ const _OffseasonController = class _OffseasonController {
   // ═══════════════════════════════════════════════════════════════════
   checkRosterComplianceAndContinue() {
     const { gameState: gameState2, helpers } = this.ctx;
-    const P = _OffseasonController.PHASES;
+    const P = _OffseasonController2.PHASES;
     this.setPhase(P.ROSTER_COMPLIANCE);
     try {
       const userTeam = helpers.getUserTeam();
@@ -47372,7 +47692,7 @@ const _OffseasonController = class _OffseasonController {
   // Owner Mode / Offseason Management
   // ═══════════════════════════════════════════════════════════════════
   showOffseasonManagement() {
-    const P = _OffseasonController.PHASES;
+    const P = _OffseasonController2.PHASES;
     this.setPhase(P.OWNER_MODE);
     try {
       const { helpers, engines } = this.ctx;
@@ -47416,7 +47736,7 @@ const _OffseasonController = class _OffseasonController {
   // ═══════════════════════════════════════════════════════════════════
   continueToSeasonSetup() {
     const { gameState: gameState2, eventBus: eventBus2, GameEvents: GameEvents2, engines, helpers } = this.ctx;
-    const P = _OffseasonController.PHASES;
+    const P = _OffseasonController2.PHASES;
     console.log("🏁 Step 5: Final season setup...");
     this.setPhase(P.SETUP_COMPLETE);
     eventBus2.emit(GameEvents2.OFFSEASON_COMPLETED, { season: gameState2.season });
@@ -47496,11 +47816,10 @@ const _OffseasonController = class _OffseasonController {
       userTeamId: gameState2.userTeamId,
       userTier: gameState2.currentTier
     });
-    gameState2.offseasonPhase = _OffseasonController.PHASES.NONE;
+    gameState2.offseasonPhase = _OffseasonController2.PHASES.NONE;
     helpers.updateUI();
   }
 };
-// Offseason phases in order — each maps to a calendar date
 __publicField(_OffseasonController, "PHASES", {
   NONE: "none",
   // Regular season
@@ -50232,237 +50551,6 @@ StorageEngine$1.init().then(() => {
     window._initGame();
   }
 });</script>
-  <style rel="stylesheet" crossorigin>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
-
-/* ═══════════════════════════════════════════════════════════════
-   The Association Project — Design System
-   Dieter Rams: Less But Better
-   Sharp geometry · Tight spacing · Team identity through color
-
-   VISUAL LANGUAGE PRINCIPLES
-   ─────────────────────────────────────────────────────────────
-   NO EMOJIS — ever. Emojis are decorative clutter and conflict
-   with the Dieter Rams aesthetic of purposeful restraint.
-   Use typographic symbols (→ · — ×) or geometric SVG marks
-   when a visual indicator is needed. Status and achievement
-   are communicated through color, weight, and layout — not icons.
-
-   ICONOGRAPHY — use only when a text label alone is insufficient.
-   Prefer simple geometric SVG shapes (circles, lines, polygons)
-   over pictographic icon sets. Every mark must earn its place.
-   ═══════════════════════════════════════════════════════════════ */
-:root {
-  /* ── Surfaces ── */
-  --color-bg:             #F7F6F3;
-  --color-bg-raised:      #FFFFFF;
-  --color-bg-sunken:      #F0EFEC;
-  --color-bg-hover:       #F5F3F0;
-  --color-bg-active:      #EDEAE6;
-  --color-bg-overlay:     rgba(0, 0, 0, 0.4);
-
-  /* ── Borders ── */
-  --color-border:         #E8E7E3;
-  --color-border-subtle:  #F0EFEC;
-  --color-divider:        #E8E7E3;
-
-  /* ── Text — three levels only ── */
-  --color-text:           #1C1C1C;
-  --color-text-secondary: #6B6B65;
-  --color-text-tertiary:  #A0A09A;
-  --color-text-inverse:   #FFFFFF;
-
-  /* ── Team Accent ──
-     These are set dynamically via JS when a team is selected.
-     Defaults are a neutral warm tone for pre-game-load states. */
-  --color-accent:         #1B4D3E;
-  --color-accent-hover:   #164035;
-  --color-accent-bg:      rgba(27, 77, 62, 0.07);
-  --color-accent-border:  rgba(27, 77, 62, 0.15);
-  --color-accent-secondary: #C4915C;
-
-  /* ── Semantic ── */
-  --color-win:            #2D7A4F;
-  --color-win-bg:         #e8f5ee;
-  --color-loss:           #B5403A;
-  --color-loss-bg:        #fde8e8;
-  --color-info:           #3574c4;
-  --color-info-bg:        #e8f0fa;
-  --color-warning:        #c48a18;
-  --color-warning-bg:     #fdf5e4;
-
-  /* ── Tier Colors ── */
-  --color-tier1:          #d4a843;
-  --color-tier1-bg:       #fdf8ec;
-  --color-tier2:          #8a8a8a;
-  --color-tier2-bg:       #f5f5f5;
-  --color-tier3:          #b37340;
-  --color-tier3-bg:       #faf2ea;
-
-  /* ── Watch Game ── */
-  --color-home:           #4ecdc4;
-  --color-away:           #ff6b6b;
-  --color-highlight-bg:   rgba(255, 215, 0, 0.08);
-
-  /* ── Data Viz (revenue charts, brackets) ── */
-  --color-chart-1:        #5a7be8;
-  --color-chart-2:        #d97a2e;
-  --color-chart-3:        #9060b8;
-  --color-chart-4:        #c4a42a;
-
-  /* Shot zone colors — used in Scoring Profile zone chart */
-  --color-zone-rim:       #4A7A6A;   /* teal-green: close, high value */
-  --color-zone-mid:       #8A8A7E;   /* neutral gray: often inefficient zone */
-  --color-zone-three:     #1B4D3E;   /* deep accent green: spacing premium */
-
-  /* ── Rating Colors ── */
-  --color-rating-elite:   #1B4D3E;
-  --color-rating-good:    #4A7A6A;
-  --color-rating-avg:     #8A8A7E;
-  --color-rating-below:   #B5403A;
-  --color-rating-poor:    #B5403A;
-
-  /* ── Typography ── */
-  --font-body:            'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono:            'JetBrains Mono', 'SF Mono', monospace;
-
-  --text-xs:    0.6875rem;  /* 11px */
-  --text-sm:    0.8125rem;  /* 13px */
-  --text-base:  0.875rem;   /* 14px */
-  --text-md:    1rem;       /* 16px */
-  --text-lg:    1.125rem;   /* 18px */
-  --text-xl:    1.375rem;   /* 22px */
-  --text-2xl:   1.5rem;     /* 24px */
-  --text-3xl:   1.625rem;   /* 26px */
-
-  --leading-tight:  1.2;
-  --leading-normal: 1.5;
-  --leading-relaxed: 1.625;
-
-  --weight-normal:  400;
-  --weight-medium:  500;
-  --weight-semi:    600;
-  --weight-bold:    700;
-
-  /* ── Spacing — tight 8px rhythm ── */
-  --space-1:  4px;
-  --space-2:  8px;
-  --space-3:  12px;
-  --space-4:  16px;
-  --space-5:  20px;
-  --space-6:  24px;
-  --space-8:  32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
-
-  --gap:      8px;  /* standard inter-card gap */
-
-  /* ── Radius — zero. Sharp geometry. ── */
-  --radius-sm:  0;
-  --radius-md:  0;
-  --radius-lg:  0;
-  --radius-xl:  0;
-  --radius-full: 0;
-
-  /* ── Shadows — barely visible ── */
-  --shadow-xs:  0 1px 2px rgba(0,0,0,0.03);
-  --shadow-sm:  0 1px 3px rgba(0,0,0,0.04);
-  --shadow-md:  0 2px 8px rgba(0,0,0,0.05);
-  --shadow-lg:  0 4px 16px rgba(0,0,0,0.06);
-  --shadow-xl:  0 8px 32px rgba(0,0,0,0.08);
-
-  /* ── Transitions ── */
-  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
-  --duration-fast:   100ms;
-  --duration-normal: 160ms;
-  --duration-slow:   280ms;
-
-  /* ── Layout ── */
-  --sidebar-width:   200px;
-  --topbar-height:   52px;
-  --content-max:     1080px;
-}
-/* ═══════════════════════════════════════════════════════════════
-   Base Styles
-   ═══════════════════════════════════════════════════════════════ */
-#react-root {
-  font-family: var(--font-body);
-  font-size: var(--text-base);
-  line-height: var(--leading-normal);
-  color: var(--color-text);
-  background: var(--color-bg);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  min-height: 100vh;
-}
-#react-root *,
-#react-root *::before,
-#react-root *::after {
-  box-sizing: border-box;
-}
-.tabular {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
-}
-.mono {
-  font-family: var(--font-mono);
-}
-/* ═══════════════════════════════════════════════════════════════
-   Animations — restrained
-   ═══════════════════════════════════════════════════════════════ */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.98); }
-  to   { opacity: 1; transform: scale(1); }
-}
-.animate-fade-in   { animation: fadeIn var(--duration-normal) var(--ease-out) both; }
-.animate-slide-up  { animation: slideUp var(--duration-slow) var(--ease-out) both; }
-.animate-slide-down { animation: slideDown var(--duration-slow) var(--ease-out) both; }
-.animate-scale-in  { animation: scaleIn var(--duration-slow) var(--ease-out) both; }
-.stagger > *:nth-child(1) { animation-delay: 0ms; }
-.stagger > *:nth-child(2) { animation-delay: 30ms; }
-.stagger > *:nth-child(3) { animation-delay: 60ms; }
-.stagger > *:nth-child(4) { animation-delay: 90ms; }
-.stagger > *:nth-child(5) { animation-delay: 120ms; }
-.stagger > *:nth-child(6) { animation-delay: 150ms; }
-.stagger > *:nth-child(7) { animation-delay: 180ms; }
-.stagger > *:nth-child(8) { animation-delay: 210ms; }
-/* ─── Stat Tooltip ──────────────────────────────────────────── */
-.stat-tooltip {
-  position: fixed;
-  background: var(--color-bg-raised);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  padding: 7px 11px;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.55;
-  max-width: 220px;
-  white-space: pre-wrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
-  pointer-events: none;
-  z-index: 9999;
-  transform: translateX(-50%);
-  animation: fadeIn var(--duration-fast) var(--ease-out) both;
-}
-.stat-tooltip-trigger {
-  cursor: default;
-  border-bottom: 1px dotted var(--color-text-tertiary);
-}</style>
 </head>
 <body>
     <!-- Legacy modal ID stubs — kept for fallback getElementById calls, all hidden -->

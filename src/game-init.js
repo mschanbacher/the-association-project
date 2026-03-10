@@ -1,5 +1,21 @@
     window._initGame = function() {
-
+        // ═══════════════════════════════════════════════════════════════════
+        // Variable declarations (required for strict mode in ES modules)
+        // Only gameState needs explicit declaration - others are declared later in the code
+        // ═══════════════════════════════════════════════════════════════════
+        let gameState;
+        
+        // Aliases for window globals (set by index.jsx before _initGame is called)
+        const { eventBus, GameEvents, StorageEngine, GameState, TeamFactory, 
+                PlayerAttributes, CoachEngine, FinanceEngine, FreeAgencyEngine,
+                PlayerDevelopmentEngine, LeagueManager, SalaryCapEngine, 
+                DivisionManager, CalendarEngine, StatEngine, PlayoffEngine,
+                TradeEngine, DraftEngine, ChemistryEngine, InjuryEngine,
+                FatigueEngine, GMMode, ScoutingEngine, OwnerEngine,
+                OffseasonController, TradeController, DraftController,
+                GameSimController, FinanceController, RosterController,
+                FreeAgencyController, DashboardController, CoachManagementController,
+                SaveLoadController, UIHelpers, UIRenderer } = window;
 
         // ============================================
         // 🏀 REFACTORED ARCHITECTURE - INCREMENTAL APPROACH

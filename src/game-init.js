@@ -157,7 +157,7 @@
             if (!_gameSimController) {
                 _gameSimController = new window.GameSimController({
                     gameState, eventBus, GameEvents,
-                    engines: { CalendarEngine, GamePipeline, StatEngine, StorageEngine },
+                    engines: { CalendarEngine, GamePipeline, StatEngine, StorageEngine, PlayoffEngine },
                     helpers: {
                         getUserTeam, getCurrentTeams, sortTeamsByStandings,
                         sortTeamsWithTiebreakers: (...args) => LeagueManager.sortTeamsWithTiebreakers(...args),

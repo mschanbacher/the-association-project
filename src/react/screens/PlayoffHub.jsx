@@ -108,6 +108,31 @@ function abbr(team) {
   return team.name?.slice(0, 3).toUpperCase() || '—';
 }
 
+// Reusable tooltip for team names
+function TeamName({ team, complete, isWinner, isLoser, style }) {
+  const [show, setShow] = useState(false);
+  const name = team?.name;
+  return (
+    <span 
+      style={{ position: 'relative', cursor: 'default', ...style }}
+      onMouseEnter={() => name && setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      {show && name && (
+        <div style={{ 
+          position: 'absolute', left: 0, top: -22, zIndex: 9999, 
+          background: 'var(--color-text)', color: 'var(--color-text-inverse)', 
+          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500,
+          padding: '2px 6px', whiteSpace: 'nowrap', pointerEvents: 'none',
+        }}>
+          {name}
+        </div>
+      )}
+      {abbr(team)}
+    </span>
+  );
+}
+
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 function PlayoffSidebar({
   userTeam, opponent, userWins, oppWins, isUserInSeries, seriesOver,
@@ -1368,11 +1393,11 @@ function T2BracketNew({ bracket, schedule, userTeamId }) {
         fontSize: 9,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontWeight: complete && w1 > w2 ? 600 : 400, color: complete && w1 < w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(higher)}</span>
+          <TeamName team={higher} style={{ fontWeight: complete && w1 > w2 ? 600 : 400, color: complete && w1 < w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8 }}>{w1}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontWeight: complete && w2 > w1 ? 600 : 400, color: complete && w2 < w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(lower)}</span>
+          <TeamName team={lower} style={{ fontWeight: complete && w2 > w1 ? 600 : 400, color: complete && w2 < w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8 }}>{w2}</span>
         </div>
       </div>
@@ -1400,11 +1425,11 @@ function T2BracketNew({ bracket, schedule, userTeamId }) {
         border: `1px solid ${isUser ? 'rgba(138,138,138,0.3)' : 'var(--color-border)'}`,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isFinals ? 11 : 10 }}>
-          <span style={{ fontWeight: complete && w1 > w2 ? 700 : 400, color: complete && w1 < w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(higher)}</span>
+          <TeamName team={higher} style={{ fontWeight: complete && w1 > w2 ? 700 : 400, color: complete && w1 < w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: isFinals ? 10 : 9 }}>{w1}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isFinals ? 11 : 10, marginTop: 1 }}>
-          <span style={{ fontWeight: complete && w2 > w1 ? 700 : 400, color: complete && w2 < w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(lower)}</span>
+          <TeamName team={lower} style={{ fontWeight: complete && w2 > w1 ? 700 : 400, color: complete && w2 < w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: isFinals ? 10 : 9 }}>{w2}</span>
         </div>
       </div>
@@ -1701,11 +1726,11 @@ function T3BracketNew({ bracket, schedule, userTeamId }) {
         border: `1px solid ${isUser ? 'rgba(179,115,64,0.3)' : 'var(--color-border)'}`,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isFinals ? 11 : 10 }}>
-          <span style={{ fontWeight: complete && w1 > w2 ? 700 : 400, color: complete && w1 < w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(higher)}</span>
+          <TeamName team={higher} style={{ fontWeight: complete && w1 > w2 ? 700 : 400, color: complete && w1 < w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: isFinals ? 10 : 9 }}>{w1}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isFinals ? 11 : 10, marginTop: 1 }}>
-          <span style={{ fontWeight: complete && w2 > w1 ? 700 : 400, color: complete && w2 < w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(lower)}</span>
+          <TeamName team={lower} style={{ fontWeight: complete && w2 > w1 ? 700 : 400, color: complete && w2 < w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: isFinals ? 10 : 9 }}>{w2}</span>
         </div>
       </div>
@@ -1803,8 +1828,8 @@ function T3BracketNew({ bracket, schedule, userTeamId }) {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: m.complete && m.w1 > m.w2 ? 600 : 400, color: m.complete && m.w1 < m.w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(m.seed1)}</div>
-                    <div style={{ fontWeight: m.complete && m.w2 > m.w1 ? 600 : 400, color: m.complete && m.w2 < m.w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(m.seed2)}</div>
+                    <div><TeamName team={m.seed1} style={{ fontWeight: m.complete && m.w1 > m.w2 ? 600 : 400, color: m.complete && m.w1 < m.w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }} /></div>
+                    <div><TeamName team={m.seed2} style={{ fontWeight: m.complete && m.w2 > m.w1 ? 600 : 400, color: m.complete && m.w2 < m.w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }} /></div>
                   </div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8 }}>
                     <div>{m.w1}</div>

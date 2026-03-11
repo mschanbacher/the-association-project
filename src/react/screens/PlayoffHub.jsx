@@ -278,20 +278,23 @@ function PlayoffSidebar({
       )}
 
       {/* Game Log */}
-      {isUserInSeries && (
+      {(isUserInSeries || seriesOver) && games.length > 0 && (
         <SbSection>
           <Label>Game Log</Label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {games.map((g, i) => (
               <div 
                 key={i} 
-                onClick={() => g.hasBoxScore && onShowBoxScore?.(g.gameIndex)}
+                onClick={() => {
+                  console.log('🎯 Game log clicked:', g);
+                  onShowBoxScore?.(g.gameIndex);
+                }}
                 style={{ 
                   display: 'flex', alignItems: 'center', gap: 5, padding: '3px 4px', fontSize: 10,
-                  cursor: g.hasBoxScore ? 'pointer' : 'default',
+                  cursor: 'pointer',
                   transition: 'background 0.1s',
                 }}
-                onMouseEnter={(e) => { if (g.hasBoxScore) e.currentTarget.style.background = 'var(--color-bg-sunken)'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-sunken)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--color-text-tertiary)', minWidth: 13 }}>G{i + 1}</span>

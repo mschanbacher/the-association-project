@@ -1285,8 +1285,15 @@ function T2BracketNew({ bracket, schedule, userTeamId }) {
     const games = schedule.bySeries[seriesId];
     let w1 = 0, w2 = 0;
     const firstGame = games[0];
-    const higherSeed = firstGame?.homeTeam || firstGame?.higherSeed;
-    const lowerSeed = firstGame?.awayTeam || firstGame?.lowerSeed;
+    // Find team objects from any game in series
+    let higherSeed = null, lowerSeed = null;
+    for (const g of games) {
+      if (!higherSeed && g.homeTeam?.id === firstGame.higherSeedId) higherSeed = g.homeTeam;
+      if (!higherSeed && g.awayTeam?.id === firstGame.higherSeedId) higherSeed = g.awayTeam;
+      if (!lowerSeed && g.homeTeam?.id === firstGame.lowerSeedId) lowerSeed = g.homeTeam;
+      if (!lowerSeed && g.awayTeam?.id === firstGame.lowerSeedId) lowerSeed = g.awayTeam;
+      if (higherSeed && lowerSeed) break;
+    }
     for (const g of games) {
       if (g.played && g.result?.winner) {
         if (g.result.winner.id === firstGame.higherSeedId) w1++;
@@ -1339,95 +1346,187 @@ function T2BracketNew({ bracket, schedule, userTeamId }) {
   const finalsRec = getSeriesRecord('t2-finals');
   const thirdPlaceRec = getSeriesRecord('t2-3rd-place');
 
-  // Mini series card component
-  const SeriesCard = ({ higher, lower, w1, w2, complete, isUser }) => (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px',
-      background: isUser ? 'var(--color-tier2-bg)' : 'var(--color-bg-raised)',
-      border: `1px solid ${isUser ? 'rgba(138,138,138,0.3)' : 'var(--color-border)'}`,
-      fontSize: 10,
-    }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: complete && w1 > w2 ? 600 : 400, color: complete && w1 < w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>
-          {abbr(higher)}
+  // Division series card (compact)
+  const DivSeriesCard = ({ higher, lower, w1, w2, complete, isUser }) => {
+    if (!higher && !lower) {
+      return (
+        <div style={{
+          width: 56, padding: '4px 5px',
+          background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border)',
+          fontSize: 9, color: 'var(--color-text-tertiary)', textAlign: 'center',
+        }}>
+          TBD
         </div>
-        <div style={{ fontWeight: complete && w2 > w1 ? 600 : 400, color: complete && w2 < w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>
-          {abbr(lower)}
+      );
+    }
+    return (
+      <div style={{
+        width: 56, padding: '4px 5px',
+        background: isUser ? 'var(--color-tier2-bg)' : 'var(--color-bg-raised)',
+        border: `1px solid ${isUser ? 'rgba(138,138,138,0.3)' : 'var(--color-border)'}`,
+        fontSize: 9,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: complete && w1 > w2 ? 600 : 400, color: complete && w1 < w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(higher)}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8 }}>{w1}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: complete && w2 > w1 ? 600 : 400, color: complete && w2 < w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(lower)}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8 }}>{w2}</span>
         </div>
       </div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textAlign: 'right' }}>
-        <div>{w1}</div>
-        <div>{w2}</div>
+    );
+  };
+
+  // National tournament series card (larger)
+  const NatSeriesCard = ({ higher, lower, w1, w2, complete, isUser, isFinals }) => {
+    const width = isFinals ? 90 : 76;
+    if (!higher && !lower) {
+      return (
+        <div style={{
+          width, padding: isFinals ? '6px 8px' : '4px 6px',
+          background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border)',
+          fontSize: isFinals ? 11 : 10, color: 'var(--color-text-tertiary)', textAlign: 'center',
+        }}>
+          TBD
+        </div>
+      );
+    }
+    return (
+      <div style={{
+        width, padding: isFinals ? '6px 8px' : '4px 6px',
+        background: isUser ? 'var(--color-tier2-bg)' : 'var(--color-bg-raised)',
+        border: `1px solid ${isUser ? 'rgba(138,138,138,0.3)' : 'var(--color-border)'}`,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isFinals ? 11 : 10 }}>
+          <span style={{ fontWeight: complete && w1 > w2 ? 700 : 400, color: complete && w1 < w2 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(higher)}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: isFinals ? 10 : 9 }}>{w1}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isFinals ? 11 : 10, marginTop: 1 }}>
+          <span style={{ fontWeight: complete && w2 > w1 ? 700 : 400, color: complete && w2 < w1 ? 'var(--color-text-tertiary)' : 'var(--color-text)' }}>{abbr(lower)}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: isFinals ? 10 : 9 }}>{w2}</span>
+        </div>
+      </div>
+    );
+  };
+
+  // Horizontal division bracket component
+  const DivisionBracket = ({ div, isUserDivision }) => (
+    <div style={{
+      padding: 10,
+      background: isUserDivision ? 'var(--color-tier2-bg)' : 'var(--color-bg-raised)',
+      border: `1px solid ${isUserDivision ? 'rgba(138,138,138,0.3)' : 'var(--color-border)'}`,
+    }}>
+      <div style={{ fontSize: 8, fontWeight: 600, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+        {div.division.toUpperCase()}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {/* Semis column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <DivSeriesCard
+            higher={div.seed1} lower={div.seed4}
+            w1={div.s1.w1} w2={div.s1.w2} complete={div.s1.complete}
+            isUser={div.seed1?.id === userTeamId || div.seed4?.id === userTeamId}
+          />
+          <DivSeriesCard
+            higher={div.seed2} lower={div.seed3}
+            w1={div.s2.w1} w2={div.s2.w2} complete={div.s2.complete}
+            isUser={div.seed2?.id === userTeamId || div.seed3?.id === userTeamId}
+          />
+        </div>
+        
+        {/* Connector lines */}
+        <svg width="14" height="46" style={{ flexShrink: 0 }}>
+          <path d="M 0 11 H 7 V 23 H 14" stroke="var(--color-border)" strokeWidth="1" fill="none" />
+          <path d="M 0 35 H 7 V 23 H 14" stroke="var(--color-border)" strokeWidth="1" fill="none" />
+        </svg>
+        
+        {/* Final */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <DivSeriesCard
+            higher={div.final.higherSeed || div.s1.winner} 
+            lower={div.final.lowerSeed || div.s2.winner}
+            w1={div.final.w1} w2={div.final.w2} complete={div.final.complete}
+            isUser={div.final.higherSeed?.id === userTeamId || div.final.lowerSeed?.id === userTeamId}
+          />
+          {div.final.winner && (
+            <div style={{ fontSize: 7, fontWeight: 600, color: 'var(--color-tier2)', marginTop: 2, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
+              CHAMP
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 
+  // Bracket connector SVG
+  const BracketConnector = ({ count, gap }) => {
+    const itemHeight = 28;
+    const totalHeight = count * itemHeight + (count - 1) * gap;
+    const midY = totalHeight / 2;
+    
+    return (
+      <svg width="16" height={totalHeight} style={{ flexShrink: 0 }}>
+        {Array.from({ length: count / 2 }).map((_, i) => {
+          const topY = i * 2 * (itemHeight + gap) + itemHeight / 2 + gap * i;
+          const bottomY = topY + itemHeight + gap;
+          const outY = (topY + bottomY) / 2;
+          return (
+            <g key={i}>
+              <path d={`M 0 ${topY} H 8 V ${outY} H 16`} stroke="var(--color-border)" strokeWidth="1" fill="none" />
+              <path d={`M 0 ${bottomY} H 8 V ${outY} H 16`} stroke="var(--color-border)" strokeWidth="1" fill="none" />
+            </g>
+          );
+        })}
+      </svg>
+    );
+  };
+
   return (
-    <div style={{ padding: '16px 24px', overflowX: 'auto' }}>
+    <div style={{ padding: '16px 20px', overflowX: 'auto' }}>
       {/* Division Playoffs Section */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
-          DIVISION PLAYOFFS
+        <div style={{ 
+          fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)', 
+          letterSpacing: '0.08em', color: 'var(--color-text-tertiary)', 
+          marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid var(--color-border)' 
+        }}>
+          STAGE 1 · DIVISION PLAYOFFS
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {divisionCards.map((div, i) => {
             const userInDiv = [div.seed1?.id, div.seed2?.id, div.seed3?.id, div.seed4?.id].includes(userTeamId);
-            return (
-              <div key={i} style={{
-                padding: 10,
-                background: userInDiv ? 'var(--color-tier2-bg)' : 'var(--color-bg-raised)',
-                border: `1px solid ${userInDiv ? 'rgba(138,138,138,0.3)' : 'var(--color-border)'}`,
-              }}>
-                <div style={{ fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', color: 'var(--color-text-secondary)', marginBottom: 8 }}>
-                  {div.division.toUpperCase()}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {/* Semi 1: 1 vs 4 */}
-                  <SeriesCard
-                    higher={div.seed1} lower={div.seed4}
-                    w1={div.s1.w1} w2={div.s1.w2} complete={div.s1.complete}
-                    isUser={div.seed1?.id === userTeamId || div.seed4?.id === userTeamId}
-                  />
-                  {/* Semi 2: 2 vs 3 */}
-                  <SeriesCard
-                    higher={div.seed2} lower={div.seed3}
-                    w1={div.s2.w1} w2={div.s2.w2} complete={div.s2.complete}
-                    isUser={div.seed2?.id === userTeamId || div.seed3?.id === userTeamId}
-                  />
-                  {/* Final */}
-                  <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 4, marginTop: 2 }}>
-                    {div.final.higherSeed || div.final.lowerSeed ? (
-                      <SeriesCard
-                        higher={div.final.higherSeed || div.s1.winner} 
-                        lower={div.final.lowerSeed || div.s2.winner}
-                        w1={div.final.w1} w2={div.final.w2} complete={div.final.complete}
-                        isUser={div.final.higherSeed?.id === userTeamId || div.final.lowerSeed?.id === userTeamId}
-                      />
-                    ) : (
-                      <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 4 }}>
-                        Final: TBD
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
+            return <DivisionBracket key={i} div={div} isUserDivision={userInDiv} />;
           })}
         </div>
       </div>
 
       {/* National Tournament Section */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
-          NATIONAL TOURNAMENT
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ 
+          fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)', 
+          letterSpacing: '0.08em', color: 'var(--color-text-tertiary)', 
+          marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid var(--color-border)' 
+        }}>
+          STAGE 2 · NATIONAL TOURNAMENT
         </div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+        
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          padding: 12,
+          background: 'var(--color-bg-sunken)',
+          border: '1px solid var(--color-border)',
+          overflowX: 'auto',
+        }}>
           {/* Round 1 */}
           <div>
-            <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Round 1</div>
+            <div style={{ fontSize: 8, fontWeight: 500, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', marginBottom: 6, textAlign: 'center' }}>
+              ROUND 1
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {natR1Cards.map((card, i) => (
-                <SeriesCard key={i}
+                <NatSeriesCard key={i}
                   higher={card.higherSeed} lower={card.lowerSeed}
                   w1={card.w1} w2={card.w2} complete={card.complete}
                   isUser={card.higherSeed?.id === userTeamId || card.lowerSeed?.id === userTeamId}
@@ -1435,12 +1534,17 @@ function T2BracketNew({ bracket, schedule, userTeamId }) {
               ))}
             </div>
           </div>
+          
+          <BracketConnector count={8} gap={4} />
+          
           {/* Quarterfinals */}
           <div>
-            <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Quarters</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontSize: 8, fontWeight: 500, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', marginBottom: 6, textAlign: 'center' }}>
+              QUARTERS
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
               {natQFCards.map((card, i) => (
-                <SeriesCard key={i}
+                <NatSeriesCard key={i}
                   higher={card.higherSeed} lower={card.lowerSeed}
                   w1={card.w1} w2={card.w2} complete={card.complete}
                   isUser={card.higherSeed?.id === userTeamId || card.lowerSeed?.id === userTeamId}
@@ -1448,12 +1552,17 @@ function T2BracketNew({ bracket, schedule, userTeamId }) {
               ))}
             </div>
           </div>
+          
+          <BracketConnector count={4} gap={36} />
+          
           {/* Semifinals */}
           <div>
-            <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Semis</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontSize: 8, fontWeight: 500, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', marginBottom: 6, textAlign: 'center' }}>
+              SEMIS
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 100 }}>
               {natSFCards.map((card, i) => (
-                <SeriesCard key={i}
+                <NatSeriesCard key={i}
                   higher={card.higherSeed} lower={card.lowerSeed}
                   w1={card.w1} w2={card.w2} complete={card.complete}
                   isUser={card.higherSeed?.id === userTeamId || card.lowerSeed?.id === userTeamId}
@@ -1461,21 +1570,81 @@ function T2BracketNew({ bracket, schedule, userTeamId }) {
               ))}
             </div>
           </div>
+          
+          <BracketConnector count={2} gap={100} />
+          
           {/* Finals */}
-          <div>
-            <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Finals</div>
-            <SeriesCard
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ fontSize: 8, fontWeight: 500, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', marginBottom: 6 }}>
+              FINALS
+            </div>
+            <NatSeriesCard
               higher={finalsRec.higherSeed} lower={finalsRec.lowerSeed}
               w1={finalsRec.w1} w2={finalsRec.w2} complete={finalsRec.complete}
               isUser={finalsRec.higherSeed?.id === userTeamId || finalsRec.lowerSeed?.id === userTeamId}
+              isFinals
             />
-            {finalsRec.complete && finalsRec.winner && (
-              <div style={{ marginTop: 8, padding: 6, background: 'var(--color-tier2-bg)', border: '1px solid rgba(138,138,138,0.3)', textAlign: 'center' }}>
-                <div style={{ fontSize: 8, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--color-tier2)', marginBottom: 2 }}>T2 CHAMPION</div>
-                <div style={{ fontSize: 11, fontWeight: 700 }}>{finalsRec.winner.name}</div>
+            
+            {/* Champion display */}
+            <div style={{ 
+              marginTop: 12, 
+              padding: '10px 16px', 
+              background: 'var(--color-tier2-bg)', 
+              border: '1px solid rgba(138,138,138,0.3)',
+              textAlign: 'center',
+            }}>
+              <div style={{ width: 10, height: 10, background: 'var(--color-tier2)', margin: '0 auto 6px' }} />
+              <div style={{ fontSize: 8, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', color: 'var(--color-tier2)', marginBottom: 2 }}>
+                T2 CHAMPION
               </div>
-            )}
+              <div style={{ fontSize: 12, fontWeight: 700, color: finalsRec.winner ? 'var(--color-text)' : 'var(--color-text-tertiary)' }}>
+                {finalsRec.winner?.name || 'TBD'}
+              </div>
+            </div>
+            
+            {/* 3rd Place */}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 7, fontWeight: 500, fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', marginBottom: 4, textAlign: 'center' }}>
+                3RD PLACE
+              </div>
+              <NatSeriesCard
+                higher={thirdPlaceRec.higherSeed} lower={thirdPlaceRec.lowerSeed}
+                w1={thirdPlaceRec.w1} w2={thirdPlaceRec.w2} complete={thirdPlaceRec.complete}
+                isUser={thirdPlaceRec.higherSeed?.id === userTeamId || thirdPlaceRec.lowerSeed?.id === userTeamId}
+              />
+            </div>
           </div>
+        </div>
+      </div>
+      
+      {/* Explanation Section */}
+      <div style={{ 
+        padding: 12, 
+        background: 'var(--color-bg-sunken)', 
+        border: '1px solid var(--color-border)',
+      }}>
+        <div style={{ 
+          fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)', 
+          letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', marginBottom: 10 
+        }}>
+          HOW T2 PLAYOFFS WORK
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 10, lineHeight: 1.5, color: 'var(--color-text-secondary)' }}>
+          <div>
+            <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 3 }}>Stage 1: Division Playoffs</div>
+            <div>Top 4 teams from each division compete in best-of-3 series. Division champions advance to the National Tournament.</div>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 3 }}>Stage 2: National Tournament</div>
+            <div>11 division champions + 5 best runners-up compete in a 16-team bracket. All rounds are best-of-5. Winner earns promotion to T1.</div>
+          </div>
+        </div>
+        
+        <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--color-border)', display: 'flex', gap: 16, fontSize: 9, color: 'var(--color-text-tertiary)' }}>
+          <div><span style={{ fontWeight: 600 }}>Division:</span> Bo3</div>
+          <div><span style={{ fontWeight: 600 }}>National:</span> Bo5</div>
+          <div><span style={{ fontWeight: 600 }}>Promoted:</span> Champion + Runner-up + 3rd</div>
         </div>
       </div>
     </div>

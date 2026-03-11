@@ -346,27 +346,25 @@ function PlayoffSidebar({
 }
 
 // ─── Matchup card ─────────────────────────────────────────────────────────────
-function MatchupCard({ s1, n1, fn1, w1, s2, n2, fn2, w2, isUser, isLive, isDone, gameLabel }) {
-  const [tip1, setTip1] = useState(false);
-  const [tip2, setTip2] = useState(false);
+function MatchupCard({ s1, n1, fn1, w1, s2, n2, fn2, w2, isUser, isLive, isDone, gameLabel, team1, team2 }) {
   const w1Leading = w1 > w2, w2Leading = w2 > w1;
   const winner1 = isDone && w1Leading, winner2 = isDone && w2Leading;
-  const Tip = ({ text, show }) => show ? (
-    <div style={{ position: 'absolute', left: 0, top: -24, zIndex: 9999, background: 'var(--color-text)', color: 'var(--color-text-inverse)', fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px', whiteSpace: 'nowrap', pointerEvents: 'none' }}>{text}</div>
-  ) : null;
+  // Create pseudo-team objects for TeamName if full team objects not provided
+  const t1 = team1 || (fn1 ? { name: fn1, abbreviation: n1 } : null);
+  const t2 = team2 || (fn2 ? { name: fn2, abbreviation: n2 } : null);
   return (
     <div style={{ width: 130, border: isUser ? '1px solid var(--color-accent-border)' : '1px solid var(--color-border)', borderLeft: isUser ? '3px solid var(--color-accent)' : undefined, background: 'var(--color-bg-raised)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', overflow: 'visible', position: 'relative', opacity: isDone ? 0.85 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', gap: 4, borderBottom: '1px solid var(--color-border-subtle)' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--color-text-tertiary)', minWidth: 11 }}>{s1}</span>
-        <span style={{ flex: 1, fontWeight: isUser ? 700 : winner1 ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, position: 'relative', cursor: 'default', color: isUser ? 'var(--color-accent)' : winner2 ? 'var(--color-text-tertiary)' : 'var(--color-text)', textDecoration: winner2 ? 'line-through' : 'none' }} onMouseEnter={() => fn1 && setTip1(true)} onMouseLeave={() => setTip1(false)}>
-          <Tip text={fn1} show={tip1} />{n1}
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10 }}>
+          <TeamName team={t1} style={{ fontWeight: isUser ? 700 : winner1 ? 700 : 500, cursor: 'default', color: isUser ? 'var(--color-accent)' : winner2 ? 'var(--color-text-tertiary)' : 'var(--color-text)', textDecoration: winner2 ? 'line-through' : 'none' }} />
         </span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, minWidth: 10, textAlign: 'right', color: w1Leading && !isDone ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{w1}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', gap: 4 }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--color-text-tertiary)', minWidth: 11 }}>{s2}</span>
-        <span style={{ flex: 1, fontWeight: winner2 ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, position: 'relative', cursor: 'default', color: winner1 ? 'var(--color-text-tertiary)' : 'var(--color-text)', textDecoration: winner1 ? 'line-through' : 'none' }} onMouseEnter={() => fn2 && setTip2(true)} onMouseLeave={() => setTip2(false)}>
-          <Tip text={fn2} show={tip2} />{n2}
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10 }}>
+          <TeamName team={t2} style={{ fontWeight: winner2 ? 700 : 500, cursor: 'default', color: winner1 ? 'var(--color-text-tertiary)' : 'var(--color-text)', textDecoration: winner1 ? 'line-through' : 'none' }} />
         </span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, minWidth: 10, textAlign: 'right', color: w2Leading && !isDone ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{w2}</span>
       </div>

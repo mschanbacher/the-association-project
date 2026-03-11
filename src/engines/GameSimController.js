@@ -3324,6 +3324,19 @@ export class GameSimController {
                 }
             }
         }
+        
+        // Update user's series ID if they're in the national tournament
+        const userTeamId = gameState.userTeamId;
+        if (userTeamId) {
+            for (let i = 0; i < natR1Series.length; i++) {
+                const games = schedule.bySeries[natR1Series[i]];
+                if (games?.[0] && (games[0].homeTeamId === userTeamId || games[0].awayTeamId === userTeamId)) {
+                    gameState.userSeriesId = natR1Series[i];
+                    console.log(`🎯 User seeded in T2 National R1: ${natR1Series[i]}`);
+                    break;
+                }
+            }
+        }
     }
     
     /**
@@ -3385,6 +3398,28 @@ export class GameSimController {
             
             // Store bye teams for Sweet 16 seeding
             gameState._t3ByeTeams = byeTeams;
+            
+            // Update user's series ID if they're in the regional round or have a bye
+            const userTeamId = gameState.userTeamId;
+            if (userTeamId) {
+                // Check if user has a bye (top 8)
+                const userByeIdx = byeTeams.findIndex(t => t.id === userTeamId);
+                if (userByeIdx >= 0) {
+                    // User has a bye - they'll be seeded in Sweet 16 later
+                    gameState._userHasT3Bye = true;
+                    console.log(`🎯 User has T3 bye (seed ${userByeIdx + 1}), waiting for Sweet 16 seeding`);
+                } else {
+                    // Check if user is in regional round
+                    for (let i = 0; i < regionalSeries.length; i++) {
+                        const games = schedule.bySeries[regionalSeries[i]];
+                        if (games?.[0] && (games[0].homeTeamId === userTeamId || games[0].awayTeamId === userTeamId)) {
+                            gameState.userSeriesId = regionalSeries[i];
+                            console.log(`🎯 User seeded in Regional: ${regionalSeries[i]}`);
+                            break;
+                        }
+                    }
+                }
+            }
         }
         
         // Check if Sweet 16 needs seeding
@@ -3418,6 +3453,20 @@ export class GameSimController {
                 const regionalWinner = regionalResults[regionalResults.length - 1 - i];
                 if (byeTeam && regionalWinner) {
                     this._populateSeriesWithTeams(sweet16Series[i], byeTeam, regionalWinner);
+                }
+            }
+            
+            // Update user's series ID if they're in Sweet 16
+            const userTeamId = gameState.userTeamId;
+            if (userTeamId) {
+                for (let i = 0; i < sweet16Series.length; i++) {
+                    const games = schedule.bySeries[sweet16Series[i]];
+                    if (games?.[0] && (games[0].homeTeamId === userTeamId || games[0].awayTeamId === userTeamId)) {
+                        gameState.userSeriesId = sweet16Series[i];
+                        gameState._userHasT3Bye = false;
+                        console.log(`🎯 User seeded in Sweet 16: ${sweet16Series[i]}`);
+                        break;
+                    }
                 }
             }
         }

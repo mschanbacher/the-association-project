@@ -143,6 +143,8 @@ function PlayoffSidebar({
   userInPlayoffs, userEliminated, onSimDay, onSimRound,
   // Playoffs complete
   playoffsComplete, onViewResults,
+  // Box score
+  onShowBoxScore,
 }) {
   const showActiveControls = isUserInSeries && !seriesOver && !playoffsComplete;
   const showEliminatedControls = (!userInPlayoffs || userEliminated) && !playoffsComplete;
@@ -281,7 +283,17 @@ function PlayoffSidebar({
           <Label>Game Log</Label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {games.map((g, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 4px', fontSize: 10 }}>
+              <div 
+                key={i} 
+                onClick={() => g.hasBoxScore && onShowBoxScore?.(g.gameIndex)}
+                style={{ 
+                  display: 'flex', alignItems: 'center', gap: 5, padding: '3px 4px', fontSize: 10,
+                  cursor: g.hasBoxScore ? 'pointer' : 'default',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={(e) => { if (g.hasBoxScore) e.currentTarget.style.background = 'var(--color-bg-sunken)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--color-text-tertiary)', minWidth: 13 }}>G{i + 1}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, fontWeight: 500, padding: '1px 4px', background: g.userWon ? 'var(--color-win-bg)' : 'var(--color-loss-bg)', color: g.userWon ? 'var(--color-win)' : 'var(--color-loss)' }}>
                   {g.userWon ? 'W' : 'L'}
@@ -519,7 +531,8 @@ export function PlayoffHub({ data, onClose }) {
     let oppWins = 0;
     const playedGames = [];
     
-    for (const game of seriesGames) {
+    for (let idx = 0; idx < seriesGames.length; idx++) {
+      const game = seriesGames[idx];
       if (game.played && game.result) {
         const userIsHome = game.homeTeamId === userTeamId;
         const userScore = userIsHome ? game.result.homeScore : game.result.awayScore;
@@ -531,11 +544,13 @@ export function PlayoffHub({ data, onClose }) {
         
         playedGames.push({
           gameNumber: game.gameNumber,
+          gameIndex: idx,
           userScore,
           oppScore,
           userWon,
           location: userIsHome ? 'vs' : '@',
-          date: game.date
+          date: game.date,
+          hasBoxScore: !!game.boxScore
         });
       }
     }
@@ -651,6 +666,32 @@ export function PlayoffHub({ data, onClose }) {
     }
     setTimeout(() => refresh?.(), 100);
   }, [refresh]);
+
+  const handleShowBoxScore = useCallback((gameIndex) => {
+    console.log('📊 Show Box Score clicked for game index:', gameIndex);
+    
+    if (!liveUserSeriesId || !livePlayoffSchedule?.bySeries) return;
+    
+    const seriesGames = livePlayoffSchedule.bySeries[liveUserSeriesId] || [];
+    const game = seriesGames[gameIndex];
+    
+    if (!game?.boxScore) {
+      console.log('No box score available for this game');
+      return;
+    }
+    
+    const boxData = {
+      home: game.boxScore.home,
+      away: game.boxScore.away,
+      date: game.date,
+      hasDetailedStats: true,
+      quarterScores: game.boxScore.quarterScores || null
+    };
+    
+    if (window._reactShowBoxScore) {
+      window._reactShowBoxScore(boxData);
+    }
+  }, [liveUserSeriesId, livePlayoffSchedule]);
 
   const handleViewResults = useCallback(() => {
     console.log('📊 View Results clicked');
@@ -877,6 +918,8 @@ export function PlayoffHub({ data, onClose }) {
         // Playoffs complete
         playoffsComplete={livePlayoffData?.completed}
         onViewResults={handleViewResults}
+        // Box score
+        onShowBoxScore={handleShowBoxScore}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Top bar */}

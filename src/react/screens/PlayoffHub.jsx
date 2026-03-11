@@ -330,20 +330,20 @@ function MatchupCard({ s1, n1, fn1, w1, s2, n2, fn2, w2, isUser, isLive, isDone,
     <div style={{ position: 'absolute', left: 0, top: -24, zIndex: 9999, background: 'var(--color-text)', color: 'var(--color-text-inverse)', fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px', whiteSpace: 'nowrap', pointerEvents: 'none' }}>{text}</div>
   ) : null;
   return (
-    <div style={{ width: 130, border: isUser ? '1px solid var(--color-accent-border)' : '1px solid var(--color-border)', borderLeft: isUser ? '3px solid var(--color-accent)' : undefined, background: 'var(--color-bg-raised)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', overflow: 'visible', position: 'relative', opacity: isDone ? 0.62 : 1 }}>
+    <div style={{ width: 130, border: isUser ? '1px solid var(--color-accent-border)' : '1px solid var(--color-border)', borderLeft: isUser ? '3px solid var(--color-accent)' : undefined, background: 'var(--color-bg-raised)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', overflow: 'visible', position: 'relative', opacity: isDone ? 0.85 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', gap: 4, borderBottom: '1px solid var(--color-border-subtle)' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--color-text-tertiary)', minWidth: 11 }}>{s1}</span>
-        <span style={{ flex: 1, fontWeight: isUser ? 700 : winner1 ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, position: 'relative', cursor: 'default', color: isUser ? 'var(--color-accent)' : winner1 ? 'var(--color-win)' : winner2 ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)', textDecoration: winner2 ? 'line-through' : 'none' }} onMouseEnter={() => fn1 && setTip1(true)} onMouseLeave={() => setTip1(false)}>
+        <span style={{ flex: 1, fontWeight: isUser ? 700 : winner1 ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, position: 'relative', cursor: 'default', color: isUser ? 'var(--color-accent)' : winner2 ? 'var(--color-text-tertiary)' : 'var(--color-text)', textDecoration: winner2 ? 'line-through' : 'none' }} onMouseEnter={() => fn1 && setTip1(true)} onMouseLeave={() => setTip1(false)}>
           <Tip text={fn1} show={tip1} />{n1}
         </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, minWidth: 10, textAlign: 'right', color: winner1 ? 'var(--color-win)' : w1Leading && !isDone ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{w1}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, minWidth: 10, textAlign: 'right', color: w1Leading && !isDone ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{w1}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', gap: 4 }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--color-text-tertiary)', minWidth: 11 }}>{s2}</span>
-        <span style={{ flex: 1, fontWeight: winner2 ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, position: 'relative', cursor: 'default', color: winner2 ? 'var(--color-win)' : winner1 ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)', textDecoration: winner1 ? 'line-through' : 'none' }} onMouseEnter={() => fn2 && setTip2(true)} onMouseLeave={() => setTip2(false)}>
+        <span style={{ flex: 1, fontWeight: winner2 ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, position: 'relative', cursor: 'default', color: winner1 ? 'var(--color-text-tertiary)' : 'var(--color-text)', textDecoration: winner1 ? 'line-through' : 'none' }} onMouseEnter={() => fn2 && setTip2(true)} onMouseLeave={() => setTip2(false)}>
           <Tip text={fn2} show={tip2} />{n2}
         </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, minWidth: 10, textAlign: 'right', color: winner2 ? 'var(--color-win)' : w2Leading && !isDone ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{w2}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, minWidth: 10, textAlign: 'right', color: w2Leading && !isDone ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{w2}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderTop: '1px solid var(--color-border-subtle)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.03em', background: isLive ? 'var(--color-win-bg)' : 'var(--color-bg-sunken)', color: isLive ? 'var(--color-win)' : 'var(--color-text-tertiary)' }}>
         {isLive && <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--color-win)', flexShrink: 0 }} />}
@@ -1114,7 +1114,7 @@ function T1BracketNew({ bracket, schedule, userTeamId }) {
       r1Winners[confKey].push(rec.winner);
       
       allR1Cards.push(
-        <Slot key={seriesId} h={58}>
+        <Slot key={seriesId} h={65}>
           <MatchupCard
             s1={hi + 1} n1={abbr(higher)} fn1={higher?.name} w1={rec.w1}
             s2={lo + 1} n2={abbr(lower)} fn2={lower?.name} w2={rec.w2}
@@ -1154,7 +1154,7 @@ function T1BracketNew({ bracket, schedule, userTeamId }) {
     const hasAnyGames = rec.w1 > 0 || rec.w2 > 0;
     
     r2Cards.push(
-      <Slot key={id} h={116}>
+      <Slot key={id} h={130}>
         {hasBothTeams ? (
           <MatchupCard
             n1={abbr(higher)} fn1={higher?.name} w1={rec.w1}
@@ -1193,7 +1193,7 @@ function T1BracketNew({ bracket, schedule, userTeamId }) {
     const hasAnyGames = rec.w1 > 0 || rec.w2 > 0;
     
     cfCards.push(
-      <Slot key={id} h={232}>
+      <Slot key={id} h={260}>
         {hasBothTeams ? (
           <MatchupCard
             n1={abbr(higher)} fn1={higher?.name} w1={rec.w1}
@@ -1223,20 +1223,20 @@ function T1BracketNew({ bracket, schedule, userTeamId }) {
         <ColHeader>Round 1</ColHeader>
         {allR1Cards}
       </div>
-      <ConnCol slots={8} slotH={58} />
+      <ConnCol slots={8} slotH={65} />
       <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <ColHeader>Conf. Semis</ColHeader>
         {r2Cards}
       </div>
-      <ConnCol slots={4} slotH={116} />
+      <ConnCol slots={4} slotH={130} />
       <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <ColHeader>Conf. Finals</ColHeader>
         {cfCards}
       </div>
-      <ConnCol slots={2} slotH={232} />
+      <ConnCol slots={2} slotH={260} />
       <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <ColHeader tier={1}>Finals</ColHeader>
-        <Slot h={464}>
+        <Slot h={520}>
           {finalsHasBothTeams ? (
             <MatchupCard
               n1={abbr(finalsHigher)} fn1={finalsHigher?.name} w1={finalsRec.w1}
@@ -1252,16 +1252,17 @@ function T1BracketNew({ bracket, schedule, userTeamId }) {
         </Slot>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', width: 20, flexShrink: 0, paddingTop: 28, alignItems: 'center' }}>
-        <div style={{ height: 464, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ height: 520, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ color: 'rgba(212,168,67,0.5)', fontSize: 14, fontFamily: 'var(--font-mono)' }}>›</span>
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <ColHeader tier={1}>Champion</ColHeader>
-        <Slot h={464}>
+        <Slot h={520}>
           {finalsRec.complete && finalsRec.winner ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-tier1)', marginBottom: 4 }}>🏆 CHAMPION</div>
+              <div style={{ width: 12, height: 12, background: 'var(--color-tier1)', marginBottom: 8 }} />
+              <div style={{ fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', color: 'var(--color-tier1)', marginBottom: 4 }}>T1 CHAMPION</div>
               <div style={{ fontSize: 14, fontWeight: 700 }}>{finalsRec.winner.name}</div>
             </div>
           ) : (

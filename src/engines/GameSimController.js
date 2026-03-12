@@ -2975,45 +2975,88 @@ export class GameSimController {
             return;
         }
         
-        // Determine current round from earliest incomplete series
-        const currentRound = this._getCurrentPlayoffRound();
+        // Get user's tier
+        const userTier = gameState.userTier || gameState.currentTier || 1;
+        const tierPrefix = `t${userTier}-`;
+        
+        // Determine current round for USER'S TIER from earliest incomplete series
+        const currentRound = this._getCurrentPlayoffRoundForTier(userTier);
         if (!currentRound) {
-            console.log('✅ All rounds complete');
+            console.log(`✅ All T${userTier} rounds complete`);
             this._checkPlayoffsComplete();
             return;
         }
         
-        console.log(`🏀 Simulating playoff round: ${currentRound}`);
+        console.log(`🏀 Simulating T${userTier} playoff round: ${currentRound}`);
         
-        // Sim all games until this round is complete
+        // Find the latest date needed to complete this round
+        const roundGames = schedule.games.filter(g => 
+            g.seriesId?.startsWith(tierPrefix) && g.round === currentRound && !g.played
+        );
+        
+        if (roundGames.length === 0) {
+            console.log(`✅ Round ${currentRound} already complete`);
+            this._updateBracketsAfterGames();
+            this._updateUserSeriesForNextRound();
+            helpers.saveGameState();
+            if (window._reactPlayoffHubRefresh) window._reactPlayoffHubRefresh();
+            return;
+        }
+        
+        // Find the last date of games in this round
+        const roundDates = [...new Set(roundGames.map(g => g.date))].sort();
+        const lastRoundDate = roundDates[roundDates.length - 1];
+        
+        console.log(`📅 Simulating all games through ${lastRoundDate} to complete round`);
+        
+        // Sim ALL games (all tiers) up through that date
         let iterations = 0;
-        while (iterations < 200) { // Safety limit
+        let gamesSimmed = 0;
+        while (iterations < 500) { // Safety limit
             iterations++;
             
-            // Check if round is complete
-            if (this._isRoundComplete(currentRound)) {
-                console.log(`✅ Round ${currentRound} complete`);
-                break;
-            }
-            
-            // Find next game in this round
+            // Find next unplayed game date across all tiers
             const nextDate = engines.PlayoffEngine.getNextPlayoffGameDate(schedule, null);
             if (!nextDate) break;
             
+            // Stop if we've passed the round's end date
+            if (nextDate > lastRoundDate) {
+                // But first check if the user's round is actually complete
+                if (this._isRoundCompleteForTier(currentRound, userTier)) {
+                    break;
+                }
+                // Round not complete but no more games on expected dates - might need more games
+                // This can happen in Bo7 series that go to game 7
+                const stillNeeded = schedule.games.filter(g => 
+                    g.seriesId?.startsWith(tierPrefix) && g.round === currentRound && !g.played
+                );
+                if (stillNeeded.length === 0) break;
+                // Update lastRoundDate to include newly necessary games
+            }
+            
+            // Get all games on this date (all tiers)
             const gamesToday = engines.PlayoffEngine.getPlayoffGamesOnDate(schedule, nextDate)
-                .filter(g => g.round === currentRound);
+                .filter(g => !g.played && !g.skipped);
             
             if (gamesToday.length === 0) {
-                // No more games in this round today, advance
                 gameState.currentDate = nextDate;
                 continue;
             }
             
             for (const game of gamesToday) {
-                this._simOneScheduledGame(game);
+                if (!game.played && !game.skipped) {
+                    this._simOneScheduledGame(game);
+                    gamesSimmed++;
+                }
             }
             
             gameState.currentDate = nextDate;
+            
+            // Check if user's tier round is now complete
+            if (this._isRoundCompleteForTier(currentRound, userTier)) {
+                console.log(`✅ T${userTier} round ${currentRound} complete after ${gamesSimmed} games`);
+                break;
+            }
         }
         
         this._updateBracketsAfterGames();
@@ -3859,6 +3902,46 @@ export class GameSimController {
     }
 
     /**
+     * Get current playoff round for a specific tier.
+     */
+    _getCurrentPlayoffRoundForTier(tier) {
+        const { gameState, engines } = this.ctx;
+        const schedule = gameState.playoffSchedule;
+        
+        if (!schedule) return null;
+        
+        const tierPrefix = `t${tier}-`;
+        
+        // Round order varies by tier
+        const roundOrders = {
+            1: ['Round1', 'Round2', 'ConfFinals', 'Finals'],
+            2: ['DivSemi', 'DivFinal', 'NatRound1', 'NatQuarter', 'NatSemi', 'ThirdPlace', 'Finals'],
+            3: ['MetroFinal', 'Regional', 'Sweet16', 'Quarter', 'Semi', 'ThirdPlace', 'Finals']
+        };
+        
+        const roundOrder = roundOrders[tier] || roundOrders[1];
+        
+        for (const round of roundOrder) {
+            // Get games for this tier and round
+            const roundGames = schedule.games.filter(g => 
+                g.seriesId?.startsWith(tierPrefix) && g.round === round
+            );
+            if (roundGames.length === 0) continue;
+            
+            // Check if any series in this round is incomplete
+            const seriesIds = [...new Set(roundGames.map(g => g.seriesId))];
+            for (const seriesId of seriesIds) {
+                const state = engines.PlayoffEngine.getSeriesState(schedule, seriesId);
+                if (!state.complete) {
+                    return round;
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    /**
      * Check if a specific round is complete (all series decided).
      */
     _isRoundComplete(round) {
@@ -3868,6 +3951,32 @@ export class GameSimController {
         if (!schedule) return true;
         
         const roundGames = schedule.games.filter(g => g.round === round);
+        const seriesIds = [...new Set(roundGames.map(g => g.seriesId))];
+        
+        for (const seriesId of seriesIds) {
+            const state = engines.PlayoffEngine.getSeriesState(schedule, seriesId);
+            if (!state.complete) return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Check if a specific round is complete for a specific tier.
+     */
+    _isRoundCompleteForTier(round, tier) {
+        const { gameState, engines } = this.ctx;
+        const schedule = gameState.playoffSchedule;
+        
+        if (!schedule) return true;
+        
+        const tierPrefix = `t${tier}-`;
+        const roundGames = schedule.games.filter(g => 
+            g.seriesId?.startsWith(tierPrefix) && g.round === round
+        );
+        
+        if (roundGames.length === 0) return true;
+        
         const seriesIds = [...new Set(roundGames.map(g => g.seriesId))];
         
         for (const seriesId of seriesIds) {

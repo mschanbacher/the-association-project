@@ -42,6 +42,7 @@ import { WatchGameModal } from './screens/WatchGameModal.jsx';
 import { BreakingNewsModal } from './screens/BreakingNewsModal.jsx';
 import { PlayoffHub } from './screens/PlayoffHub.jsx';
 import { PlayoffEndModal } from './screens/PlayoffEndModal.jsx';
+import { GameLogScreen } from './screens/GameLogScreen.jsx';
 
 function AppContent() {
   const { isReady, gameState, refresh } = useGame();
@@ -276,6 +277,7 @@ function AppContent() {
     dashboard:  <DashboardScreen />,
     standings:  <StandingsScreen />,
     schedule:   <ScheduleScreen />,
+    gamelog:    <GameLogScreen />,
     roster:     <RosterScreen />,
     finances:   <FinancesScreen />,
     history:    <HistoryScreen />,

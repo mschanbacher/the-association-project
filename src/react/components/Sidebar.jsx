@@ -5,6 +5,7 @@ const navItems = [
   { id: 'roster',    label: 'Roster' },
   { id: 'standings', label: 'Standings' },
   { id: 'schedule',  label: 'Schedule' },
+  { id: 'gamelog',   label: 'Game Log' },
   { id: 'finances',  label: 'Finances' },
   { id: 'scouting',  label: 'Scouting' },
   { id: 'coach',     label: 'Coach' },

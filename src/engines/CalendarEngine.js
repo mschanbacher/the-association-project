@@ -943,8 +943,17 @@ export class CalendarEngine {
     
     /**
      * Get the next date that has any scheduled (unplayed) games
+     * Checks TODAY first, then future dates
      */
     static getNextGameDate(currentDateStr, gameState) {
+        // First check if there are unplayed games TODAY
+        const todaysGames = CalendarEngine.getGamesForDate(currentDateStr, gameState);
+        const unplayedToday = todaysGames.tier1.filter(g => !g.played).length +
+                             todaysGames.tier2.filter(g => !g.played).length +
+                             todaysGames.tier3.filter(g => !g.played).length;
+        if (unplayedToday > 0) return currentDateStr;
+        
+        // Then check future dates
         let checkDate = CalendarEngine.addDays(currentDateStr, 1);
         const maxCheck = CalendarEngine.toDateString(new Date(
             parseInt(currentDateStr.substring(0, 4)) + 1, 7, 1 // Check up to Aug of next year
@@ -964,6 +973,7 @@ export class CalendarEngine {
     
     /**
      * Get the next date when the user's team has a game
+     * Checks TODAY first (for unplayed games), then future dates
      */
     static getNextUserGameDate(currentDateStr, gameState) {
         const userTeamId = gameState.userTeamId;
@@ -977,7 +987,15 @@ export class CalendarEngine {
         
         if (!userSchedule) return null;
         
-        // Find the next unplayed game for the user's team after current date
+        // First check for unplayed game TODAY - prevents skipping current day's game
+        const todayGame = userSchedule.find(g => 
+            !g.played && 
+            g.date === currentDateStr &&
+            (g.homeTeamId === userTeamId || g.awayTeamId === userTeamId)
+        );
+        if (todayGame) return todayGame.date;
+        
+        // Then find the next unplayed game for the user's team after current date
         const nextGame = userSchedule.find(g => 
             !g.played && 
             g.date > currentDateStr &&

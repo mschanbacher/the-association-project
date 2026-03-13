@@ -4271,30 +4271,23 @@ export class GameSimController {
      */
     static _calcLiveWinProb(margin, elapsedSeconds, userIsHome, preGameProb) {
         const TOTAL = 2880;
-        const remaining = Math.max(0, TOTAL - elapsedSeconds);
+        const timeRemaining = Math.max(1, TOTAL - elapsedSeconds);
+        const timeRemainingFrac = timeRemaining / TOTAL;
 
         // Convert margin to user's perspective
-        // margin > 0 means home is ahead; flip if user is away
         const userMargin = userIsHome ? margin : -margin;
 
-        // Pre-game advantage adjustment: shift from 0.5 baseline
-        // e.g. preGameProb=0.60 → pregameAdj=+1.6 points
-        const preGameAdj = (preGameProb - 0.5) * 8;
-
-        // Adjusted margin includes pre-game expectation
-        const adjustedMargin = userMargin + preGameAdj;
-
-        // Time pressure: sqrt(remaining) gives gentle early weighting,
-        // dramatic convergence in final minutes. k tuned so:
-        //   +10 pts at 2 min remaining → ~93%
-        //   +10 pts at Q3 start (18 min remaining) → ~79%
-        //   +10 pts at tip-off (48 min remaining) → ~68%
-        const timePressure = 1 / (Math.sqrt(remaining / 60 + 0.5));
-        const k = 0.42;
-
-        const raw = 1 / (1 + Math.exp(-k * adjustedMargin * timePressure));
-
-        // Clamp to [0.02, 0.98] — never show 0% or 100% until game ends
-        return Math.min(0.98, Math.max(0.02, raw));
+        // Convert preGameProb to logit
+        const preGameLogit = Math.log(Math.max(0.001, preGameProb) / Math.max(0.001, 1 - preGameProb));
+        
+        // Margin coefficient grows as time runs out
+        const marginCoef = 0.035 * Math.sqrt(1 / timeRemainingFrac);
+        
+        // Pre-game advantage fades linearly
+        const logit = (preGameLogit * timeRemainingFrac) + (marginCoef * userMargin);
+        
+        const prob = 1 / (1 + Math.exp(-logit));
+        
+        return Math.min(0.99, Math.max(0.01, prob));
     }
 }

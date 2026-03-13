@@ -150,10 +150,11 @@ export class GamePipeline {
         const trackWinProb = options.trackWinProbability !== false; // Default to true
         const winProbHistory = [];
         
-        // Calculate pre-game probability based on team ratings
+        // Calculate pre-game probability based on team ratings (same formula as dashboard)
         const homeOvr = homeTeam.rating || homeTeam.ovr || 75;
         const awayOvr = awayTeam.rating || awayTeam.ovr || 75;
-        const preGameProb = 1 / (1 + Math.pow(10, (awayOvr - homeOvr - 3) / 15)); // Home court ~3pts
+        // Elo-style formula: home court worth ~3 points
+        const preGameProb = 1 / (1 + Math.pow(10, (awayOvr - homeOvr - 3) / 15));
         
         if (trackWinProb) {
             winProbHistory.push({
@@ -176,7 +177,8 @@ export class GamePipeline {
                 const homeProb = GamePipeline._calcWinProb(
                     game.homeScore - game.awayScore,
                     elapsedSeconds,
-                    preGameProb
+                    preGameProb,
+                    game.isComplete
                 );
                 winProbHistory.push({
                     possession: game.possession,
@@ -192,6 +194,11 @@ export class GamePipeline {
 
         const result = GamePipeline._buildResult(game, setup);
         if (trackWinProb) {
+            // Ensure final point shows 100% for winner
+            if (winProbHistory.length > 0) {
+                const lastPt = winProbHistory[winProbHistory.length - 1];
+                lastPt.homeProb = lastPt.homeScore > lastPt.awayScore ? 1.0 : 0.0;
+            }
             result.winProbHistory = winProbHistory;
             result.preGameProb = preGameProb;
         }
@@ -213,25 +220,46 @@ export class GamePipeline {
     }
     
     /**
-     * Calculate win probability for home team given margin and time
+     * Calculate win probability for home team given margin and time remaining.
+     * 
+     * Based on empirical NBA logistic regression patterns from play-by-play data.
+     * 
+     * Key behaviors:
+     * - At game start with 0-0: returns exactly preGameProb
+     * - Pre-game advantage fades linearly as game progresses
+     * - Margin effect grows as sqrt(1/timeRemaining) - stronger late game
+     * - Empirical calibration: ~3% swing per 3pts early, ~25% swing late
      */
-    static _calcWinProb(margin, elapsedSeconds, preGameProb = 0.5) {
-        const TOTAL = 2880;
-        const remaining = Math.max(0, TOTAL - elapsedSeconds);
+    static _calcWinProb(margin, elapsedSeconds, preGameProb = 0.5, isGameOver = false) {
+        // If game is over, return definitive result
+        if (isGameOver || elapsedSeconds >= 2880) {
+            if (margin > 0) return 1.0;
+            if (margin < 0) return 0.0;
+            return 0.5; // Tie going to OT
+        }
         
-        // Pre-game advantage adjustment
-        const preGameAdj = (preGameProb - 0.5) * 8;
-        const adjustedMargin = margin + preGameAdj;
+        const TOTAL = 2880; // 48 minutes in seconds
+        const timeRemaining = Math.max(1, TOTAL - elapsedSeconds);
+        const timeRemainingFrac = timeRemaining / TOTAL; // 1.0 at start, ~0 at end
         
-        // Time pressure: sqrt(remaining) gives gentle early weighting,
-        // dramatic convergence in final minutes
-        const timePressure = 1 / (Math.sqrt(remaining / 60 + 0.5));
-        const k = 0.42;
+        // Convert preGameProb to logit space
+        const preGameLogit = Math.log(Math.max(0.001, preGameProb) / Math.max(0.001, 1 - preGameProb));
         
-        const raw = 1 / (1 + Math.exp(-k * adjustedMargin * timePressure));
+        // Margin coefficient grows as time runs out: sqrt(1/timeRemainingFrac)
+        // At start: sqrt(1/1) = 1 → 0.035 per point
+        // At 2 min left: sqrt(1/0.042) = 4.9 → 0.17 per point  
+        // At 10 sec left: sqrt(1/0.0035) = 17 → 0.60 per point
+        const marginCoef = 0.035 * Math.sqrt(1 / timeRemainingFrac);
         
-        // Clamp to [0.02, 0.98]
-        return Math.min(0.98, Math.max(0.02, raw));
+        // Pre-game advantage fades linearly as game progresses
+        // At start: full preGameLogit
+        // At end: 0 (only margin matters)
+        const logit = (preGameLogit * timeRemainingFrac) + (marginCoef * margin);
+        
+        const prob = 1 / (1 + Math.exp(-logit));
+        
+        // Clamp to [0.01, 0.99]
+        return Math.min(0.99, Math.max(0.01, prob));
     }
 
     /**

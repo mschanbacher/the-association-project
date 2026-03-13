@@ -658,7 +658,8 @@ export const StatEngine = {
         const westTeam = buildTeam(westRoster, `${tierLabel} West All-Stars`, 'west');
         
         // Simulate the game (All-Star games tend to be high-scoring)
-        const result = GameEngine.calculateGameOutcome(eastTeam, westTeam, false);
+        // Don't track win probability for All-Star game
+        const result = GameEngine.calculateGameOutcome(eastTeam, westTeam, false, false);
         
         // Boost scores to feel more like an All-Star game (typically higher scoring)
         const scoreBoost = Math.floor(Math.random() * 15) + 10;

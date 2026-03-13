@@ -148,7 +148,8 @@ export class GamePipeline {
         const setup = GamePipeline._setupTeams(game);
         
         // Track win probability if requested
-        const trackWinProb = options.trackWinProbability !== false; // Default to true
+        // Track win probability only if explicitly requested (default false to save memory)
+        const trackWinProb = options.trackWinProbability === true;
         const winProbHistory = [];
         
         // Calculate pre-game probability using unified LeagueManager function

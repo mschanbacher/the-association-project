@@ -135,7 +135,8 @@ export class SimulationController {
      * @returns {Object} Game result
      */
     simulatePlayoffGame(homeTeam, awayTeam) {
-        const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, true);
+        // Don't track win probability for batch playoff simulations
+        const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, true, false);
         this.accumulatePlayerStats(homeTeam, result.homePlayerStats);
         this.accumulatePlayerStats(awayTeam, result.awayPlayerStats);
         this.notifyObservers('playoffGameComplete', result);

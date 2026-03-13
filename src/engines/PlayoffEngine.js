@@ -285,7 +285,8 @@ export class PlayoffEngine {
             const awayTeam = pattern[gameNum] === 'higher' ? lowerSeed : higherSeed;
             
             // Use the simulation engine for realistic games
-            const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, true);
+            // Don't track win probability to save memory during batch playoff sim
+            const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, true, false);
             
             games.push({
                 gameNumber: gameNum + 1,

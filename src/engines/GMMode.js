@@ -667,17 +667,24 @@ export class GMMode {
                 ];
                 const results = [];
                 for (const config of tierConfigs) {
+                    console.log(`  ⭐ Processing ${config.label}...`);
                     const gamesPerTeam = config.tier === 1 ? 82 : config.tier === 2 ? 60 : 40;
                     const minGames = Math.floor(gamesPerTeam * config.minPct);
+                    console.log(`    - minGames: ${minGames}, teams: ${config.teams?.length || 0}`);
                     const confMap = this.deps.buildConferenceMap(config.teams, config.tier);
+                    console.log(`    - confMap built`);
                     const selections = StatEngine.selectAllStars(config.teams, minGames, confMap);
+                    console.log(`    - selections: east=${selections.east?.length || 0}, west=${selections.west?.length || 0}`);
                     const gameResult = StatEngine.simulateAllStarGame(selections.east, selections.west, config.label);
+                    console.log(`    - game simulated: ${gameResult.eastScore}-${gameResult.westScore}`);
                     results.push({ ...config, selections, gameResult });
                 }
+                console.log('⭐ All-Star selection complete');
                 this.gameState._allStarCompleted = true;
                 this.gameState._allStarResults = results;
             }
         }
+        console.log('🏁 Calling finishSeasonBatch...');
         this.finishSeasonBatch();
     }
     

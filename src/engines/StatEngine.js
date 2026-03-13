@@ -617,6 +617,20 @@ export const StatEngine = {
      * @returns {Object} Game result with box score highlights
      */
     simulateAllStarGame(eastRoster, westRoster, tierLabel) {
+        // Early exit if either roster is empty (not enough players qualified)
+        if (!eastRoster || eastRoster.length === 0 || !westRoster || westRoster.length === 0) {
+            console.log(`⚠️ Skipping ${tierLabel} All-Star game - not enough qualified players`);
+            return {
+                eastScore: 0,
+                westScore: 0,
+                winner: 'None',
+                gameMVP: null,
+                eastTeam: null,
+                westTeam: null,
+                skipped: true
+            };
+        }
+        
         // Build temporary team objects for the game engine
         const buildTeam = (roster, name, id) => {
             const players = roster.map((p, idx) => {

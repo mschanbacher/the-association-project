@@ -43,6 +43,7 @@ import { BreakingNewsModal } from './screens/BreakingNewsModal.jsx';
 import { PlayoffHub } from './screens/PlayoffHub.jsx';
 import { PlayoffEndModal } from './screens/PlayoffEndModal.jsx';
 import { GameLogScreen } from './screens/GameLogScreen.jsx';
+import GlossaryScreen from './screens/GlossaryScreen.jsx';
 
 function AppContent() {
   const { isReady, gameState, refresh } = useGame();
@@ -283,6 +284,7 @@ function AppContent() {
     history:    <HistoryScreen />,
     coach:      <CoachScreen />,
     scouting:   <ScoutingScreen />,
+    glossary:   <GlossaryScreen />,
   };
 
   // Diagnostic logging for PlayoffHub render decision

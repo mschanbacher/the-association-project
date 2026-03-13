@@ -10,6 +10,7 @@ const navItems = [
   { id: 'scouting',  label: 'Scouting' },
   { id: 'coach',     label: 'Coach' },
   { id: 'history',   label: 'History' },
+  { id: 'glossary',  label: 'Glossary' },
 ];
 
 export function Sidebar({ activeScreen, onNavigate }) {

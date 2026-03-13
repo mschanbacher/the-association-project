@@ -706,6 +706,27 @@ export class GMMode {
             safetyCounter++;
             const currentDate = this.gameState.currentDate;
             
+            // Check for All-Star Weekend
+            const seasonDates = this.gameState.seasonDates;
+            if (seasonDates && !this.gameState._allStarCompleted) {
+                const allStarStart = this.deps.CalendarEngine.toDateString(seasonDates.allStarStart);
+                if (currentDate === allStarStart) {
+                    console.log('⭐ finishSeasonBatch: Triggering All-Star Weekend');
+                    this.deps.saveGameState();
+                    this.deps.updateUI();
+                    // Run All-Star and set callback to resume
+                    window._allStarContinueCallback = () => {
+                        delete window._allStarContinueCallback;
+                        // Skip past All-Star weekend
+                        const allStarEnd = this.deps.CalendarEngine.toDateString(seasonDates.allStarEnd);
+                        this.gameState.currentDate = this.deps.CalendarEngine.addDays(allStarEnd, 1);
+                        this.finishSeasonBatch();
+                    };
+                    this.deps.runAllStarWeekend();
+                    return;
+                }
+            }
+            
             const todaysGames = this.deps.CalendarEngine.getGamesForDate(currentDate, this.gameState);
             const unplayed = todaysGames.tier1.filter(g => !g.played).length +
                            todaysGames.tier2.filter(g => !g.played).length +

@@ -465,7 +465,8 @@ export class GMMode {
                 this.deps.applyFatigueAutoRest(awayTeam, false);
                 
                 // Simulate - only track win probability for user games to save memory
-                const gameResult = this.sim.simulateFullGame(homeTeam, awayTeam, false, isUserGame);
+                // Use lightweight mode for non-user games (skips events and detailed stats)
+                const gameResult = this.sim.simulateFullGame(homeTeam, awayTeam, false, isUserGame, !isUserGame);
                 game.played = true;
                 game.homeScore = gameResult.homeScore;
                 game.awayScore = gameResult.awayScore;
@@ -793,7 +794,8 @@ export class GMMode {
                     if (!home || !away) { game.played = true; continue; }
                     
                     // No win probability tracking for orphan games (memory optimization)
-                    const result = this.sim.simulateFullGame(home, away, false, false);
+                    // Use lightweight mode (skips events and detailed stats)
+                    const result = this.sim.simulateFullGame(home, away, false, false, true);
                     game.played = true;
                     game.homeScore = result.homeScore;
                     game.awayScore = result.awayScore;

@@ -163,16 +163,20 @@ export const GameEngine = {
      * @param {Object} homeTeam - Home team object
      * @param {Object} awayTeam - Away team object
      * @param {boolean} isPlayoffs - Whether this is a playoff game
+     * @param {boolean} trackWinProbability - Whether to track win probability history
+     * @param {boolean} lightweight - Skip events and player stats (for batch sims)
      * @returns {Object} Game result with scores, winner, and player stat lines
      */
-    calculateGameOutcome(homeTeam, awayTeam, isPlayoffs = false, trackWinProbability = false) {
+    calculateGameOutcome(homeTeam, awayTeam, isPlayoffs = false, trackWinProbability = false, lightweight = false) {
         const tier = homeTeam.tier || awayTeam.tier || 1;
         // Use GamePipeline for possession-by-possession simulation
         // trackWinProbability defaults to false to prevent memory issues during batch sims
+        // lightweight mode skips events and detailed player stats
         return GamePipeline.resolve(homeTeam, awayTeam, {
             isPlayoffs: isPlayoffs,
             tier: tier,
             trackWinProbability: trackWinProbability,
+            lightweight: lightweight,
         });
     },
 

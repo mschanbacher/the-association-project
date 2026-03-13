@@ -659,7 +659,8 @@ export const StatEngine = {
         
         // Simulate the game (All-Star games tend to be high-scoring)
         // Don't track win probability for All-Star game
-        const result = GameEngine.calculateGameOutcome(eastTeam, westTeam, false, false);
+        // Use lightweight mode (skips events and detailed stats)
+        const result = GameEngine.calculateGameOutcome(eastTeam, westTeam, false, false, true);
         
         // Boost scores to feel more like an All-Star game (typically higher scoring)
         const scoreBoost = Math.floor(Math.random() * 15) + 10;

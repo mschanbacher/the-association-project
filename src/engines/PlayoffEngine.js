@@ -286,7 +286,8 @@ export class PlayoffEngine {
             
             // Use the simulation engine for realistic games
             // Don't track win probability to save memory during batch playoff sim
-            const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, true, false);
+            // Use lightweight mode (skips events and detailed stats)
+            const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, true, false, true);
             
             games.push({
                 gameNumber: gameNum + 1,

@@ -17,12 +17,15 @@ export class SimulationController {
      * @param {Object} homeTeam - Home team object
      * @param {Object} awayTeam - Away team object
      * @param {boolean} isPlayoffs - Whether this is a playoff game
+     * @param {boolean} trackWinProbability - Whether to track win probability
+     * @param {boolean} lightweight - Skip events/stats for memory efficiency
      * @returns {Object} Game result
      */
-    simulateFullGame(homeTeam, awayTeam, isPlayoffs = false, trackWinProbability = false) {
+    simulateFullGame(homeTeam, awayTeam, isPlayoffs = false, trackWinProbability = false, lightweight = false) {
         // Use GameEngine to calculate outcome
         // trackWinProbability should only be true for user team games to save memory
-        const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, isPlayoffs, trackWinProbability);
+        // lightweight mode skips events and detailed player stats
+        const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, isPlayoffs, trackWinProbability, lightweight);
         
         // Apply state changes
         if (result.homeWon) {
@@ -136,7 +139,8 @@ export class SimulationController {
      */
     simulatePlayoffGame(homeTeam, awayTeam) {
         // Don't track win probability for batch playoff simulations
-        const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, true, false);
+        // Don't use lightweight mode here - we need player stats for accumulation
+        const result = GameEngine.calculateGameOutcome(homeTeam, awayTeam, true, false, false);
         this.accumulatePlayerStats(homeTeam, result.homePlayerStats);
         this.accumulatePlayerStats(awayTeam, result.awayPlayerStats);
         this.notifyObservers('playoffGameComplete', result);

@@ -94,7 +94,8 @@ export class GameSimController {
                     helpers.applyFatigueAutoRest(home, false);
                     helpers.applyFatigueAutoRest(away, false);
                     // No win probability tracking for non-user games
-                    const result = helpers.getSimulationController().simulateFullGame(home, away, false, false);
+                    // Use lightweight mode (skips events and detailed stats)
+                    const result = helpers.getSimulationController().simulateFullGame(home, away, false, false, true);
                     game.played = true;
                     game.homeScore = result.homeScore;
                     game.awayScore = result.awayScore;

@@ -87,6 +87,8 @@ class PipelineGameState {
         this.lastPossessionWasFastBreak = false;
         this.events = [];
         this.isComplete = false;
+        // Lightweight mode skips returning events to save memory
+        this.lightweight = options.lightweight === true;
 
         // Momentum (-10 to +10, positive = home advantage)
         this.momentum = 0;
@@ -128,6 +130,16 @@ class PipelineGameState {
 // ═══════════════════════════════════════════════════════════════
 
 export class GamePipeline {
+
+    /**
+     * Push an event to the game log only if not in lightweight mode
+     * This saves memory during batch simulations
+     */
+    static _pushEvent(game, event) {
+        if (!game.lightweight) {
+            game.events.push(event);
+        }
+    }
 
     // Pace constants: seconds consumed per possession type
     static PACE = {
@@ -303,12 +315,12 @@ export class GamePipeline {
                 if (side === 'home' && game.homeTimeouts > 0) {
                     game.homeTimeouts--;
                     game.momentum = Math.max(-3, Math.min(3, game.momentum * 0.3));
-                    game.events.push({ type: 'timeout', side: 'home', quarter: game.clock.quarter });
+                    GamePipeline._pushEvent(game, { type: 'timeout', side: 'home', quarter: game.clock.quarter });
                     return true;
                 } else if (side === 'away' && game.awayTimeouts > 0) {
                     game.awayTimeouts--;
                     game.momentum = Math.max(-3, Math.min(3, game.momentum * 0.3));
-                    game.events.push({ type: 'timeout', side: 'away', quarter: game.clock.quarter });
+                    GamePipeline._pushEvent(game, { type: 'timeout', side: 'away', quarter: game.clock.quarter });
                     return true;
                 }
                 return false;
@@ -496,7 +508,7 @@ export class GamePipeline {
                     }
                 }
                 GamePipeline._addScore(game, isHome, ftMade);
-                game.events.push({
+                GamePipeline._pushEvent(game, {
                     type: 'foul_shooting', shooter: shooter.player.name,
                     fouler: fouler ? fouler.player.name : 'unknown',
                     ftMade, ftAttempted: 2, side: isHome ? 'home' : 'away',
@@ -518,7 +530,7 @@ export class GamePipeline {
         const toChance = (baseTORate[game.tier] || 0.14) + defenseImpact * 0.15;
         if (roll < Math.max(0.11, Math.min(0.16, toChance))) {
             shooterStats.turnovers++;
-            game.events.push({
+            GamePipeline._pushEvent(game, {
                 type: 'turnover', player: shooter.player.name, side: isHome ? 'home' : 'away',
                 quarter: game.clock.quarter, clock: game.clock.display
             });
@@ -526,7 +538,7 @@ export class GamePipeline {
             const stealer = GamePipeline._pickDefender(defRotation);
             if (stealer && Math.random() < 0.55) {
                 defStats[stealer.player.id].steals++;
-                game.events.push({
+                GamePipeline._pushEvent(game, {
                     type: 'steal', player: stealer.player.name, side: isHome ? 'away' : 'home',
                     quarter: game.clock.quarter
                 });
@@ -560,7 +572,7 @@ export class GamePipeline {
                         }
                     }
                     GamePipeline._addScore(game, isHome, ftMade);
-                    game.events.push({
+                    GamePipeline._pushEvent(game, {
                         type: 'foul_shooting', shooter: shooter.player.name, fouler: fouler.player.name,
                         ftMade, ftAttempted: ftCount, side: isHome ? 'home' : 'away',
                         quarter: game.clock.quarter, clock: game.clock.display
@@ -568,7 +580,7 @@ export class GamePipeline {
                     GamePipeline._endPossession(game, setup, ftMade > 0, isHome);
                     return;
                 }
-                game.events.push({
+                GamePipeline._pushEvent(game, {
                     type: 'foul', fouler: fouler.player.name, side: isHome ? 'away' : 'home',
                     quarter: game.clock.quarter
                 });
@@ -605,13 +617,13 @@ export class GamePipeline {
                     shooterStats.points++;
                     GamePipeline._addScore(game, isHome, 1);
                 }
-                game.events.push({
+                GamePipeline._pushEvent(game, {
                     type: 'and_one', player: shooter.player.name, points: points,
                     side: isHome ? 'home' : 'away', quarter: game.clock.quarter, clock: game.clock.display
                 });
             }
 
-            game.events.push({
+            GamePipeline._pushEvent(game, {
                 type: 'made_shot', player: shooter.player.name, points: points,
                 shotType: isThree ? '3pt' : '2pt', side: isHome ? 'home' : 'away',
                 homeScore: game.homeScore, awayScore: game.awayScore,
@@ -621,7 +633,7 @@ export class GamePipeline {
             GamePipeline._endPossession(game, setup, true, isHome);
         } else {
             // === MISSED SHOT ===
-            game.events.push({
+            GamePipeline._pushEvent(game, {
                 type: 'missed_shot', player: shooter.player.name,
                 shotType: isThree ? '3pt' : '2pt', side: isHome ? 'home' : 'away',
                 quarter: game.clock.quarter, clock: game.clock.display
@@ -746,7 +758,7 @@ export class GamePipeline {
 
         const run = isHome ? game.homeRun : game.awayRun;
         if (run >= 8 && run % 4 === 0) {
-            game.events.push({
+            GamePipeline._pushEvent(game, {
                 type: 'run', side: isHome ? 'home' : 'away', run: run,
                 quarter: game.clock.quarter
             });
@@ -786,7 +798,7 @@ export class GamePipeline {
         if (game.isComplete) return; // Already ended
 
         if (game.clock.quarter < 4) {
-            game.events.push({
+            GamePipeline._pushEvent(game, {
                 type: 'quarter_end', quarter: game.clock.quarter,
                 homeScore: game.homeScore, awayScore: game.awayScore
             });
@@ -796,19 +808,19 @@ export class GamePipeline {
             game.momentum *= 0.5;
         } else if (game.clock.quarter === 4) {
             if (game.homeScore === game.awayScore) {
-                game.events.push({
+                GamePipeline._pushEvent(game, {
                     type: 'quarter_end', quarter: 4,
                     homeScore: game.homeScore, awayScore: game.awayScore
                 });
                 game.quarterScores.home.push(0);
                 game.quarterScores.away.push(0);
                 game.clock.startOvertime();
-                game.events.push({ type: 'overtime', homeScore: game.homeScore, awayScore: game.awayScore });
+                GamePipeline._pushEvent(game, { type: 'overtime', homeScore: game.homeScore, awayScore: game.awayScore });
                 GamePipeline._quarterBreakSubs(setup.homeRotation);
                 GamePipeline._quarterBreakSubs(setup.awayRotation);
             } else {
                 game.isComplete = true;
-                game.events.push({
+                GamePipeline._pushEvent(game, {
                     type: 'game_end', homeScore: game.homeScore, awayScore: game.awayScore,
                     isOvertime: false
                 });
@@ -818,10 +830,10 @@ export class GamePipeline {
                 game.quarterScores.home.push(0);
                 game.quarterScores.away.push(0);
                 game.clock.startOvertime();
-                game.events.push({ type: 'overtime', period: game.clock.otPeriod });
+                GamePipeline._pushEvent(game, { type: 'overtime', period: game.clock.otPeriod });
             } else {
                 game.isComplete = true;
-                game.events.push({
+                GamePipeline._pushEvent(game, {
                     type: 'game_end', homeScore: game.homeScore, awayScore: game.awayScore,
                     isOvertime: true
                 });
@@ -919,7 +931,7 @@ export class GamePipeline {
 
         const homeWon = game.homeScore > game.awayScore;
 
-        return {
+        const result = {
             homeTeam: game.homeTeam,
             awayTeam: game.awayTeam,
             homeScore: game.homeScore,
@@ -931,11 +943,18 @@ export class GamePipeline {
             homePlayerStats: homeStats,
             awayPlayerStats: awayStats,
             quarterScores: game.quarterScores,
-            events: game.events,
             isOvertime: game.clock.isOvertime,
             momentum: game.momentum,
             totalPossessions: game.possession
         };
+        
+        // In lightweight mode, skip events array to save memory
+        // Events are only needed for WatchGame play-by-play display
+        if (!game.lightweight) {
+            result.events = game.events;
+        }
+        
+        return result;
     }
 
     static _distributeBlocks(stats, rotation) {

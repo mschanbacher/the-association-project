@@ -15,6 +15,7 @@
  */
 
 import { CoachEngine } from './CoachEngine.js';
+import { LeagueManager } from './LeagueManager.js';
 import {
     POSITION_ARCHETYPES,
     getFatiguePenalty,
@@ -150,11 +151,9 @@ export class GamePipeline {
         const trackWinProb = options.trackWinProbability !== false; // Default to true
         const winProbHistory = [];
         
-        // Calculate pre-game probability based on team ratings (same formula as dashboard)
-        const homeOvr = homeTeam.rating || homeTeam.ovr || 75;
-        const awayOvr = awayTeam.rating || awayTeam.ovr || 75;
-        // Elo-style formula: home court worth ~3 points
-        const preGameProb = 1 / (1 + Math.pow(10, (awayOvr - homeOvr - 3) / 15));
+        // Calculate pre-game probability using unified LeagueManager function
+        // This ensures Dashboard, WatchGame, and GameLog all show the same starting probability
+        const preGameProb = LeagueManager.calcPreGameWinProbHome(homeTeam, awayTeam);
         
         if (trackWinProb) {
             winProbHistory.push({

@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { UIRenderer } from './UIRenderer.js';
+import { LeagueManager } from './LeagueManager.js';
 
 export class GameSimController {
     constructor(ctx) {
@@ -136,7 +137,8 @@ export class GameSimController {
         // Used as the t=0 starting point for the chart
         const preGameProb = GameSimController._calcPreGameWinProb(
             userIsHome ? homeTeam : awayTeam,
-            userIsHome ? awayTeam : homeTeam
+            userIsHome ? awayTeam : homeTeam,
+            userIsHome
         );
         this._watchPreGameProb = preGameProb;
 
@@ -3210,7 +3212,8 @@ export class GameSimController {
         
         const preGameProb = GameSimController._calcPreGameWinProb(
             userIsHome ? homeTeam : awayTeam,
-            userIsHome ? awayTeam : homeTeam
+            userIsHome ? awayTeam : homeTeam,
+            userIsHome
         );
         this._watchPreGameProb = preGameProb;
         
@@ -4237,24 +4240,9 @@ export class GameSimController {
      * @param {object} oppTeam
      * @returns {number} 0–1 win probability for user
      */
-    static _calcPreGameWinProb(userTeam, oppTeam) {
-        const avgRating = (team) => {
-            const roster = (team.roster || []).slice(0, 8);
-            if (!roster.length) return 75;
-            return roster.reduce((sum, p) => {
-                const off = p.offRating || p.rating || 75;
-                const def = p.defRating || p.rating || 75;
-                return sum + (off + def) / 2;
-            }, 0) / roster.length;
-        };
-
-        const userRating = avgRating(userTeam);
-        const oppRating  = avgRating(oppTeam);
-        const delta = userRating - oppRating;
-
-        // Logistic: k=0.15 → 5pt edge ≈ 69%, 10pt edge ≈ 82%
-        // Home court is handled by GamePipeline internally; here we just do ratings
-        return 1 / (1 + Math.exp(-0.15 * delta));
+    static _calcPreGameWinProb(userTeam, oppTeam, userIsHome = true) {
+        // Use unified LeagueManager function for consistency across all UI
+        return LeagueManager.calcPreGameWinProb(userTeam, oppTeam, userIsHome);
     }
 
     /**

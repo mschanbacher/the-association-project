@@ -152,12 +152,10 @@ export function NextGameWidget() {
                 currentTier === 2 ? gameState.tier2Teams : gameState.tier3Teams;
   const opponent = teams.find(t => t.id === opponentId);
 
-  // Calculate win probability from team strengths
-  const userStrength = LeagueManager?.calculateTeamStrength?.(userTeam) || 50;
-  const oppStrength = opponent ? (LeagueManager?.calculateTeamStrength?.(opponent) || 50) : 50;
-  const rawProb = userStrength / (userStrength + oppStrength);
-  // Apply home court advantage (~3-4% swing)
-  const winProb = isHome ? Math.min(0.95, rawProb + 0.03) : Math.max(0.05, rawProb - 0.03);
+  // Calculate win probability using unified LeagueManager function
+  const winProb = (LeagueManager?.calcPreGameWinProb && opponent)
+    ? LeagueManager.calcPreGameWinProb(userTeam, opponent, isHome)
+    : 0.5;
 
   return (
     <Card padding="md" style={{ display: 'flex', flexDirection: 'column' }}>

@@ -59,6 +59,45 @@ export class LeagueManager {
         return (rosterStrength * 0.7) + ((team.rating || 70) * 0.3);
     }
 
+    /**
+     * Calculate pre-game win probability for userTeam vs opponent
+     * This is the SINGLE SOURCE OF TRUTH for all pre-game win probability calculations.
+     * Used by: Dashboard arc, WatchGame initial point, GamePipeline box score.
+     * 
+     * @param {Object} userTeam - The user's team (or team whose probability we want)
+     * @param {Object} oppTeam - The opponent team
+     * @param {boolean} userIsHome - Whether userTeam is the home team
+     * @returns {number} Win probability 0-1 for userTeam
+     */
+    static calcPreGameWinProb(userTeam, oppTeam, userIsHome) {
+        // Get team strengths using the consistent calculateTeamStrength method
+        const userStrength = LeagueManager.calculateTeamStrength(userTeam);
+        const oppStrength = LeagueManager.calculateTeamStrength(oppTeam);
+        
+        // Base probability from strength ratio
+        const rawProb = userStrength / (userStrength + oppStrength);
+        
+        // Apply home court advantage (~3% swing, matching getHomeCourtAdvantage)
+        const homeAdvantage = 0.03;
+        const winProb = userIsHome 
+            ? Math.min(0.95, rawProb + homeAdvantage) 
+            : Math.max(0.05, rawProb - homeAdvantage);
+        
+        return winProb;
+    }
+
+    /**
+     * Calculate pre-game win probability from HOME team's perspective
+     * Convenience wrapper for GamePipeline which tracks home team probability.
+     * 
+     * @param {Object} homeTeam - The home team
+     * @param {Object} awayTeam - The away team
+     * @returns {number} Win probability 0-1 for home team
+     */
+    static calcPreGameWinProbHome(homeTeam, awayTeam) {
+        return LeagueManager.calcPreGameWinProb(homeTeam, awayTeam, true);
+    }
+
     // ─────────────────────────────────────────────────────────────
     // HEAD-TO-HEAD & STRENGTH OF SCHEDULE
     // ─────────────────────────────────────────────────────────────

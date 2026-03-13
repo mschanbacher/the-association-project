@@ -706,6 +706,11 @@ export class GMMode {
             safetyCounter++;
             const currentDate = this.gameState.currentDate;
             
+            // Diagnostic: log every 10 iterations
+            if (safetyCounter % 10 === 0) {
+                console.log(`🔄 finishSeasonBatch iteration ${safetyCounter}, date: ${currentDate}, games simulated: ${gamesSimulated}`);
+            }
+            
             // Check for All-Star Weekend
             const seasonDates = this.gameState.seasonDates;
             if (seasonDates && !this.gameState._allStarCompleted) {
@@ -731,6 +736,11 @@ export class GMMode {
             const unplayed = todaysGames.tier1.filter(g => !g.played).length +
                            todaysGames.tier2.filter(g => !g.played).length +
                            todaysGames.tier3.filter(g => !g.played).length;
+            
+            // Diagnostic: log if simulating games
+            if (unplayed > 0 && safetyCounter <= 3) {
+                console.log(`📅 Day ${safetyCounter} (${currentDate}): simulating ${unplayed} games`);
+            }
             
             if (unplayed > 0) {
                 this._simulateAllGamesOnDate(currentDate, true);

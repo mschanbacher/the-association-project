@@ -21,6 +21,7 @@ export function WatchGameModal({ isOpen, data, onClose }) {
   const [currentWinProb, setCurrentWinProb] = useState(null);
   const [tooltip, setTooltip] = useState(null); // { x, y, point }
   const winProbPointsRef = useRef([]);
+  const userIsHomeRef = useRef(false); // Track userIsHome for callback
 
   const homeScoreRef = useRef(null);
   const awayScoreRef = useRef(null);
@@ -30,6 +31,13 @@ export function WatchGameModal({ isOpen, data, onClose }) {
   const playsRef = useRef(null);
   const leadersRef = useRef(null);
   const chartWrapRef = useRef(null);
+
+  // Keep userIsHomeRef in sync with data
+  useEffect(() => {
+    if (data?.userIsHome !== undefined) {
+      userIsHomeRef.current = data.userIsHome;
+    }
+  }, [data?.userIsHome]);
 
   useEffect(() => {
     if (isOpen && data) {
@@ -51,10 +59,14 @@ export function WatchGameModal({ isOpen, data, onClose }) {
         leaders: leadersRef.current,
         setGameOver: (resultData) => { 
           // Save win probability history to window for box score storage
+          // pt.prob is USER's win probability - convert to HOME probability for consistent storage
+          const uih = userIsHomeRef.current;
           window._wgWinProbHistory = winProbPointsRef.current.map(pt => ({
             possession: pt.possession || 0,
             elapsedSeconds: pt.elapsedSeconds,
-            homeProb: pt.prob,
+            // Convert user prob to home prob: if user is home, prob is already home prob
+            // If user is away, home prob = 1 - user prob
+            homeProb: uih ? pt.prob : (1 - pt.prob),
             homeScore: pt.homeScore || 0,
             awayScore: pt.awayScore || 0,
             homeRun: pt.homeRun || 0,

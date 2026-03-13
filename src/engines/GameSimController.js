@@ -298,6 +298,20 @@ export class GameSimController {
         const userTeam = helpers.getUserTeam();
         const userWon = result.winner.id === userTeam.id;
 
+        // Push final 100%/0% win probability point
+        if (window._wgRefs?.pushWinProb) {
+            const finalProb = userWon ? 1.0 : 0.0;
+            // Use 2880 seconds (end of regulation) or estimate OT end
+            const finalSeconds = result.isOvertime ? 2880 + 300 : 2880;
+            window._wgRefs.pushWinProb(finalSeconds, finalProb, {
+                homeScore: result.homeScore,
+                awayScore: result.awayScore,
+                homeRun: 0,
+                awayRun: 0,
+                clockDisplay: 'Final',
+            });
+        }
+
         if (window._wgRefs?.setGameOver) {
             window._wgRefs.setGameOver({
                 won: userWon,

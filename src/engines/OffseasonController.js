@@ -394,6 +394,17 @@ export class OffseasonController {
         if (window._reactCloseChampionship) window._reactCloseChampionship();
         // Close the PlayoffHub screen — we're now entering offseason flow
         if (window._reactClosePlayoffHub) window._reactClosePlayoffHub();
+
+        // Open OffseasonHub — this will stay open throughout the entire offseason
+        if (window._reactShowOffseasonHub) {
+            console.log('🌴 [OFFSEASON] Opening OffseasonHub...');
+            window._reactShowOffseasonHub({
+                userTier: gameState.currentTier,
+                userTeamId: helpers.getUserTeam()?.id,
+                season: gameState.season,
+            });
+        }
+
         // [LEGACY DOM] document.getElementById('championshipPlayoffModal').classList.add('hidden');
         this.setPhase(P.PROMO_REL);
 
@@ -1460,6 +1471,12 @@ export class OffseasonController {
 
         // Clear offseason phase — we're back in regular season
         gameState.offseasonPhase = OffseasonController.PHASES.NONE;
+
+        // Close OffseasonHub — returning to regular dashboard
+        if (window._reactCloseOffseasonHub) {
+            console.log('🌴 [OFFSEASON] Closing OffseasonHub — new season starting');
+            window._reactCloseOffseasonHub();
+        }
 
         helpers.updateUI();
     }

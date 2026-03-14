@@ -42,6 +42,7 @@ import { WatchGameModal } from './screens/WatchGameModal.jsx';
 import { BreakingNewsModal } from './screens/BreakingNewsModal.jsx';
 import { PlayoffHub } from './screens/PlayoffHub.jsx';
 import { PlayoffEndModal } from './screens/PlayoffEndModal.jsx';
+import { OffseasonHub } from './screens/OffseasonHub.jsx';
 import { GameLogScreen } from './screens/GameLogScreen.jsx';
 import GlossaryScreen from './screens/GlossaryScreen.jsx';
 
@@ -82,6 +83,7 @@ function AppContent() {
   const [breakingNewsData, setBreakingNewsData] = useState(null);
   const [playoffHubData, setPlayoffHubData] = useState(null);
   const [playoffEndData, setPlayoffEndData] = useState(null);
+  const [offseasonHubData, setOffseasonHubData] = useState(null);
 
   // Hide the legacy game container elements once React takes over
   useEffect(() => {
@@ -170,6 +172,17 @@ function AppContent() {
     window._reactClosePlayoffHub = () => setPlayoffHubData(null);
     window._reactShowPlayoffEnd = (data) => setPlayoffEndData({ ...data });
     window._reactClosePlayoffEnd = () => setPlayoffEndData(null);
+
+    // Offseason Hub
+    window._reactShowOffseasonHub = (data) => {
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🌴 [OFFSEASON-HUB] _reactShowOffseasonHub CALLED');
+      console.log('🌴 [OFFSEASON-HUB] data received:', data);
+      console.log('═══════════════════════════════════════════════════════════');
+      setOffseasonHubData({ ...data });
+    };
+    window._reactCloseOffseasonHub = () => setOffseasonHubData(null);
+
     // Bridge to access GameSimController from React components
     window._getGameSimController = () => {
       const bridge = window._gameBridge;
@@ -227,6 +240,8 @@ function AppContent() {
       delete window._reactClosePlayoffHub;
       delete window._reactShowPlayoffEnd;
       delete window._reactClosePlayoffEnd;
+      delete window._reactShowOffseasonHub;
+      delete window._reactCloseOffseasonHub;
       delete window._getGameSimController;
     };
   }, []);
@@ -289,6 +304,7 @@ function AppContent() {
 
   // Diagnostic logging for PlayoffHub render decision
   console.log('🔄 [DIAG-RENDER] App render - playoffHubData:', playoffHubData ? 'SET' : 'NULL');
+  console.log('🔄 [DIAG-RENDER] App render - offseasonHubData:', offseasonHubData ? 'SET' : 'NULL');
 
   return (
     <div style={{
@@ -296,7 +312,8 @@ function AppContent() {
       background: 'var(--color-bg)',
     }}>
       <TopBar />
-      <OffseasonTracker />
+      {/* Only show OffseasonTracker when NOT in OffseasonHub (it has its own phase tracker) */}
+      {!offseasonHubData && <OffseasonTracker />}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Playoff Hub replaces sidebar + main during postseason */}
         {playoffHubData ? (
@@ -307,6 +324,17 @@ function AppContent() {
               onClose={() => {
                 setPlayoffHubData(null);
                 playoffHubData?.onComplete?.();
+              }}
+            />
+          </>
+        ) : offseasonHubData ? (
+          <>
+            {console.log('🌴 [DIAG-RENDER] RENDERING OffseasonHub component')}
+            <OffseasonHub
+              data={offseasonHubData}
+              onClose={() => {
+                setOffseasonHubData(null);
+                offseasonHubData?.onComplete?.();
               }}
             />
           </>

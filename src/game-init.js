@@ -62,6 +62,7 @@
                         clearMarketValueCache: (players) => TeamFactory.clearMarketValueCache(players),
                         runDraft: () => getDraftController().runDraft(),
                         startCollegeGraduateFA: () => getDraftController().startCollegeGraduateFA(),
+                        getDraftController: () => getDraftController(),
                         showFreeAgencyModal: () => getFreeAgencyController().show(),
                         generateSponsorOffers: (team) => OwnerEngine.generateSponsorOffers(team),
                         applyAIFinancialDefaults: (team) => OwnerEngine.applyAIFinancialDefaults(team),
@@ -76,6 +77,11 @@
         // Expose for React modal callbacks
         Object.defineProperty(window, '_offseasonController', {
             get: () => getOffseasonController(),
+            configurable: true
+        });
+        // Also expose draftController for hub access
+        Object.defineProperty(window, '_draftController', {
+            get: () => getDraftController(),
             configurable: true
         });
 

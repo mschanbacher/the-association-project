@@ -574,8 +574,19 @@ export class OffseasonController {
         }
 
         eventBus.emit(GameEvents.PROMO_REL_COMPLETED, { season: gameState.season, tierChanged: false });
-        console.log('Proceeding to draft/development...');
-        this.proceedToDraftOrDevelopment();
+        
+        // ─── HUB-BASED OFFSEASON ───────────────────────────────────────────
+        // Don't auto-trigger draft/FA here. The OffseasonHub is now open and
+        // the user can sim forward using the dashboard controls. Events will
+        // trigger when their dates are reached via _checkDateTriggers().
+        // 
+        // The date is currently around Jun 1 (promo/rel). User sims to:
+        //   - Jun 15: Draft (T1) or College FA (T2/T3)
+        //   - Jul 1:  Free Agency
+        //   - Aug 1:  Development
+        //   - Aug 16: Training Camp / New Season
+        console.log('🌴 [OFFSEASON] Promo/rel complete. User can now sim forward in OffseasonHub.');
+        helpers.saveGameState();
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -649,7 +660,8 @@ export class OffseasonController {
             const self = this;
             window._financialTransitionContinueCallback = () => {
                 helpers.saveGameState();
-                self.proceedToDraftOrDevelopment();
+                // Don't auto-trigger draft - hub handles it via sim controls
+                console.log('🌴 [OFFSEASON] Financial transition complete. User can sim forward in OffseasonHub.');
             };
             window._financialTransitionSpendingCallback = (pct) => {
                 const ratio = parseInt(pct) / 100;
@@ -1599,33 +1611,84 @@ export class OffseasonController {
         
         // Draft Day (Jun 15) — trigger lottery and draft for T1
         if (current >= seasonDates.draftDay && !gameState._draftComplete && userTier === 1) {
-            console.log('🎰 [OFFSEASON] Draft day reached — triggering draft');
+            console.log('🎰 [OFFSEASON] Draft day reached — triggering draft via hub');
             this.setPhase(P.DRAFT);
-            helpers.runDraft();
+            
+            // Generate draft class if needed
+            if (!gameState.draftClass || gameState.draftClass.length === 0) {
+                gameState.draftClass = engines.DraftEngine.generateDraftClass?.(60) ||
+                    engines.DraftEngine.generateDraftProspects?.(gameState.currentSeason, 60) || [];
+            }
+            
+            // Get promoted team IDs from postseason results
+            const promotedTeamIds = gameState.postseasonResults?.promoted?.toT1?.map(t => t.id) || [];
+            
+            // Run lottery
+            const lotteryData = engines.DraftEngine.simulateDraftLottery(gameState.tier1Teams, promotedTeamIds);
+            gameState._lotteryResults = lotteryData.lotteryResults;
+            
+            // Send to React hub
+            if (window._reactShowLottery) {
+                window._reactShowLottery({
+                    lotteryResults: lotteryData.lotteryResults,
+                    userTeamId: helpers.getUserTeam()?.id,
+                    prospects: gameState.draftClass
+                });
+            }
             return; // Only trigger one event per sim
         }
         
         // College FA (Jun 22) — trigger for T2/T3
         if (current >= seasonDates.collegeFA && !gameState._collegeFAComplete && userTier > 1) {
-            console.log('🎓 [OFFSEASON] College FA reached');
+            console.log('🎓 [OFFSEASON] College FA reached — triggering via hub');
             this.setPhase(P.COLLEGE_FA);
-            helpers.startCollegeGraduateFA();
+            
+            // Generate college grads and send to hub
+            const graduates = engines.DraftEngine?.generateCollegeGraduates?.(40) || [];
+            if (window._reactShowCGFA) {
+                window._reactShowCGFA({
+                    graduates,
+                    userTeamId: helpers.getUserTeam()?.id,
+                    userTier
+                });
+            }
             return;
         }
         
         // Free Agency (Jul 1)
         if (current >= seasonDates.freeAgencyStart && !gameState._freeAgencyComplete) {
-            console.log('📝 [OFFSEASON] Free Agency reached');
+            console.log('📝 [OFFSEASON] Free Agency reached — triggering via hub');
             this.setPhase(P.FREE_AGENCY);
-            this.startFreeAgencyPeriod();
+            
+            // Prepare FA data and send to hub
+            if (window._reactShowFA) {
+                const userTeam = helpers.getUserTeam();
+                window._reactShowFA({
+                    freeAgents: gameState.freeAgents || [],
+                    userTeamId: userTeam?.id,
+                    userTier: userTeam?.tier || userTier,
+                    salary: helpers.calculateTeamSalary?.(userTeam) || 0,
+                    cap: engines.SalaryCapEngine?.getEffectiveCap?.(userTeam, userTeam?.tier) || 100000000
+                });
+            }
             return;
         }
         
         // Player Development (Aug 1)
         if (current >= seasonDates.playerDevelopment && !gameState._developmentComplete) {
-            console.log('📈 [OFFSEASON] Development reached');
+            console.log('📈 [OFFSEASON] Development reached — triggering via hub');
             this.setPhase(P.DEVELOPMENT);
-            this.proceedToPlayerDevelopment();
+            
+            // Run development and send results to hub
+            const developmentResult = this.applyPlayerDevelopment();
+            if (window._reactShowDevelopment) {
+                window._reactShowDevelopment({
+                    developmentLog: developmentResult?.developmentLog || [],
+                    retirements: gameState._userTeamRetirements || [],
+                    notableRetirements: gameState._seasonRetirements?.filter(r => r.peakRating >= 80) || []
+                });
+            }
+            gameState._developmentComplete = true;
             return;
         }
         

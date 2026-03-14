@@ -1749,9 +1749,32 @@
                 console.log('✅ GMMode initialized');
 
                 // ── Expose sim controls on window for React ──
+                // These check if we're in offseason and route to appropriate controller
                 window.simNextGame = () => gmMode.simulateNextGame();
-                window.simDay = () => gmMode.simulateDay();
-                window.simWeek = () => gmMode.simulateWeek();
+                window.simDay = () => {
+                    if (getOffseasonController().isInOffseason()) {
+                        getOffseasonController().simOffseasonDay();
+                    } else {
+                        gmMode.simulateDay();
+                    }
+                };
+                window.simWeek = () => {
+                    if (getOffseasonController().isInOffseason()) {
+                        getOffseasonController().simOffseasonWeek();
+                    } else {
+                        gmMode.simulateWeek();
+                    }
+                };
+                window.simToNextEvent = () => {
+                    if (getOffseasonController().isInOffseason()) {
+                        getOffseasonController().simToNextEvent();
+                    }
+                };
+                window.simToTrainingCamp = () => {
+                    if (getOffseasonController().isInOffseason()) {
+                        getOffseasonController().simToTrainingCamp();
+                    }
+                };
                 window.finishSeason = () => gmMode.finishSeason();
                 window.resumeOffseason = () => getOffseasonController().resumeOffseason();
 

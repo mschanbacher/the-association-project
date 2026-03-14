@@ -21,27 +21,40 @@ import { ScoutingScreen } from './ScoutingScreen.jsx';
 import GlossaryScreen from './GlossaryScreen.jsx';
 
 // ─── Offseason phase definitions ─────────────────────────────────────────────
+// Offseason phases with calendar dates (month is 0-indexed)
+// These define when each phase BECOMES AVAILABLE - user can sim to reach them
 const OFFSEASON_PHASES = [
-  { key: 'season_ended', label: 'End' },
-  { key: 'postseason', label: 'Playoffs' },
-  { key: 'promo_rel', label: 'P/R' },
-  { key: 'draft', label: 'Draft' },
-  { key: 'college_fa', label: 'CFA' },
-  { key: 'development', label: 'Dev' },
-  { key: 'free_agency', label: 'FA' },
-  { key: 'training_camp', label: 'Camp' },
-  { key: 'roster_compliance', label: 'Cuts' },
-  { key: 'setup_complete', label: 'Ready' },
+  { key: 'postseason', label: 'Playoffs', month: 3, day: 16 },      // Apr 16
+  { key: 'promo_rel', label: 'P/R', month: 5, day: 1 },             // Jun 1
+  { key: 'draft', label: 'Draft', month: 5, day: 15 },              // Jun 15
+  { key: 'college_fa', label: 'CFA', month: 5, day: 22 },           // Jun 22
+  { key: 'free_agency', label: 'FA', month: 6, day: 1 },            // Jul 1
+  { key: 'development', label: 'Dev', month: 7, day: 1 },           // Aug 1
+  { key: 'training_camp', label: 'Camp', month: 7, day: 16 },       // Aug 16
+  { key: 'preseason', label: 'Ready', month: 9, day: 1 },           // Oct 1
 ];
+
+// Helper to check if current date has reached a phase date
+function hasReachedPhase(currentDateStr, phaseKey, seasonStartYear) {
+  if (!currentDateStr || !seasonStartYear) return false;
+  const phase = OFFSEASON_PHASES.find(p => p.key === phaseKey);
+  if (!phase) return false;
+  
+  const current = new Date(currentDateStr);
+  const phaseDate = new Date(seasonStartYear + 1, phase.month, phase.day);
+  return current >= phaseDate;
+}
 
 // ─── Navigation items (mirrors Sidebar but for offseason) ────────────────────
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'roster', label: 'Roster' },
+  { id: 'draft', label: 'Draft' },
   { id: 'freeagency', label: 'Free Agency' },
+  { id: 'development', label: 'Development' },
+  { id: 'contracts', label: 'Contracts' },
   { id: 'trades', label: 'Trades' },
   { id: 'scouting', label: 'Scouting' },
-  { id: 'calendar', label: 'Calendar' },
   { id: 'coach', label: 'Coach' },
   { id: 'finances', label: 'Finances' },
   { id: 'history', label: 'History' },
@@ -49,8 +62,24 @@ const NAV_ITEMS = [
 ];
 
 // ─── Phase Tracker Bar ───────────────────────────────────────────────────────
-function OffseasonPhaseTracker({ currentPhase }) {
-  const currentIdx = OFFSEASON_PHASES.findIndex(p => p.key === currentPhase);
+function OffseasonPhaseTracker({ currentDate, seasonStartYear }) {
+  const { gameState } = useGame();
+  const raw = gameState?._raw || gameState;
+  const dateStr = currentDate || raw?.currentDate;
+  const startYear = seasonStartYear || raw?.seasonStartYear || raw?.currentSeason;
+  
+  // Format current date for display
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+  
+  // Format phase date
+  const formatPhaseDate = (phase, year) => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[phase.month]} ${phase.day}`;
+  };
 
   return (
     <div style={{
@@ -69,12 +98,20 @@ function OffseasonPhaseTracker({ currentPhase }) {
         color: 'var(--color-accent)',
         marginRight: 14,
         flexShrink: 0,
-      }}>Offseason</div>
+      }}>
+        <div>Offseason</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+          {formatDate(dateStr)}
+        </div>
+      </div>
 
       {OFFSEASON_PHASES.map((phase, i) => {
-        const isActive = phase.key === currentPhase;
-        const isDone = i < currentIdx;
-        const isFuture = i > currentIdx;
+        const reached = hasReachedPhase(dateStr, phase.key, startYear);
+        const current = new Date(dateStr);
+        const phaseDate = new Date(startYear + 1, phase.month, phase.day);
+        const nextPhase = OFFSEASON_PHASES[i + 1];
+        const nextPhaseDate = nextPhase ? new Date(startYear + 1, nextPhase.month, nextPhase.day) : null;
+        const isActive = reached && (!nextPhaseDate || current < nextPhaseDate);
 
         return (
           <React.Fragment key={phase.key}>
@@ -82,7 +119,7 @@ function OffseasonPhaseTracker({ currentPhase }) {
               <div style={{
                 width: 16,
                 height: 2,
-                background: isDone ? 'var(--color-accent)' : 'var(--color-border-subtle)',
+                background: reached ? 'var(--color-accent)' : 'var(--color-border-subtle)',
                 flexShrink: 0,
               }} />
             )}
@@ -91,9 +128,9 @@ function OffseasonPhaseTracker({ currentPhase }) {
               flexDirection: 'column',
               alignItems: 'center',
               gap: 2,
-              minWidth: 36,
+              minWidth: 40,
               flexShrink: 0,
-              opacity: isFuture ? 0.5 : 1,
+              opacity: reached ? 1 : 0.5,
             }}>
               <div style={{
                 width: isActive ? 18 : 14,
@@ -101,28 +138,33 @@ function OffseasonPhaseTracker({ currentPhase }) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: isDone ? 10 : 8,
+                fontSize: reached && !isActive ? 10 : 8,
                 fontWeight: 700,
-                background: isDone ? 'var(--color-accent)'
+                background: reached && !isActive ? 'var(--color-accent)'
                   : isActive ? 'var(--color-bg-raised)'
                   : 'var(--color-bg-sunken)',
                 border: isActive ? '2px solid var(--color-accent)'
-                  : isDone ? 'none'
+                  : reached ? 'none'
                   : '1px solid var(--color-border-subtle)',
-                color: isDone ? 'var(--color-text-inverse)'
+                color: reached && !isActive ? 'var(--color-text-inverse)'
                   : isActive ? 'var(--color-accent)'
                   : 'var(--color-text-tertiary)',
               }}>
-                {isDone ? '+' : (i + 1)}
+                {reached && !isActive ? '+' : (i + 1)}
               </div>
               <span style={{
                 fontSize: 8,
                 whiteSpace: 'nowrap',
                 fontWeight: isActive ? 600 : 400,
                 color: isActive ? 'var(--color-text)'
-                  : isFuture ? 'var(--color-text-tertiary)'
+                  : !reached ? 'var(--color-text-tertiary)'
                   : 'var(--color-text-secondary)',
               }}>{phase.label}</span>
+              <span style={{
+                fontSize: 7,
+                color: 'var(--color-text-tertiary)',
+                fontFamily: 'var(--font-mono)',
+              }}>{formatPhaseDate(phase, startYear)}</span>
             </div>
           </React.Fragment>
         );
@@ -300,6 +342,23 @@ function OffseasonDashboard({ onNavigate, gameState, engines }) {
               style={{
                 width: '100%',
                 padding: 10,
+                marginBottom: 6,
+                background: 'var(--color-bg-sunken)',
+                border: '1px solid var(--color-border-subtle)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 11,
+                fontWeight: 500,
+                color: 'var(--color-text-secondary)',
+                cursor: 'pointer',
+              }}
+            >
+              Sim to Next Event
+            </button>
+            <button
+              onClick={() => window.simToTrainingCamp?.()}
+              style={{
+                width: '100%',
+                padding: 10,
                 background: 'var(--color-accent)',
                 border: 'none',
                 fontFamily: 'var(--font-body)',
@@ -416,11 +475,29 @@ function OffseasonDashboard({ onNavigate, gameState, engines }) {
 // ─── Free Agency Screen (embedded, not modal) ───────────────────────────────
 const POSITIONS = ['ALL', 'PG', 'SG', 'SF', 'PF', 'C'];
 
-function FreeAgencyScreen({ faData, faPhase, onFaDataUpdate }) {
+function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, seasonStartYear }) {
   const { gameState, engines, refresh } = useGame();
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [posFilter, setPosFilter] = useState('ALL');
   const [offers, setOffers] = useState({});
+  const [activeTab, setActiveTab] = useState('fa'); // 'fa' or 'cgfa'
+
+  // Check if FA date has been reached (Jul 1)
+  const faReached = hasReachedPhase(currentDate, 'free_agency', seasonStartYear);
+  const collegeFAReached = hasReachedPhase(currentDate, 'college_fa', seasonStartYear);
+
+  // Determine which data to show
+  const showCgfa = cgfaData && cgfaPhase !== 'waiting';
+  const showFa = faData && faPhase !== 'waiting';
+  
+  // If CGFA data arrives, switch to that tab
+  useEffect(() => {
+    if (showCgfa && !showFa) {
+      setActiveTab('cgfa');
+    } else if (showFa) {
+      setActiveTab('fa');
+    }
+  }, [showCgfa, showFa]);
 
   // Extract data (with defaults for when faData is null)
   const formerPlayers = faData?.formerPlayers || [];
@@ -512,9 +589,25 @@ function FreeAgencyScreen({ faData, faPhase, onFaDataUpdate }) {
   const remaining = capSpace - estCost;
   const isEmpty = filteredFormer.length === 0 && filteredWatched.length === 0 && filteredUnwatched.length === 0;
   const raw = gameState?._raw || gameState;
-  const inFaPhase = raw?.offseasonPhase === 'free_agency';
 
   // ─── RENDER ───────────────────────────────────────────────────────────────
+
+  // Not yet FA date
+  if (!faReached) {
+    return (
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: 'var(--space-6)' }}>
+        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>Free Agency</h2>
+        <div style={{ padding: 40, background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)', textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--text-md)', color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
+            Free agency opens on July 1
+          </div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
+            Use the Sim controls on the Dashboard to advance time
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // No FA data yet — show waiting state
   if (!faData) {
@@ -536,9 +629,7 @@ function FreeAgencyScreen({ faData, faPhase, onFaDataUpdate }) {
           textAlign: 'center',
           color: 'var(--color-text-tertiary)',
         }}>
-          {inFaPhase 
-            ? 'Loading free agent data...'
-            : 'Free agency will begin after player development phase'}
+          Loading free agent data...
         </div>
       </div>
     );
@@ -1184,20 +1275,607 @@ function PlaceholderScreen({ title, message }) {
   );
 }
 
+// ─── Draft Screen ────────────────────────────────────────────────────────────
+function DraftScreen({ draftData, draftPhase, setDraftPhase, currentDate, seasonStartYear }) {
+  const { gameState } = useGame();
+  const [posFilter, setPosFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('rating');
+  const [resultsTab, setResultsTab] = useState('round1');
+  
+  const raw = gameState?._raw || gameState;
+  const userTier = raw?.userTeam?.tier || 1;
+  
+  // Check if draft date has been reached
+  const draftReached = hasReachedPhase(currentDate, 'draft', seasonStartYear);
+  const collegeFAReached = hasReachedPhase(currentDate, 'college_fa', seasonStartYear);
+  
+  // Extract data safely (with defaults)
+  const lotteryData = draftData?.lottery || null;
+  const userPickData = draftData?.userPick || null;
+  const resultsData = draftData?.results || null;
+  
+  const prospects = userPickData?.prospects || [];
+  const roster = userPickData?.roster || [];
+  const results = resultsData?.results || [];
+  const userTeamId = resultsData?.userTeamId || lotteryData?.userTeamId;
+  
+  // All useMemo hooks at top level
+  const filteredProspects = useMemo(() => {
+    let list = posFilter === 'ALL' ? [...prospects] : prospects.filter(p => p.position === posFilter);
+    if (sortBy === 'rating') list.sort((a, b) => b.rating - a.rating);
+    else if (sortBy === 'age') list.sort((a, b) => a.age - b.age);
+    return list;
+  }, [prospects, posFilter, sortBy]);
+  
+  const round1 = useMemo(() => results.filter(r => r.round === 1), [results]);
+  const comp = useMemo(() => results.filter(r => r.round === 'Comp'), [results]);
+  const round2 = useMemo(() => results.filter(r => r.round === 2), [results]);
+  const userPicks = useMemo(() => results.filter(r => r.teamId === userTeamId), [results, userTeamId]);
+  
+  // Rating color helper
+  const rc = (r) => r >= 80 ? 'var(--color-rating-elite)' : r >= 70 ? 'var(--color-rating-good)' : r >= 60 ? 'var(--color-rating-avg)' : 'var(--color-rating-poor)';
+  
+  // ─── RENDER ───────────────────────────────────────────────────────────────
+  
+  // Not yet draft date
+  if (!draftReached) {
+    return (
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: 'var(--space-6)' }}>
+        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>Draft</h2>
+        <div style={{ padding: 40, background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)', textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--text-md)', color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
+            {userTier === 1 ? 'The draft will take place on June 15' : 'College Graduate FA will open on June 22'}
+          </div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
+            Use the Sim controls on the Dashboard to advance time
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Waiting for draft data to load
+  if (!draftData || draftPhase === 'waiting') {
+    return (
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: 'var(--space-6)' }}>
+        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>Draft</h2>
+        <div style={{ padding: 40, background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)', textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--text-md)', color: 'var(--color-text-tertiary)' }}>
+            Draft data loading...
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Lottery results
+  if (draftPhase === 'lottery' && lotteryData) {
+    const { lotteryResults = [] } = lotteryData;
+    const top4 = lotteryResults.slice(0, 4);
+    const remaining = lotteryResults.slice(4);
+    const userResult = lotteryResults.find(r => r.team.id === userTeamId);
+    
+    return (
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: 'var(--space-6)' }}>
+        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>
+          Draft Lottery Results
+        </h2>
+        
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textAlign: 'center', marginBottom: 16 }}>
+          14 teams competed for the top 4 picks
+        </div>
+        
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-tier1)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+          Lottery Winners
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
+          {top4.map(result => (
+            <LotteryCard key={result.pick} result={result} isUser={result.team.id === userTeamId} />
+          ))}
+        </div>
+        
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+          Remaining Picks
+        </div>
+        <div style={{ background: 'var(--color-bg-raised)', border: '1px solid var(--color-border-subtle)', marginBottom: 16 }}>
+          {remaining.map(result => (
+            <div key={result.pick} style={{
+              display: 'flex', alignItems: 'center', padding: '6px 12px',
+              borderBottom: '1px solid var(--color-border-subtle)', fontSize: 'var(--text-sm)',
+              background: result.team.id === userTeamId ? 'var(--color-accent-bg)' : 'transparent',
+            }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--color-text-tertiary)', width: 40 }}>{result.pick}</span>
+              <span style={{ flex: 1, fontWeight: 500 }}>{result.team.name}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>{result.team.wins}–{result.team.losses}</span>
+            </div>
+          ))}
+        </div>
+        
+        {userResult && (
+          <div style={{
+            padding: '14px 16px', background: 'var(--color-accent-bg)',
+            border: '1px solid var(--color-accent-border)', textAlign: 'center', marginBottom: 16,
+          }}>
+            <div style={{ fontSize: 'var(--text-md)', fontWeight: 700 }}>
+              {userResult.pick <= 4 ? `You won the #${userResult.pick} pick` : `You have the #${userResult.pick} pick`}
+            </div>
+          </div>
+        )}
+        
+        {/* Info about next steps - no Continue button needed */}
+        <div style={{ 
+          padding: '12px 16px', 
+          background: 'var(--color-bg-sunken)', 
+          border: '1px solid var(--color-border-subtle)',
+          fontSize: 'var(--text-xs)',
+          color: 'var(--color-text-secondary)',
+          textAlign: 'center',
+        }}>
+          The draft will begin shortly. Your pick selections will appear when it's your turn.
+        </div>
+      </div>
+    );
+  }
+  
+  // User draft pick
+  if (draftPhase === 'picking' && userPickData) {
+    const { pickNumber, roundText } = userPickData;
+    
+    return (
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: 'var(--space-6)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Your Pick</div>
+            <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>Make Your Selection</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>#{pickNumber}</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>{roundText}</div>
+          </div>
+        </div>
+        
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: 4 }}>Pos</span>
+            {POSITIONS.map(pos => (
+              <button key={pos} onClick={() => setPosFilter(pos)} style={{
+                padding: '3px 10px', fontSize: 'var(--text-xs)', border: 'none',
+                background: posFilter === pos ? 'var(--color-accent)' : 'transparent',
+                color: posFilter === pos ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                fontWeight: posFilter === pos ? 600 : 400, fontFamily: 'var(--font-body)', cursor: 'pointer',
+              }}>{pos === 'ALL' ? 'All' : pos}</button>
+            ))}
+          </div>
+        </div>
+        
+        {/* Two columns */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 'var(--gap)' }}>
+          {/* Prospects */}
+          <div style={{ background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)' }}>
+            {filteredProspects.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--color-text-tertiary)', padding: 40, fontSize: 'var(--text-sm)' }}>No prospects match your filters</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <th style={{ ...thS, paddingLeft: 16, textAlign: 'left' }}>Prospect</th>
+                    <th style={thS}>Pos</th>
+                    <th style={thS}>Age</th>
+                    <th style={thS}>OVR</th>
+                    <th style={{ ...thS, paddingRight: 16 }}>Pot</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProspects.map((p, i) => (
+                    <tr key={p.id || i}
+                      onClick={() => window.selectDraftProspect?.(p.id)}
+                      style={{
+                        borderBottom: '1px solid var(--color-border-subtle)', cursor: 'pointer',
+                        background: 'var(--color-bg-raised)', transition: 'background 100ms ease',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-accent-bg)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg-raised)'}
+                    >
+                      <td style={{ padding: '10px 12px 10px 16px' }}>
+                        <div style={{ fontWeight: 600 }}>{p.name}</div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 2 }}>{p.college || ''}</div>
+                      </td>
+                      <td style={{ ...tdC, fontWeight: 500, fontSize: 'var(--text-xs)' }}>{p.position}</td>
+                      <td style={{ ...tdC, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>{p.age}</td>
+                      <td style={{ ...tdC, fontFamily: 'var(--font-mono)', fontWeight: 700, color: rc(p.rating) }}>{p.rating}</td>
+                      <td style={{ ...tdC, paddingRight: 16, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>{p.projectedCeiling || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          
+          {/* Roster sidebar */}
+          <DraftRosterSidebar roster={roster} getRatingColor={rc} />
+        </div>
+      </div>
+    );
+  }
+  
+  // Draft results
+  if (draftPhase === 'results' && resultsData) {
+    const tabs = [
+      { key: 'round1', label: 'Round 1', count: round1.length },
+      comp.length > 0 && { key: 'comp', label: 'Comp.', count: comp.length },
+      { key: 'round2', label: 'Round 2', count: round2.length },
+      { key: 'user', label: 'Your Picks', count: userPicks.length },
+    ].filter(Boolean);
+    
+    const activeResults = resultsTab === 'round1' ? round1 : resultsTab === 'comp' ? comp : resultsTab === 'round2' ? round2 : userPicks;
+    
+    return (
+      <div style={{ maxWidth: 700, margin: '0 auto', padding: 'var(--space-6)' }}>
+        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>Draft Results</h2>
+        
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-sunken)', marginBottom: 16 }}>
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => setResultsTab(t.key)} style={{
+              padding: '10px 16px', border: 'none',
+              borderBottom: resultsTab === t.key ? '2px solid var(--color-accent)' : '2px solid transparent',
+              background: 'transparent', color: resultsTab === t.key ? 'var(--color-text)' : 'var(--color-text-tertiary)',
+              fontWeight: resultsTab === t.key ? 600 : 400, fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              {t.label}
+              <span style={{ fontSize: 10, padding: '1px 6px', background: 'var(--color-bg-sunken)', color: 'var(--color-text-tertiary)' }}>{t.count}</span>
+            </button>
+          ))}
+        </div>
+        
+        {/* Results table */}
+        <div style={{ background: 'var(--color-bg-raised)', border: '1px solid var(--color-border-subtle)', marginBottom: 16 }}>
+          {activeResults.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>No picks in this round.</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <th style={{ ...thS, paddingLeft: 16, textAlign: 'left', width: 44 }}>Pick</th>
+                  <th style={{ ...thS, textAlign: 'left' }}>Player</th>
+                  <th style={thS}>Pos</th>
+                  <th style={thS}>Age</th>
+                  <th style={{ ...thS, paddingRight: 16 }}>OVR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeResults.map((result, i) => {
+                  const isUser = result.teamId === userTeamId;
+                  const p = result.player;
+                  return (
+                    <tr key={i} style={{
+                      borderBottom: '1px solid var(--color-border-subtle)',
+                      background: isUser ? 'var(--color-accent-bg)' : 'transparent',
+                      borderLeft: isUser ? '3px solid var(--color-accent)' : '3px solid transparent',
+                    }}>
+                      <td style={{ padding: '8px 8px 8px 16px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--color-text-tertiary)' }}>{result.pick}</td>
+                      <td style={{ padding: 8 }}>
+                        <div style={{ fontWeight: 600 }}>{p.name}</div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 1 }}>{result.teamName}</div>
+                      </td>
+                      <td style={{ ...tdC, fontWeight: 500, fontSize: 'var(--text-xs)' }}>{p.position}</td>
+                      <td style={{ ...tdC, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>{p.age}</td>
+                      <td style={{ ...tdC, paddingRight: 16, fontFamily: 'var(--font-mono)', fontWeight: 700, color: rc(p.rating) }}>{p.rating}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+        
+        {/* Info text instead of Continue button */}
+        <div style={{ 
+          padding: '12px 16px', 
+          background: 'var(--color-bg-sunken)', 
+          border: '1px solid var(--color-border-subtle)',
+          fontSize: 'var(--text-xs)',
+          color: 'var(--color-text-secondary)',
+          textAlign: 'center',
+        }}>
+          Draft complete. Free Agency opens on July 1 — use Sim controls to advance.
+        </div>
+      </div>
+    );
+  }
+  
+  return <PlaceholderScreen title="Draft" message="No draft data available" />;
+}
+
+function LotteryCard({ result, isUser }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+      background: isUser ? 'var(--color-accent-bg)' : 'var(--color-bg-sunken)',
+      border: isUser ? '1px solid var(--color-accent-border)' : '1px solid var(--color-border-subtle)',
+      borderLeft: `3px solid ${isUser ? 'var(--color-accent)' : 'var(--color-tier1)'}`,
+    }}>
+      <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--color-tier1)', minWidth: 40, textAlign: 'center' }}>#{result.pick}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 'var(--text-base)', fontWeight: 700 }}>{result.team.name}</div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+          {result.team.wins}–{result.team.losses}
+          {result.jumped && result.originalPosition && (
+            <span style={{ color: 'var(--color-win)', marginLeft: 8, fontWeight: 600 }}>Jumped from #{result.originalPosition}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DraftRosterSidebar({ roster, getRatingColor }) {
+  const rc = getRatingColor || ((r) => r >= 80 ? 'var(--color-rating-elite)' : r >= 70 ? 'var(--color-rating-good)' : r >= 60 ? 'var(--color-rating-avg)' : 'var(--color-rating-poor)');
+  const posCounts = useMemo(() => {
+    const counts = { PG: 0, SG: 0, SF: 0, PF: 0, C: 0 };
+    (roster || []).forEach(p => { if (counts[p.position] !== undefined) counts[p.position]++; });
+    return counts;
+  }, [roster]);
+  const topPlayers = useMemo(() => [...(roster || [])].sort((a, b) => b.rating - a.rating).slice(0, 8), [roster]);
+  
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+      <div style={{ background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)', padding: '12px 14px' }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Roster ({(roster || []).length}/15)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, textAlign: 'center' }}>
+          {['PG', 'SG', 'SF', 'PF', 'C'].map(pos => (
+            <div key={pos}>
+              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{pos}</div>
+              <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, fontFamily: 'var(--font-mono)', color: posCounts[pos] === 0 ? 'var(--color-loss)' : 'var(--color-text)' }}>{posCounts[pos]}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)', padding: '12px 14px', flex: 1 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Current Players</div>
+        {topPlayers.map((p, i) => (
+          <div key={p.id || i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 'var(--text-xs)', borderBottom: i < topPlayers.length - 1 ? '1px solid var(--color-border-subtle)' : 'none' }}>
+            <span><span style={{ fontWeight: 500 }}>{p.name}</span><span style={{ color: 'var(--color-text-tertiary)', marginLeft: 4 }}>{p.position}</span></span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: rc(p.rating) }}>{p.rating}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Development Screen ──────────────────────────────────────────────────────
+function DevelopmentScreen({ devData, currentDate, seasonStartYear }) {
+  const { gameState } = useGame();
+  const [tab, setTab] = useState('summary');
+  
+  const raw = gameState?._raw || gameState;
+  
+  // Check if development date has been reached (Aug 1)
+  const devReached = hasReachedPhase(currentDate, 'development', seasonStartYear);
+  
+  // Not yet development date
+  if (!devReached) {
+    return (
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: 'var(--space-6)' }}>
+        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>Player Development</h2>
+        <div style={{ padding: 40, background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)', textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--text-md)', color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
+            Development reports will be available on August 1
+          </div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
+            Use the Sim controls on the Dashboard to advance time
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!devData) {
+    return (
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: 'var(--space-6)' }}>
+        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>Player Development</h2>
+        <div style={{ padding: 40, background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)', textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--text-md)', color: 'var(--color-text-tertiary)' }}>
+            Loading development report...
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  const { improvements = [], declines = [], userRetirements = [], notableRetirements = [], allRetirementsCount = 0 } = devData;
+  const hasContent = improvements.length > 0 || declines.length > 0 || userRetirements.length > 0 || notableRetirements.length > 0;
+  
+  const tabs = [
+    { key: 'summary', label: 'Summary' },
+    improvements.length > 0 && { key: 'improved', label: 'Improved', count: improvements.length, color: 'var(--color-win)' },
+    declines.length > 0 && { key: 'declined', label: 'Declined', count: declines.length, color: 'var(--color-loss)' },
+    (userRetirements.length > 0 || notableRetirements.length > 0) && { key: 'retired', label: 'Retired', count: allRetirementsCount || notableRetirements.length, color: 'var(--color-warning)' },
+  ].filter(Boolean);
+  
+  return (
+    <div style={{ maxWidth: 700, margin: '0 auto', padding: 'var(--space-6)' }}>
+      <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>Player Development Report</h2>
+      
+      {/* Tabs */}
+      {tabs.length > 1 && (
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-sunken)', marginBottom: 16 }}>
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)} style={{
+              padding: '10px 16px', border: 'none',
+              borderBottom: tab === t.key ? '2px solid var(--color-accent)' : '2px solid transparent',
+              background: 'transparent', color: tab === t.key ? 'var(--color-text)' : 'var(--color-text-tertiary)',
+              fontWeight: tab === t.key ? 600 : 400, fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              {t.label}
+              {t.count != null && <span style={{ fontSize: 10, padding: '1px 6px', background: tab === t.key ? `${t.color}15` : 'var(--color-bg-sunken)', color: tab === t.key ? t.color : 'var(--color-text-tertiary)' }}>{t.count}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      
+      {!hasContent ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-tertiary)' }}>No significant player changes this offseason.</div>
+      ) : (
+        <>
+          {tab === 'summary' && (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--gap)', marginBottom: 20 }}>
+                <DevMetricBox label="Improved" value={improvements.length} color="var(--color-win)" />
+                <DevMetricBox label="Declined" value={declines.length} color="var(--color-loss)" />
+                <DevMetricBox label="Retired" value={allRetirementsCount} color="var(--color-warning)" />
+              </div>
+              {userRetirements.length > 0 && (
+                <>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-warning)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Your Team — Retirements</div>
+                  {userRetirements.map((r, i) => <DevPlayerRow key={i} player={r} type="retired" />)}
+                </>
+              )}
+            </div>
+          )}
+          {tab === 'improved' && improvements.map((p, i) => <DevPlayerRow key={i} player={p} type="improved" />)}
+          {tab === 'declined' && declines.map((p, i) => <DevPlayerRow key={i} player={p} type="declined" />)}
+          {tab === 'retired' && [...userRetirements, ...notableRetirements].map((p, i) => <DevPlayerRow key={i} player={p} type="retired" />)}
+        </>
+      )}
+    </div>
+  );
+}
+
+function DevMetricBox({ label, value, color }) {
+  return (
+    <div style={{ padding: '12px 14px', background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)', textAlign: 'center' }}>
+      <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-mono)', color }}>{value}</div>
+      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 4 }}>{label}</div>
+    </div>
+  );
+}
+
+function DevPlayerRow({ player, type }) {
+  const p = player;
+  const color = type === 'improved' ? 'var(--color-win)' : type === 'declined' ? 'var(--color-loss)' : 'var(--color-warning)';
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-raised)' }}>
+      <div>
+        <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>{p.name}</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 8 }}>{p.position} · {p.age}yo</span>
+      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color }}>
+        {type === 'retired' ? 'Retired' : `${p.oldRating || p.rating} → ${p.newRating || p.rating}`}
+      </div>
+    </div>
+  );
+}
+
+// ─── Contracts Screen ────────────────────────────────────────────────────────
+function ContractsScreen({ contractData }) {
+  const { gameState } = useGame();
+  const [decisions, setDecisions] = useState({});
+  
+  const raw = gameState?._raw || gameState;
+  
+  if (!contractData) {
+    return (
+      <PlaceholderScreen
+        title="Contract Decisions"
+        message="Contract decisions will appear when players have expiring contracts"
+      />
+    );
+  }
+  
+  const { players = [], capSpace, rosterCount, formatCurrency, getRatingColor, determineContractLength } = contractData;
+  const fc = formatCurrency || ((v) => '$' + (v / 1e6).toFixed(1) + 'M');
+  const rc = getRatingColor || ((r) => r >= 80 ? 'var(--color-rating-elite)' : r >= 70 ? 'var(--color-rating-good)' : r >= 60 ? 'var(--color-rating-avg)' : 'var(--color-rating-poor)');
+  
+  const resignedSalary = players.filter(p => decisions[p.id] === 'resign').reduce((sum, p) => sum + (p.salary || 0), 0);
+  const resignedCount = Object.values(decisions).filter(d => d === 'resign').length;
+  const releasedCount = Object.values(decisions).filter(d => d === 'release').length;
+  const remainingCap = capSpace - resignedSalary;
+  const decidedAll = Object.keys(decisions).length === players.length;
+  
+  const toggle = (playerId, action) => {
+    setDecisions(prev => ({ ...prev, [playerId]: action }));
+  };
+  
+  const handleConfirm = () => {
+    if (!decidedAll) { alert('Please make a decision for all players.'); return; }
+    window._confirmContractDecisions?.(decisions);
+  };
+  
+  return (
+    <div style={{ maxWidth: 620, margin: '0 auto', padding: 'var(--space-6)' }}>
+      <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>Contract Decisions</h2>
+      
+      {/* Summary bar */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: '12px 20px', background: 'var(--color-bg-sunken)', borderBottom: '1px solid var(--color-border)', marginBottom: 16 }}>
+        <div style={{ textAlign: 'center' }}><div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' }}>Expiring</div><div style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--color-warning)' }}>{players.length}</div></div>
+        <div style={{ textAlign: 'center' }}><div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' }}>Cap Space</div><div style={{ fontSize: 'var(--text-lg)', fontWeight: 700, fontFamily: 'var(--font-mono)', color: remainingCap >= 0 ? 'var(--color-text)' : 'var(--color-loss)' }}>{fc(remainingCap)}</div></div>
+        <div style={{ textAlign: 'center' }}><div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' }}>After</div><div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>{rosterCount + resignedCount}</div></div>
+      </div>
+      
+      {/* Player cards */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+        {players.map(player => {
+          const decision = decisions[player.id];
+          const newYears = determineContractLength ? determineContractLength(player.age, player.rating) : 2;
+          const canAfford = player.salary <= remainingCap || decision === 'resign';
+          
+          return (
+            <div key={player.id} style={{
+              padding: '12px 14px', background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)',
+              borderLeft: decision === 'resign' ? '3px solid var(--color-win)' : decision === 'release' ? '3px solid var(--color-loss)' : '3px solid transparent',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>{player.name}</span>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 8 }}>{player.position} · {player.age}yo</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 'var(--text-xs)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: rc(player.rating) }}>{player.rating}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{fc(player.salary)}/yr</span>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <button onClick={() => toggle(player.id, 'resign')} disabled={!canAfford && decision !== 'resign'} style={{
+                  padding: 6, border: 'none', cursor: !canAfford && decision !== 'resign' ? 'not-allowed' : 'pointer',
+                  opacity: !canAfford && decision !== 'resign' ? 0.3 : 1,
+                  background: decision === 'resign' ? 'var(--color-win)' : 'var(--color-win-bg)',
+                  color: decision === 'resign' ? 'var(--color-text-inverse)' : 'var(--color-win)',
+                  fontWeight: 600, fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)',
+                }}>Re-sign ({newYears}yr)</button>
+                <button onClick={() => toggle(player.id, 'release')} style={{
+                  padding: 6, border: 'none', cursor: 'pointer',
+                  background: decision === 'release' ? 'var(--color-loss)' : 'var(--color-loss-bg)',
+                  color: decision === 'release' ? 'var(--color-text-inverse)' : 'var(--color-loss)',
+                  fontWeight: 600, fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)',
+                }}>Release</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      
+      <div style={{ textAlign: 'center' }}>
+        <button onClick={handleConfirm} disabled={!decidedAll} style={{
+          padding: '12px 32px', background: decidedAll ? 'var(--color-accent)' : 'var(--color-bg-sunken)',
+          border: 'none', color: decidedAll ? 'var(--color-text-inverse)' : 'var(--color-text-tertiary)',
+          fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semi)', fontFamily: 'var(--font-body)',
+          cursor: decidedAll ? 'pointer' : 'not-allowed',
+        }}>Confirm Decisions</button>
+      </div>
+    </div>
+  );
+}
+
 function TradesScreen() {
   return (
     <PlaceholderScreen
       title="Trades"
-      message="Trade center — click Propose a Trade on dashboard to open trade screen"
-    />
-  );
-}
-
-function CalendarScreen() {
-  return (
-    <PlaceholderScreen
-      title="Offseason Calendar"
-      message="Offseason calendar will be added in a future update"
+      message="Trade center — use Propose Trade button on dashboard"
     />
   );
 }
@@ -1351,42 +2029,123 @@ export function OffseasonHub({ data, onClose }) {
   const { gameState, engines, refresh } = useGame();
   const [activeScreen, setActiveScreen] = useState('dashboard');
   
-  // FA state - intercept FA modal data and render inline
+  // ─── Offseason data state (intercept modal data, render inline) ────────────
+  // Free Agency
   const [faData, setFaData] = useState(null);
-  const [faPhase, setFaPhase] = useState('select'); // 'select' or 'results'
+  const [faPhase, setFaPhase] = useState('select');
+  
+  // Draft (lottery, user pick, results)
+  const [draftData, setDraftData] = useState(null);
+  const [draftPhase, setDraftPhase] = useState('waiting'); // waiting, lottery, picking, results
+  
+  // College Grad FA
+  const [cgfaData, setCgfaData] = useState(null);
+  const [cgfaPhase, setCgfaPhase] = useState('waiting');
+  
+  // Player Development
+  const [devData, setDevData] = useState(null);
+  
+  // Contract Decisions
+  const [contractData, setContractData] = useState(null);
+  
+  // Compliance (roster cuts)
+  const [complianceData, setComplianceData] = useState(null);
 
-  // Get current offseason phase
+  // Get current offseason state
   const raw = gameState?._raw || gameState;
   const currentPhase = raw?.offseasonPhase || 'free_agency';
+  const currentDate = raw?.currentDate;
+  const seasonStartYear = raw?.seasonStartYear || raw?.currentSeason;
 
-  // Intercept FA modal calls and redirect to inline display
+  // ─── Intercept all offseason modal calls ───────────────────────────────────
   useEffect(() => {
     // Store original functions
-    const originalShowFA = window._reactShowFA;
+    const originals = {
+      showFA: window._reactShowFA,
+      showLottery: window._reactShowLottery,
+      showUserPick: window._reactShowUserPick,
+      showDraftResults: window._reactShowDraftResults,
+      showCGFA: window._reactShowCGFA,
+      showDevelopment: window._reactShowDevelopment,
+      showContractDecisions: window._reactShowContractDecisions,
+      showCompliance: window._reactShowCompliance,
+    };
     
-    // Override to intercept FA data
+    // Free Agency
     window._reactShowFA = (faDataFromController) => {
-      console.log('🌴 [OFFSEASON-HUB] Intercepting FA data for inline display');
+      console.log('🌴 [OFFSEASON-HUB] Intercepting FA data');
       setFaData(faDataFromController);
       setFaPhase(faDataFromController?.phase || 'select');
-      setActiveScreen('freeagency'); // Auto-navigate to FA screen
+      setActiveScreen('freeagency');
+    };
+    
+    // Draft Lottery
+    window._reactShowLottery = (lotteryData) => {
+      console.log('🎰 [OFFSEASON-HUB] Intercepting lottery data');
+      setDraftData(prev => ({ ...prev, lottery: lotteryData }));
+      setDraftPhase('lottery');
+      setActiveScreen('draft');
+    };
+    
+    // User Draft Pick
+    window._reactShowUserPick = (pickData) => {
+      console.log('🏀 [OFFSEASON-HUB] Intercepting user pick data');
+      setDraftData(prev => ({ ...prev, userPick: pickData }));
+      setDraftPhase('picking');
+      setActiveScreen('draft');
+    };
+    
+    // Draft Results
+    window._reactShowDraftResults = (resultsData) => {
+      console.log('📋 [OFFSEASON-HUB] Intercepting draft results');
+      setDraftData(prev => ({ ...prev, results: resultsData }));
+      setDraftPhase('results');
+      setActiveScreen('draft');
+    };
+    
+    // College Grad FA
+    window._reactShowCGFA = (cgfaDataFromController) => {
+      console.log('🎓 [OFFSEASON-HUB] Intercepting CGFA data');
+      setCgfaData(cgfaDataFromController);
+      setCgfaPhase(cgfaDataFromController?.phase || 'select');
+      setActiveScreen('freeagency'); // Show in FA screen since it's similar
+    };
+    
+    // Player Development
+    window._reactShowDevelopment = (devDataFromController) => {
+      console.log('📈 [OFFSEASON-HUB] Intercepting development data');
+      setDevData(devDataFromController);
+      setActiveScreen('development');
+    };
+    
+    // Contract Decisions
+    window._reactShowContractDecisions = (contractDataFromController) => {
+      console.log('📝 [OFFSEASON-HUB] Intercepting contract decisions');
+      setContractData(contractDataFromController);
+      setActiveScreen('contracts');
+    };
+    
+    // Compliance
+    window._reactShowCompliance = (complianceDataFromController) => {
+      console.log('✂️ [OFFSEASON-HUB] Intercepting compliance data');
+      setComplianceData(complianceDataFromController);
+      setActiveScreen('roster'); // Show on roster screen
     };
 
     // Cleanup
     return () => {
-      window._reactShowFA = originalShowFA;
+      window._reactShowFA = originals.showFA;
+      window._reactShowLottery = originals.showLottery;
+      window._reactShowUserPick = originals.showUserPick;
+      window._reactShowDraftResults = originals.showDraftResults;
+      window._reactShowCGFA = originals.showCGFA;
+      window._reactShowDevelopment = originals.showDevelopment;
+      window._reactShowContractDecisions = originals.showContractDecisions;
+      window._reactShowCompliance = originals.showCompliance;
     };
   }, []);
 
-  // Also listen for phase changes to auto-navigate
-  useEffect(() => {
-    if (currentPhase === 'free_agency' && activeScreen === 'dashboard') {
-      // When FA phase starts and we're on dashboard, navigate to FA
-      // (but don't force it if user navigated elsewhere)
-    }
-  }, [currentPhase, activeScreen]);
-
-  // Screen components map - pass FA data to FreeAgencyScreen
+  // Screen components map
   const screens = useMemo(() => ({
     dashboard: (
       <OffseasonDashboard
@@ -1395,22 +2154,43 @@ export function OffseasonHub({ data, onClose }) {
         engines={engines}
       />
     ),
-    roster: <RosterScreen />,
+    roster: <RosterScreen complianceData={complianceData} />,
+    draft: (
+      <DraftScreen 
+        draftData={draftData}
+        draftPhase={draftPhase}
+        setDraftPhase={setDraftPhase}
+        currentDate={currentDate}
+        seasonStartYear={seasonStartYear}
+      />
+    ),
     freeagency: (
       <FreeAgencyScreen 
         faData={faData} 
         faPhase={faPhase}
-        onFaDataUpdate={setFaData}
+        cgfaData={cgfaData}
+        cgfaPhase={cgfaPhase}
+        currentDate={currentDate}
+        seasonStartYear={seasonStartYear}
       />
+    ),
+    development: (
+      <DevelopmentScreen 
+        devData={devData}
+        currentDate={currentDate}
+        seasonStartYear={seasonStartYear}
+      />
+    ),
+    contracts: (
+      <ContractsScreen contractData={contractData} />
     ),
     trades: <TradesScreen />,
     scouting: <ScoutingScreen />,
-    calendar: <CalendarScreen />,
     coach: <CoachScreen />,
     finances: <FinancesScreen />,
     history: <HistoryScreen />,
     glossary: <GlossaryScreen />,
-  }), [gameState, engines, faData, faPhase]);
+  }), [gameState, engines, faData, faPhase, cgfaData, cgfaPhase, draftData, draftPhase, devData, contractData, complianceData, currentDate, seasonStartYear]);
 
   return (
     <div style={{
@@ -1420,7 +2200,7 @@ export function OffseasonHub({ data, onClose }) {
       minHeight: 0,
     }}>
       {/* Phase Tracker */}
-      <OffseasonPhaseTracker currentPhase={currentPhase} />
+      <OffseasonPhaseTracker currentDate={currentDate} seasonStartYear={seasonStartYear} />
 
       {/* Sidebar + Content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>

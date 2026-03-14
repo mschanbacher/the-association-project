@@ -1480,4 +1480,379 @@ export class OffseasonController {
 
         helpers.updateUI();
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Offseason Sim Controls (for hub-based navigation)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Advance offseason by one day. Triggers events when dates are reached.
+     */
+    simOffseasonDay() {
+        const { gameState, engines, helpers } = this.ctx;
+        const P = OffseasonController.PHASES;
+        
+        if (!gameState.currentDate) return;
+        
+        // Advance one day
+        const nextDate = engines.CalendarEngine.addDays(gameState.currentDate, 1);
+        gameState.currentDate = nextDate;
+        
+        console.log(`📅 [OFFSEASON] Simmed to ${nextDate}`);
+        
+        // Check for phase triggers based on new date
+        this._checkDateTriggers(nextDate);
+        
+        helpers.saveGameState();
+        if (window._notifyReact) window._notifyReact();
+    }
+
+    /**
+     * Advance offseason by one week (7 days)
+     */
+    simOffseasonWeek() {
+        const { gameState, engines, helpers } = this.ctx;
+        
+        if (!gameState.currentDate) return;
+        
+        // Advance 7 days
+        const nextDate = engines.CalendarEngine.addDays(gameState.currentDate, 7);
+        gameState.currentDate = nextDate;
+        
+        console.log(`📅 [OFFSEASON] Simmed week to ${nextDate}`);
+        
+        // Check for phase triggers
+        this._checkDateTriggers(nextDate);
+        
+        helpers.saveGameState();
+        if (window._notifyReact) window._notifyReact();
+    }
+
+    /**
+     * Sim to the next major offseason event date
+     */
+    simToNextEvent() {
+        const { gameState, engines, helpers } = this.ctx;
+        
+        if (!gameState.currentDate) return;
+        
+        const current = new Date(gameState.currentDate);
+        const seasonYear = gameState.seasonStartYear || gameState.currentSeason;
+        const seasonDates = engines.CalendarEngine.getSeasonDates(seasonYear);
+        
+        // Find next event date after current
+        const eventDates = [
+            { date: seasonDates.draftDay, phase: 'draft', label: 'Draft Day' },
+            { date: seasonDates.collegeFA, phase: 'college_fa', label: 'College FA' },
+            { date: seasonDates.freeAgencyStart, phase: 'free_agency', label: 'Free Agency' },
+            { date: seasonDates.playerDevelopment, phase: 'development', label: 'Development' },
+            { date: seasonDates.trainingCamp, phase: 'training_camp', label: 'Training Camp' },
+        ];
+        
+        const nextEvent = eventDates.find(e => e.date > current);
+        
+        if (nextEvent) {
+            gameState.currentDate = engines.CalendarEngine.toDateString(nextEvent.date);
+            console.log(`📅 [OFFSEASON] Simmed to ${nextEvent.label} (${gameState.currentDate})`);
+            this._checkDateTriggers(gameState.currentDate);
+        } else {
+            // Past all events — go to training camp
+            gameState.currentDate = engines.CalendarEngine.toDateString(seasonDates.trainingCamp);
+            console.log(`📅 [OFFSEASON] Simmed to Training Camp`);
+            this._checkDateTriggers(gameState.currentDate);
+        }
+        
+        helpers.saveGameState();
+        if (window._notifyReact) window._notifyReact();
+    }
+
+    /**
+     * Sim directly to training camp / season start
+     */
+    simToTrainingCamp() {
+        const { gameState, engines, helpers } = this.ctx;
+        
+        const seasonYear = gameState.seasonStartYear || gameState.currentSeason;
+        const seasonDates = engines.CalendarEngine.getSeasonDates(seasonYear);
+        
+        gameState.currentDate = engines.CalendarEngine.toDateString(seasonDates.trainingCamp);
+        console.log(`📅 [OFFSEASON] Simmed to Training Camp (${gameState.currentDate})`);
+        
+        // Trigger all remaining phases
+        this._runRemainingOffseasonPhases();
+        
+        helpers.saveGameState();
+        if (window._notifyReact) window._notifyReact();
+    }
+
+    /**
+     * Check current date and trigger appropriate offseason events
+     */
+    _checkDateTriggers(dateStr) {
+        const { gameState, engines, helpers } = this.ctx;
+        const P = OffseasonController.PHASES;
+        
+        const current = new Date(dateStr);
+        const seasonYear = gameState.seasonStartYear || gameState.currentSeason;
+        const seasonDates = engines.CalendarEngine.getSeasonDates(seasonYear);
+        const userTier = gameState.currentTier || gameState.userTeam?.tier || 1;
+        
+        // Draft Day (Jun 15) — trigger lottery and draft for T1
+        if (current >= seasonDates.draftDay && !gameState._draftComplete && userTier === 1) {
+            console.log('🎰 [OFFSEASON] Draft day reached — triggering draft');
+            this.setPhase(P.DRAFT);
+            helpers.runDraft();
+            return; // Only trigger one event per sim
+        }
+        
+        // College FA (Jun 22) — trigger for T2/T3
+        if (current >= seasonDates.collegeFA && !gameState._collegeFAComplete && userTier > 1) {
+            console.log('🎓 [OFFSEASON] College FA reached');
+            this.setPhase(P.COLLEGE_FA);
+            helpers.startCollegeGraduateFA();
+            return;
+        }
+        
+        // Free Agency (Jul 1)
+        if (current >= seasonDates.freeAgencyStart && !gameState._freeAgencyComplete) {
+            console.log('📝 [OFFSEASON] Free Agency reached');
+            this.setPhase(P.FREE_AGENCY);
+            this.startFreeAgencyPeriod();
+            return;
+        }
+        
+        // Player Development (Aug 1)
+        if (current >= seasonDates.playerDevelopment && !gameState._developmentComplete) {
+            console.log('📈 [OFFSEASON] Development reached');
+            this.setPhase(P.DEVELOPMENT);
+            this.proceedToPlayerDevelopment();
+            return;
+        }
+        
+        // Training Camp (Aug 16) — setup new season
+        if (current >= seasonDates.trainingCamp && gameState.offseasonPhase !== P.SETUP_COMPLETE) {
+            console.log('⛺ [OFFSEASON] Training Camp reached — setting up new season');
+            this.setPhase(P.SETUP_COMPLETE);
+            this.setupNewSeason();
+        }
+    }
+
+    /**
+     * Run all remaining offseason phases quickly (for sim-to-training-camp)
+     */
+    _runRemainingOffseasonPhases() {
+        const { gameState } = this.ctx;
+        
+        // Run any incomplete phases silently
+        if (!gameState._draftComplete) {
+            console.log('🎰 [OFFSEASON] Running draft silently...');
+            this.runDraftSilently();
+        }
+        
+        if (!gameState._collegeFAComplete) {
+            console.log('🎓 [OFFSEASON] Running college FA silently...');
+            this.runCollegeGradFASilently();
+        }
+        
+        if (!gameState._freeAgencyComplete) {
+            console.log('📝 [OFFSEASON] Running FA silently...');
+            this.runFreeAgencySilently();
+        }
+        
+        if (!gameState._developmentComplete) {
+            console.log('📈 [OFFSEASON] Running development silently...');
+            this.runDevelopmentSilently();
+        }
+        
+        // Setup new season
+        this.setupNewSeason();
+    }
+
+    /**
+     * Run draft without UI (for quick sim)
+     * For T1: runs full draft with AI picks, user's picks go to best available
+     */
+    runDraftSilently() {
+        const { gameState, engines, helpers } = this.ctx;
+        
+        // Generate draft class if needed
+        if (!gameState.draftClass || gameState.draftClass.length === 0) {
+            gameState.draftClass = engines.DraftEngine.generateDraftClass(60);
+        }
+        
+        // Run lottery silently
+        const lotteryTeams = gameState.tier1Teams
+            .filter(t => !gameState.playoffTeams?.includes(t.id))
+            .sort((a, b) => a.wins - b.wins)
+            .slice(0, 14);
+        
+        const lotteryResults = engines.DraftEngine.runLottery(lotteryTeams);
+        gameState._lotteryResults = lotteryResults;
+        
+        // Run full draft - AI makes all picks (user's picks go to best available)
+        const draftOrder = engines.DraftEngine.generateDraftOrder(
+            gameState.tier1Teams,
+            lotteryResults,
+            gameState.draftPickOwnership
+        );
+        
+        const prospects = [...gameState.draftClass];
+        const results = [];
+        
+        draftOrder.forEach((pick, idx) => {
+            if (prospects.length === 0) return;
+            
+            // Pick best available
+            prospects.sort((a, b) => b.rating - a.rating);
+            const selection = prospects.shift();
+            
+            const team = gameState.tier1Teams.find(t => t.id === pick.teamId);
+            if (team && selection) {
+                // Sign rookie
+                selection.salary = engines.TeamFactory?.generateRookieSalary?.(idx + 1) || 1500000;
+                selection.contractYears = 4;
+                selection.tier = 1;
+                team.roster.push(selection);
+                
+                results.push({
+                    pick: idx + 1,
+                    round: idx < 30 ? 1 : 2,
+                    teamId: team.id,
+                    teamName: team.name,
+                    player: selection
+                });
+            }
+        });
+        
+        gameState._draftResults = results;
+        gameState._draftComplete = true;
+        gameState.draftClass = []; // Clear draft class
+        
+        console.log(`🎰 [OFFSEASON] Draft complete silently: ${results.length} picks made`);
+    }
+
+    /**
+     * Run college FA without UI (for quick sim)
+     * T2/T3 teams sign college graduates
+     */
+    runCollegeGradFASilently() {
+        const { gameState, engines, helpers } = this.ctx;
+        const userTier = gameState.currentTier || 1;
+        
+        if (userTier === 1) {
+            gameState._collegeFAComplete = true;
+            return; // T1 doesn't do college FA
+        }
+        
+        // Generate college graduates
+        const graduates = engines.DraftEngine?.generateCollegeGraduates?.(40) || [];
+        
+        // AI teams sign graduates
+        const tierTeams = userTier === 2 ? gameState.tier2Teams : gameState.tier3Teams;
+        const userTeam = helpers.getUserTeam();
+        const aiTeams = tierTeams.filter(t => t.id !== userTeam?.id);
+        
+        // Each AI team signs 1-2 grads based on need
+        aiTeams.forEach(team => {
+            const rosterSize = team.roster?.length || 0;
+            if (rosterSize >= 14 || graduates.length === 0) return;
+            
+            // Sign 1-2 players
+            const toSign = Math.min(2, 15 - rosterSize, graduates.length);
+            for (let i = 0; i < toSign; i++) {
+                graduates.sort((a, b) => b.rating - a.rating);
+                const grad = graduates.shift();
+                if (grad) {
+                    grad.tier = team.tier;
+                    grad.salary = engines.TeamFactory?.generateSalary?.(grad.rating, team.tier) || 500000;
+                    grad.contractYears = 2;
+                    team.roster.push(grad);
+                }
+            }
+        });
+        
+        // User team auto-signs top available grads to fill roster gaps
+        if (userTeam) {
+            const rosterSize = userTeam.roster?.length || 0;
+            const spotsNeeded = Math.max(0, 10 - rosterSize);
+            for (let i = 0; i < spotsNeeded && graduates.length > 0; i++) {
+                graduates.sort((a, b) => b.rating - a.rating);
+                const grad = graduates.shift();
+                if (grad) {
+                    grad.tier = userTeam.tier;
+                    grad.salary = engines.TeamFactory?.generateSalary?.(grad.rating, userTeam.tier) || 500000;
+                    grad.contractYears = 2;
+                    userTeam.roster.push(grad);
+                }
+            }
+        }
+        
+        gameState._collegeFAComplete = true;
+        console.log(`🎓 [OFFSEASON] College FA complete silently`);
+    }
+
+    /**
+     * Run FA without UI (for quick sim)
+     * All FA signings happen automatically
+     */
+    runFreeAgencySilently() {
+        const { gameState, engines, helpers } = this.ctx;
+        
+        if (!gameState.freeAgents || gameState.freeAgents.length === 0) {
+            gameState._freeAgencyComplete = true;
+            return;
+        }
+        
+        // All teams (including user) participate in AI signing
+        const allTeams = [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams];
+        
+        const totalSigned = engines.FreeAgencyEngine?.aiSigningPhase?.(
+            { aiTeams: allTeams, freeAgentPool: gameState.freeAgents },
+            {
+                TeamFactory: engines.TeamFactory,
+                getEffectiveCap: (team) => engines.SalaryCapEngine?.getEffectiveCap?.(team, team.tier) || 100000000,
+                calculateTeamSalary: (team) => engines.SalaryCapEngine?.calculateTeamSalary?.(team) || 0
+            }
+        ) || 0;
+        
+        gameState._freeAgencyComplete = true;
+        console.log(`📝 [OFFSEASON] FA complete silently: ${totalSigned} signings`);
+    }
+
+    /**
+     * Run development without UI (for quick sim)
+     */
+    runDevelopmentSilently() {
+        const { gameState, engines } = this.ctx;
+        
+        // Apply development to all players
+        const allTeams = [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams];
+        
+        allTeams.forEach(team => {
+            team.roster?.forEach(player => {
+                // Simple development: young players improve, old players decline
+                const age = player.age || 25;
+                if (age < 27) {
+                    player.rating = Math.min(99, player.rating + Math.floor(Math.random() * 3));
+                } else if (age > 32) {
+                    player.rating = Math.max(40, player.rating - Math.floor(Math.random() * 3));
+                }
+                player.age = age + 1;
+            });
+        });
+        
+        // Process retirements (players 38+ or low rating old players)
+        allTeams.forEach(team => {
+            if (!team.roster) return;
+            team.roster = team.roster.filter(player => {
+                const age = player.age || 25;
+                const rating = player.rating || 50;
+                const retireChance = age >= 40 ? 0.8 : age >= 38 ? 0.4 : age >= 35 && rating < 60 ? 0.2 : 0;
+                return Math.random() > retireChance;
+            });
+        });
+        
+        gameState._developmentComplete = true;
+        console.log(`📈 [OFFSEASON] Development complete silently`);
+    }
 }

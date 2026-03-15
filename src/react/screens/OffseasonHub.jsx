@@ -477,7 +477,7 @@ function OffseasonDashboard({ onNavigate, gameState, engines }) {
 // ─── Free Agency Screen (embedded, not modal) ───────────────────────────────
 const POSITIONS = ['ALL', 'PG', 'SG', 'SF', 'PF', 'C'];
 
-function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, seasonStartYear }) {
+function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, seasonStartYear, onCgfaComplete }) {
   const { gameState, engines, refresh } = useGame();
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [posFilter, setPosFilter] = useState('ALL');
@@ -614,6 +614,12 @@ function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, s
       const lostCount = resultsData.lost || 0;
       const details = resultsData.details || [];
       
+      // Handle continue - close CG modal, clear data, return to dashboard
+      const handleContinue = () => {
+        window.closeCollegeGradResults?.();
+        if (onCgfaComplete) onCgfaComplete();
+      };
+      
       return (
         <div style={{ maxWidth: 700, margin: '0 auto', padding: 'var(--space-6)' }}>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>
@@ -621,21 +627,29 @@ function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, s
           </h2>
           
           {/* Show details of each player */}
-          {details.length > 0 && (
+          {details.length > 0 ? (
             <div style={{ marginBottom: 20, background: 'var(--color-bg-raised)', border: '1px solid var(--color-border-subtle)' }}>
               {details.map((d, i) => (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 14px', borderBottom: '1px solid var(--color-border-subtle)',
+                  padding: '12px 16px', borderBottom: '1px solid var(--color-border-subtle)',
                 }}>
-                  <div>
-                    <span style={{ fontWeight: 500 }}>{d.player?.name}</span>
-                    <span style={{ marginLeft: 8, fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-                      {d.player?.position} · {d.player?.rating} OVR
-                    </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{d.player?.name}</div>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                      {d.player?.position} · {d.player?.age}yo · {d.player?.college || 'Unknown'}
+                    </div>
+                  </div>
+                  <div style={{ 
+                    fontFamily: 'var(--font-mono)', fontWeight: 700, 
+                    color: cgRc(d.player?.rating), marginRight: 16 
+                  }}>
+                    {d.player?.rating}
                   </div>
                   <span style={{
+                    padding: '4px 10px',
                     fontSize: 'var(--text-xs)', fontWeight: 600,
+                    background: d.signed ? 'var(--color-win-bg)' : 'var(--color-loss-bg)',
                     color: d.signed ? 'var(--color-win)' : 'var(--color-loss)',
                   }}>
                     {d.signed ? 'SIGNED' : 'DECLINED'}
@@ -643,18 +657,28 @@ function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, s
                 </div>
               ))}
             </div>
+          ) : (
+            <div style={{ 
+              marginBottom: 20, padding: 24, background: 'var(--color-bg-sunken)', 
+              border: '1px solid var(--color-border-subtle)', textAlign: 'center',
+              color: 'var(--color-text-tertiary)'
+            }}>
+              No players selected
+            </div>
           )}
           
           <div style={{ padding: 24, background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)', textAlign: 'center', marginBottom: 20 }}>
             <div style={{ fontSize: 'var(--text-md)', marginBottom: 8 }}>
               {signedCount} graduate{signedCount !== 1 ? 's' : ''} signed
             </div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
-              {lostCount} chose other teams
-            </div>
+            {lostCount > 0 && (
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
+                {lostCount} chose other teams
+              </div>
+            )}
           </div>
           <button
-            onClick={() => window.closeCollegeGradResults?.()}
+            onClick={handleContinue}
             style={{
               width: '100%', padding: '14px 20px', background: 'var(--color-accent)',
               border: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)',
@@ -2391,6 +2415,11 @@ export function OffseasonHub({ data, onClose }) {
         cgfaPhase={cgfaPhase}
         currentDate={currentDate}
         seasonStartYear={seasonStartYear}
+        onCgfaComplete={() => {
+          setCgfaData(null);
+          setCgfaPhase('waiting');
+          setActiveScreen('dashboard');
+        }}
       />
     ),
     development: (

@@ -474,13 +474,14 @@ function OwnerModeSection({
             )}
           </div>
           
-          {/* Save Button (during offseason) */}
-          {isOffseason && (
-            <Button onClick={handleConfirm} style={{ marginTop: 'var(--space-2)' }}>
-              Save and Return to Dashboard
-            </Button>
-          )}
         </div>
+      )}
+      
+      {/* Save Button - always visible during offseason */}
+      {isOffseason && (
+        <Button onClick={handleConfirm} style={{ marginTop: 'var(--space-4)', width: '100%' }}>
+          Save and Return to Dashboard
+        </Button>
       )}
     </Card>
   );

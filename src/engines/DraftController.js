@@ -589,14 +589,20 @@ export class DraftController {
         gameState._collegeFAComplete = true;
 
         if (window._reactCloseCG) window._reactCloseCG();
-        document.getElementById('collegeGradFAModal').classList.add('hidden');
+        // Legacy DOM - may not exist
+        const modal = document.getElementById('collegeGradFAModal');
+        if (modal) modal.classList.add('hidden');
 
         const remaining = gameState.collegeGraduates || [];
         console.log(`🤖 AI signing remaining ${remaining.length} college graduates...`);
         this.aiSignCollegeGraduates(remaining);
 
         helpers.saveGameState();
-        helpers.proceedToPlayerDevelopment();
+        
+        // In hub-based flow, just notify React and let user sim forward
+        // Don't auto-trigger proceedToPlayerDevelopment
+        if (window._notifyReact) window._notifyReact();
+        console.log('🎓 [COLLEGE FA] Complete. User can sim forward to next phase.');
     }
 
     aiSignCollegeGraduates(graduates) {

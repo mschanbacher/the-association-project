@@ -608,17 +608,49 @@ function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, s
     
     // Results phase
     if (cgfaPhase === 'results') {
+      // Results come as { results: { signed, lost, details } }
+      const resultsData = cgfaData?.results || {};
+      const signedCount = resultsData.signed || 0;
+      const lostCount = resultsData.lost || 0;
+      const details = resultsData.details || [];
+      
       return (
         <div style={{ maxWidth: 700, margin: '0 auto', padding: 'var(--space-6)' }}>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-4)' }}>
             College Graduate FA Results
           </h2>
+          
+          {/* Show details of each player */}
+          {details.length > 0 && (
+            <div style={{ marginBottom: 20, background: 'var(--color-bg-raised)', border: '1px solid var(--color-border-subtle)' }}>
+              {details.map((d, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 14px', borderBottom: '1px solid var(--color-border-subtle)',
+                }}>
+                  <div>
+                    <span style={{ fontWeight: 500 }}>{d.player?.name}</span>
+                    <span style={{ marginLeft: 8, fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                      {d.player?.position} · {d.player?.rating} OVR
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: 'var(--text-xs)', fontWeight: 600,
+                    color: d.signed ? 'var(--color-win)' : 'var(--color-loss)',
+                  }}>
+                    {d.signed ? 'SIGNED' : 'DECLINED'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          
           <div style={{ padding: 24, background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)', textAlign: 'center', marginBottom: 20 }}>
             <div style={{ fontSize: 'var(--text-md)', marginBottom: 8 }}>
-              {cgfaData?.signed || 0} graduates signed
+              {signedCount} graduate{signedCount !== 1 ? 's' : ''} signed
             </div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
-              {cgfaData?.lost || 0} chose other teams
+              {lostCount} chose other teams
             </div>
           </div>
           <button
@@ -707,7 +739,7 @@ function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, s
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500 }}>{grad.name}</div>
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-                      {grad.position} · {grad.age}yo · {grad._measurables || ''}
+                      {grad.position} · {grad.age}yo · {grad.college || 'Unknown'} · {grad._measurables || ''}
                     </div>
                   </div>
                   <div style={{

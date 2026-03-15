@@ -317,7 +317,7 @@
                     },
                     helpers: {
                         getUserTeam, getTeamById, formatCurrency,
-                        aiSigningPhase,
+                        aiSigningPhase, saveGameState,
                         getRosterController: () => getRosterController(),
                         getOffseasonController: () => getOffseasonController()
                     }

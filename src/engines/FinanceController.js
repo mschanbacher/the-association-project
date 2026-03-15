@@ -231,7 +231,9 @@ export class FinanceController {
         });
         offers.splice(index, 1);
         console.log(`✅ Accepted sponsor: ${offer.name} (${helpers.formatCurrency(offer.annualValue)}/yr × ${offer.years}yr)`);
-        this.showOwnerModeModal(team);
+        helpers.saveGameState();
+        // Notify React to refresh (don't open modal)
+        if (window._notifyReact) window._notifyReact();
     }
 
     upgradeArena(type) {
@@ -257,7 +259,9 @@ export class FinanceController {
             arena.upgradeYearsLeft = 2;
             console.log(`🔧 Arena renovation: +25 condition (${helpers.formatCurrency(cost)} over 2yr)`);
         }
-        this.showOwnerModeModal(team);
+        helpers.saveGameState();
+        // Notify React to refresh (don't open modal)
+        if (window._notifyReact) window._notifyReact();
     }
 
     updateTicketPrice(value) {
@@ -275,17 +279,8 @@ export class FinanceController {
         const team = helpers.getUserTeam();
         if (!team || !team.finances) return;
         team.finances.marketingBudget = amount;
-
-        // In React mode, the component manages its own state — no re-render needed
-        if (window._wgRefs || window._reactShowOwnerMode) return;
-
-        const effectEl = document.getElementById('marketingEffect');
-        if (effectEl) {
-            effectEl.textContent = amount > 0
-                ? `Investing ${helpers.formatCurrency(amount)}/season in marketing — this reduces your available spending limit.`
-                : 'No marketing spend — fanbase growth relies on winning alone.';
-        }
-        this.showOwnerModeModal(team);
+        console.log(`📢 Marketing budget set to: ${helpers.formatCurrency(amount)}/season`);
+        // Don't open modal or update legacy DOM - React handles its own state
     }
 
     updateOwnerSpendingRatio(value) {

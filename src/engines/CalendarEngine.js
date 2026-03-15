@@ -42,6 +42,7 @@ export class CalendarEngine {
             draftLottery: new Date(startYear + 1, 5, 8),       // Jun 8
             draftDay: new Date(startYear + 1, 5, 15),          // Jun 15
             collegeFA: new Date(startYear + 1, 5, 22),         // Jun 22
+            contractExpiration: new Date(startYear + 1, 5, 30), // Jun 30
             freeAgencyStart: new Date(startYear + 1, 6, 1),    // Jul 1
             freeAgencyEnd: new Date(startYear + 1, 6, 15),     // Jul 15
             rosterCompliance: new Date(startYear + 1, 6, 16),  // Jul 16

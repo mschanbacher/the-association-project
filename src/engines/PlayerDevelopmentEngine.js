@@ -255,15 +255,8 @@ export class PlayerDevelopmentEngine {
                 player._peakRating = boundedRating;
             }
 
-            // Countdown contract years
-            if (!player.contractYears) {
-                player.contractYears = 1;
-            }
-            player.contractYears--;
-
-            if (player.contractYears <= 0) {
-                expiredContracts.push(player);
-            }
+            // NOTE: Contract expiration is now handled separately in OffseasonController.runContractExpiration()
+            // which runs on Jun 30, BEFORE free agency opens. This method no longer touches contracts.
 
             // Log significant changes
             const ratingChange = boundedRating - oldRating;
@@ -278,6 +271,7 @@ export class PlayerDevelopmentEngine {
             }
         }
 
+        // expiredContracts is now always empty - kept for API compatibility
         return { developmentLog, expiredContracts, retirements };
     }
 }

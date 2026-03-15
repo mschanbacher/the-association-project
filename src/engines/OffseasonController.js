@@ -729,25 +729,92 @@ export class OffseasonController {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // Contract Expiration (Jun 30) - BEFORE Free Agency
+    // ═══════════════════════════════════════════════════════════════════
+    
+    /**
+     * Process contract expiration for all teams.
+     * - Decrements contractYears for all players
+     * - Moves players with expired contracts (contractYears <= 0) to FA pool
+     * - Sets previousTeamId so former players are highlighted in FA
+     * 
+     * This runs BEFORE Free Agency opens so the FA pool includes all expired contracts.
+     */
+    runContractExpiration() {
+        const { gameState, helpers } = this.ctx;
+        const userTeam = helpers.getUserTeam();
+        
+        console.log('📋 Running contract expiration for all teams...');
+        
+        const allTeams = [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams];
+        let totalExpired = 0;
+        let userExpiredCount = 0;
+        
+        allTeams.forEach(team => {
+            const expiredPlayers = [];
+            
+            // Decrement contract years and identify expired contracts
+            team.roster.forEach(player => {
+                if (!player.contractYears) {
+                    player.contractYears = 1;
+                }
+                player.contractYears--;
+                
+                if (player.contractYears <= 0) {
+                    expiredPlayers.push(player);
+                }
+            });
+            
+            // Remove expired players from roster and add to FA pool
+            expiredPlayers.forEach(player => {
+                const index = team.roster.findIndex(p => p.id === player.id);
+                if (index !== -1) {
+                    team.roster.splice(index, 1);
+                }
+                
+                // Set previousTeamId for FA highlighting
+                player.previousTeamId = team.id;
+                
+                // Give them a new contract length for when they sign
+                player.contractYears = helpers.determineContractLength(player.age, player.rating);
+                player.originalContractLength = player.contractYears;
+                player.contractExpired = false;
+                
+                gameState.freeAgents.push(player);
+                totalExpired++;
+                
+                if (team.id === userTeam.id) {
+                    userExpiredCount++;
+                    console.log(`  🔓 ${player.name} (${player.rating} OVR) — contract expired, now a free agent`);
+                }
+            });
+            
+            // Log team summary if they had expirations
+            if (expiredPlayers.length > 0 && team.id !== userTeam.id) {
+                console.log(`  ${team.name}: ${expiredPlayers.length} contracts expired`);
+            }
+        });
+        
+        console.log(`📋 Contract Expiration Complete: ${totalExpired} players moved to FA pool`);
+        if (userExpiredCount > 0) {
+            console.log(`  ⭐ Your team: ${userExpiredCount} former players now in free agency`);
+        }
+        
+        // Save after contract changes
+        helpers.saveGameState();
+    }
+
     applyPlayerDevelopment() {
         const { gameState, helpers } = this.ctx;
 
-        console.log('🌟 Applying player development...');
+        console.log('🌟 Applying player development (ratings, aging, retirements)...');
         
-        // Debug: Log user team contract status BEFORE development
         const userTeam = helpers.getUserTeam();
-        console.log(`📋 [DEBUG] User team roster BEFORE development (${userTeam.roster.length} players):`);
-        userTeam.roster.forEach(p => {
-            console.log(`   ${p.name}: contractYears=${p.contractYears}, age=${p.age}, rating=${p.rating}`);
-        });
-
         const allTeams = [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams];
         helpers.advanceFinancialTransitions(allTeams);
 
         let userTeamLog = [];
-        let userExpiredContracts = [];
-
-        let totalExpired = 0, totalResigned = 0, totalReleased = 0;
         let allRetirements = [];
         let userTeamRetirements = [];
 
@@ -756,16 +823,9 @@ export class OffseasonController {
                 const result = helpers.developTeamPlayers(team, gamesPerSeason);
                 if (result && team.id === userTeam.id) {
                     userTeamLog = result.developmentLog || [];
-                    userExpiredContracts = result.expiredContracts || [];
                     userTeamRetirements = result.retirements || [];
                 }
                 if (result && result.retirements) allRetirements.push(...result.retirements);
-                if (result && result.expiredContracts && team.id !== userTeam.id) {
-                    totalExpired += result.expiredContracts.length;
-                    const counts = helpers.handleAITeamFreeAgency(team, result.expiredContracts);
-                    totalResigned += counts.resigned;
-                    totalReleased += counts.released;
-                }
             });
         };
 
@@ -790,37 +850,11 @@ export class OffseasonController {
         gameState._seasonRetirements = allRetirements;
         gameState._userTeamRetirements = userTeamRetirements;
 
-        console.log('═══════════════════════════════════════════════════════');
-        console.log(`📊 AI Free Agency Summary:`);
-        console.log(`  Total Expired Contracts: ${totalExpired}`);
-        console.log(`  Re-signed: ${totalResigned}`);
-        console.log(`  Released to FA: ${totalReleased}`);
-        console.log(`  User Expired: ${userExpiredContracts.length}`);
-        console.log(`  Total FA Pool: ${gameState.freeAgents.length} players`);
-        console.log('═══════════════════════════════════════════════════════');
-
         if (userTeamLog.length > 0) {
             console.log(`📊 ${userTeam.name} Player Development:`);
             userTeamLog.forEach(log => {
- const arrow = log.change > 0 ? '️' : '️';
+                const arrow = log.change > 0 ? '📈' : '📉';
                 console.log(`  ${arrow} ${log.name} (${log.age}yo): ${log.oldRating} → ${log.newRating} (${log.change > 0 ? '+' : ''}${log.change})`);
-            });
-        }
-
-        // Auto-release expired contracts to FA pool with loyalty bonus
-        if (userExpiredContracts.length > 0) {
-            console.log(`📝 ${userTeam.name} Expired Contracts (${userExpiredContracts.length}):`);
-            userExpiredContracts.forEach(player => {
-                console.log(`  🔓 ${player.name} (${player.rating} OVR) - Released to free agency with loyalty bonus`);
-
-                const index = userTeam.roster.findIndex(p => p.id === player.id);
-                if (index !== -1) userTeam.roster.splice(index, 1);
-
-                player.previousTeamId = userTeam.id;
-                player.contractYears = helpers.determineContractLength(player.age, player.rating);
-                player.originalContractLength = player.contractYears;
-                player.contractExpired = false;
-                gameState.freeAgents.push(player);
             });
         }
 
@@ -848,7 +882,7 @@ export class OffseasonController {
                 return true;
             });
             const faRetired = faBefore - gameState.freeAgents.length;
- if (faRetired > 0) console.log(`${faRetired} free agents retired`);
+            if (faRetired > 0) console.log(`${faRetired} free agents retired`);
         }
 
         // Heal injuries and reset fatigue
@@ -860,7 +894,7 @@ export class OffseasonController {
         console.log('😴 Resetting player fatigue for new season...');
         helpers.resetAllFatigue([...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams]);
 
-        return { developmentLog: userTeamLog, expiredContracts: userExpiredContracts };
+        return { developmentLog: userTeamLog };
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -1684,6 +1718,15 @@ export class OffseasonController {
             return;
         }
         
+        // Contract Expiration (Jun 30) - runs BEFORE Free Agency opens
+        // Decrements contract years and moves expired contracts to FA pool
+        if (dateGTE(currentDateOnly, seasonDates.contractExpiration) && !gameState._contractExpirationComplete) {
+            console.log('📋 [OFFSEASON] Contract Expiration Day — processing expired contracts');
+            this.runContractExpiration();
+            gameState._contractExpirationComplete = true;
+            // Don't return - allow FA to trigger on same sim if it's Jul 1+
+        }
+        
         // Free Agency (Jul 1)
         // Only trigger once - use _freeAgencyStarted to track if we've shown the FA window
         if (dateGTE(currentDateOnly, seasonDates.freeAgencyStart) && !gameState._freeAgencyComplete && !gameState._freeAgencyStarted) {
@@ -1697,7 +1740,7 @@ export class OffseasonController {
             return;
         }
         
-        // Player Development (Aug 1)
+        // Player Development (Aug 1) - NOW only handles aging, ratings, retirements (not contracts)
         if (dateGTE(currentDateOnly, seasonDates.playerDevelopment) && !gameState._developmentComplete) {
             console.log('📈 [OFFSEASON] Development reached — triggering via hub');
             this.setPhase(P.DEVELOPMENT);
@@ -1751,6 +1794,13 @@ export class OffseasonController {
         if (!gameState._collegeFAComplete) {
             console.log('🎓 [OFFSEASON] Running college FA silently...');
             this.runCollegeGradFASilently();
+        }
+        
+        // Contract expiration must run before FA
+        if (!gameState._contractExpirationComplete) {
+            console.log('📋 [OFFSEASON] Running contract expiration silently...');
+            this.runContractExpiration();
+            gameState._contractExpirationComplete = true;
         }
         
         if (!gameState._freeAgencyComplete) {

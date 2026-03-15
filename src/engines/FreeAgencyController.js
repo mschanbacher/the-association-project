@@ -611,10 +611,10 @@ export class FreeAgencyController {
         
         helpers.saveGameState();
 
-        // In hub mode, just close FA and return to hub - let user continue simming
-        if (window._reactCloseFA) {
-            window._reactCloseFA();
-            console.log('📝 [FA] Complete - returning to Offseason Hub');
+        // In hub mode (OffseasonHub is active), just return - the React callback handles navigation
+        // We detect hub mode by checking if we're in offseason phase
+        if (gameState.offseasonPhase) {
+            console.log('📝 [FA] Complete - hub mode detected, returning control to React');
             return;
         }
         

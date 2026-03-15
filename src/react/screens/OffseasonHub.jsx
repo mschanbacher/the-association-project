@@ -1499,6 +1499,64 @@ function PlaceholderScreen({ title, message }) {
   );
 }
 
+// ─── Training Camp Screen ─────────────────────────────────────────────────────
+function TrainingCampScreen({ onContinue }) {
+  return (
+    <div style={{
+      maxWidth: 600,
+      margin: '0 auto',
+      padding: 'var(--space-6)',
+    }}>
+      <h2 style={{
+        fontSize: 'var(--text-lg)',
+        fontWeight: 'var(--weight-semi)',
+        marginBottom: 'var(--space-4)',
+      }}>Training Camp</h2>
+      
+      <div style={{
+        padding: 'var(--space-8)',
+        background: 'var(--color-bg-sunken)',
+        border: '1px solid var(--color-border-subtle)',
+        textAlign: 'center',
+        marginBottom: 'var(--space-4)',
+      }}>
+        <div style={{ 
+          fontSize: 'var(--text-xl)', 
+          marginBottom: 'var(--space-4)',
+          color: 'var(--color-text-secondary)',
+        }}>
+          Coming Soon
+        </div>
+        <div style={{ 
+          fontSize: 'var(--text-sm)', 
+          color: 'var(--color-text-tertiary)',
+          lineHeight: 1.6,
+        }}>
+          Training camp will include expanded roster limits, preseason games, 
+          and cutdown decisions before the regular season begins.
+        </div>
+      </div>
+      
+      <button
+        onClick={onContinue}
+        style={{
+          width: '100%',
+          padding: '14px 20px',
+          background: 'var(--color-accent)',
+          border: 'none',
+          fontFamily: 'var(--font-body)',
+          fontSize: 'var(--text-sm)',
+          fontWeight: 600,
+          color: 'var(--color-text-inverse)',
+          cursor: 'pointer',
+        }}
+      >
+        Continue to Season Setup
+      </button>
+    </div>
+  );
+}
+
 // ─── Draft Screen ────────────────────────────────────────────────────────────
 function DraftScreen({ draftData, draftPhase, setDraftPhase, currentDate, seasonStartYear }) {
   const { gameState } = useGame();
@@ -2285,6 +2343,9 @@ export function OffseasonHub({ data, onClose }) {
   
   // Compliance (roster cuts)
   const [complianceData, setComplianceData] = useState(null);
+  
+  // Training Camp
+  const [trainingCampData, setTrainingCampData] = useState(null);
 
   // Get current offseason state
   const raw = gameState?._raw || gameState;
@@ -2305,6 +2366,7 @@ export function OffseasonHub({ data, onClose }) {
       showDevelopment: window._reactShowDevelopment,
       showContractDecisions: window._reactShowContractDecisions,
       showCompliance: window._reactShowCompliance,
+      showTrainingCamp: window._reactShowTrainingCamp,
     };
     
     // Free Agency
@@ -2373,6 +2435,13 @@ export function OffseasonHub({ data, onClose }) {
       setComplianceData(complianceDataFromController);
       setActiveScreen('roster'); // Show on roster screen
     };
+    
+    // Training Camp
+    window._reactShowTrainingCamp = (campData) => {
+      console.log('⛺ [OFFSEASON-HUB] Intercepting training camp data');
+      setTrainingCampData(campData);
+      setActiveScreen('trainingcamp');
+    };
 
     // Cleanup
     return () => {
@@ -2385,6 +2454,7 @@ export function OffseasonHub({ data, onClose }) {
       window._reactShowDevelopment = originals.showDevelopment;
       window._reactShowContractDecisions = originals.showContractDecisions;
       window._reactShowCompliance = originals.showCompliance;
+      window._reactShowTrainingCamp = originals.showTrainingCamp;
     };
   }, []);
 
@@ -2438,6 +2508,9 @@ export function OffseasonHub({ data, onClose }) {
     finances: <FinancesScreen />,
     history: <HistoryScreen />,
     glossary: <GlossaryScreen />,
+    trainingcamp: <TrainingCampScreen onContinue={() => {
+      window._offseasonController?.checkRosterComplianceAndContinue?.();
+    }} />,
   }), [gameState, engines, faData, faPhase, cgfaData, cgfaPhase, draftData, draftPhase, devData, contractData, complianceData, currentDate, seasonStartYear]);
 
   return (

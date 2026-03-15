@@ -1710,15 +1710,23 @@ export class OffseasonController {
         }
         
         // Training Camp (Aug 16) — setup new season
-        // First run roster compliance, then owner mode, then season setup
+        // For now, just a placeholder - skip directly to roster compliance and season setup
         if (dateGTE(currentDateOnly, seasonDates.trainingCamp) && gameState.offseasonPhase !== P.SETUP_COMPLETE) {
-            console.log('⛺ [OFFSEASON] Training Camp reached — checking roster compliance');
+            console.log('⛺ [OFFSEASON] Training Camp reached — proceeding to season setup');
             
-            // Run any remaining phases silently first
-            this._runRemainingOffseasonPhases();
+            // Mark all phases complete (they should be by now, but just in case)
+            gameState._draftComplete = true;
+            gameState._collegeFAComplete = true;
+            gameState._freeAgencyComplete = true;
+            gameState._developmentComplete = true;
             
-            // Now check roster compliance and continue through owner mode to season setup
-            this.checkRosterComplianceAndContinue();
+            // Show training camp placeholder in hub, then continue
+            if (window._reactShowTrainingCamp) {
+                window._reactShowTrainingCamp({ placeholder: true });
+            } else {
+                // No React handler, just continue directly
+                this.checkRosterComplianceAndContinue();
+            }
         }
     }
 

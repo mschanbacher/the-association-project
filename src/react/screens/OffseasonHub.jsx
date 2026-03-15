@@ -893,7 +893,7 @@ function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, s
               cursor: 'pointer',
             }}
           >
-            Continue to Season Setup
+            Return to Dashboard
           </button>
         </div>
       </div>

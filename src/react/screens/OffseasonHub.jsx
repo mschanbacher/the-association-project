@@ -883,10 +883,14 @@ function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, s
           <button
             onClick={() => {
               console.log('📋 [FA] Return to Dashboard clicked');
-              console.log('📋 [FA] onFaComplete exists:', !!onFaComplete);
               // Run the controller logic (AI signing, mark complete, save)
+              // But don't let it call _reactCloseFA - we handle navigation ourselves
+              const origCloseFA = window._reactCloseFA;
+              window._reactCloseFA = null; // Temporarily disable
               window.continueFreeAgency?.();
-              // Then navigate back to dashboard
+              window._reactCloseFA = origCloseFA; // Restore
+              
+              // Navigate back to dashboard
               if (onFaComplete) {
                 console.log('📋 [FA] Calling onFaComplete...');
                 onFaComplete();

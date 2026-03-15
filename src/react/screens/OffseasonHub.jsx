@@ -2369,6 +2369,20 @@ export function OffseasonHub({ data, onClose }) {
   const currentDate = raw?.currentDate;
   const seasonStartYear = raw?.seasonStartYear || raw?.currentSeason;
 
+  // ─── Initialize offseason data on mount ──────────────────────────────────────
+  useEffect(() => {
+    // Generate sponsor offers if not already present
+    const userTeam = gameState?.userTeam;
+    if (userTeam && engines?.FinanceEngine) {
+      engines.FinanceEngine.ensureFinances(userTeam);
+      const pendingOffers = userTeam.finances?.pendingSponsorOffers || [];
+      if (pendingOffers.length === 0) {
+        console.log('📋 [OFFSEASON-HUB] Generating sponsor offers...');
+        window._helpers?.generateSponsorOffers?.(userTeam);
+      }
+    }
+  }, [gameState?.userTeam, engines?.FinanceEngine]);
+
   // ─── Intercept all offseason modal calls ───────────────────────────────────
   useEffect(() => {
     // Store original functions

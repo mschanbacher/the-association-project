@@ -4,7 +4,7 @@ import { Card, CardHeader } from '../components/Card.jsx';
 import { Badge } from '../components/Badge.jsx';
 import { Button } from '../components/Button.jsx';
 
-export function FinancesScreen({ isOffseason = false, onConfirm }) {
+export function FinancesScreen({ isOffseason = false, onNavigate }) {
   const { gameState, engines, isReady, refresh } = useGame();
   
   // Local state for owner mode controls
@@ -202,7 +202,7 @@ export function FinancesScreen({ isOffseason = false, onConfirm }) {
         totalRev={totalRev}
         fc={fc}
         refresh={refresh}
-        onConfirm={onConfirm}
+        onNavigate={onNavigate}
         FinanceEngine={FinanceEngine}
       />
     </div>
@@ -219,7 +219,7 @@ function OwnerModeSection({
   ticketPrice, setTicketPrice, 
   marketingBudget, setMarketingBudget,
   spendingRatio, setSpendingRatio,
-  totalRev, fc, refresh, onConfirm, FinanceEngine
+  totalRev, fc, refresh, onNavigate, FinanceEngine
 }) {
   const ownerModeEnabled = finances.ownerMode ?? false;
   const arena = finances.arena || { capacity: 10000, condition: 80 };
@@ -268,10 +268,16 @@ function OwnerModeSection({
     window._financeController?.setMarketingBudget?.(marketingBudget);
     if (!isT1) window._financeController?.updateOwnerSpendingRatio?.(spendingRatio);
     
-    // Call confirm callback
-    if (onConfirm) onConfirm();
-    else window._offseasonController?.confirmOffseasonDecisions?.();
-  }, [ticketPrice, marketingBudget, spendingRatio, isT1, onConfirm]);
+    // Save game state
+    window._helpers?.saveGameState?.();
+    
+    // Just notify React to refresh - don't trigger season setup
+    // Season setup is triggered from Training Camp screen
+    if (refresh) refresh();
+    
+    // Return to dashboard
+    if (onNavigate) onNavigate('dashboard');
+  }, [ticketPrice, marketingBudget, spendingRatio, isT1, refresh, onNavigate]);
   
   // Calculate costs
   const expansionCost = Math.round(arena.capacity * (tier === 1 ? 1500 : tier === 2 ? 800 : 300));
@@ -468,10 +474,10 @@ function OwnerModeSection({
             )}
           </div>
           
-          {/* Confirm Button (during offseason) */}
+          {/* Save Button (during offseason) */}
           {isOffseason && (
             <Button onClick={handleConfirm} style={{ marginTop: 'var(--space-2)' }}>
-              Confirm Offseason Decisions
+              Save and Return to Dashboard
             </Button>
           )}
         </div>

@@ -2521,9 +2521,7 @@ export function OffseasonHub({ data, onClose }) {
     trades: <TradesScreen />,
     scouting: <ScoutingScreen />,
     coach: <CoachScreen />,
-    finances: <FinancesScreen isOffseason={true} onConfirm={() => {
-      window._offseasonController?.continueToSeasonSetup?.();
-    }} />,
+    finances: <FinancesScreen isOffseason={true} onNavigate={setActiveScreen} />,
     history: <HistoryScreen />,
     glossary: <GlossaryScreen />,
     trainingcamp: <TrainingCampScreen onContinue={() => {

@@ -477,7 +477,7 @@ function OffseasonDashboard({ onNavigate, gameState, engines }) {
 // ─── Free Agency Screen (embedded, not modal) ───────────────────────────────
 const POSITIONS = ['ALL', 'PG', 'SG', 'SF', 'PF', 'C'];
 
-function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, seasonStartYear, onCgfaComplete }) {
+function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, seasonStartYear, onCgfaComplete, onFaComplete }) {
   const { gameState, engines, refresh } = useGame();
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [posFilter, setPosFilter] = useState('ALL');
@@ -881,7 +881,12 @@ function FreeAgencyScreen({ faData, faPhase, cgfaData, cgfaPhase, currentDate, s
         
         <div style={{ textAlign: 'center', marginTop: 24 }}>
           <button
-            onClick={() => window.continueFreeAgency?.()}
+            onClick={() => {
+              // Run the controller logic (AI signing, mark complete, save)
+              window.continueFreeAgency?.();
+              // Then navigate back to dashboard
+              if (onFaComplete) onFaComplete();
+            }}
             style={{
               padding: '12px 32px',
               background: 'var(--color-accent)',
@@ -2522,6 +2527,11 @@ export function OffseasonHub({ data, onClose }) {
         onCgfaComplete={() => {
           setCgfaData(null);
           setCgfaPhase('waiting');
+          setActiveScreen('dashboard');
+        }}
+        onFaComplete={() => {
+          setFaData(null);
+          setFaPhase('waiting');
           setActiveScreen('dashboard');
         }}
       />

@@ -1710,10 +1710,15 @@ export class OffseasonController {
         }
         
         // Training Camp (Aug 16) — setup new season
+        // First run roster compliance, then owner mode, then season setup
         if (dateGTE(currentDateOnly, seasonDates.trainingCamp) && gameState.offseasonPhase !== P.SETUP_COMPLETE) {
-            console.log('⛺ [OFFSEASON] Training Camp reached — setting up new season');
-            this.setPhase(P.SETUP_COMPLETE);
-            this.setupNewSeason();
+            console.log('⛺ [OFFSEASON] Training Camp reached — checking roster compliance');
+            
+            // Run any remaining phases silently first
+            this._runRemainingOffseasonPhases();
+            
+            // Now check roster compliance and continue through owner mode to season setup
+            this.checkRosterComplianceAndContinue();
         }
     }
 
@@ -1744,8 +1749,8 @@ export class OffseasonController {
             this.runDevelopmentSilently();
         }
         
-        // Setup new season
-        this.setupNewSeason();
+        // Check roster compliance and continue through owner mode to season setup
+        this.checkRosterComplianceAndContinue();
     }
 
     /**

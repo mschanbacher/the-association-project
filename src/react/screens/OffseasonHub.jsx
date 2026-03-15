@@ -2079,6 +2079,7 @@ export function OffseasonHub({ data, onClose }) {
       showUserPick: window._reactShowUserPick,
       showDraftResults: window._reactShowDraftResults,
       showCGFA: window._reactShowCGFA,
+      showCG: window._reactShowCG,
       showDevelopment: window._reactShowDevelopment,
       showContractDecisions: window._reactShowContractDecisions,
       showCompliance: window._reactShowCompliance,
@@ -2116,12 +2117,18 @@ export function OffseasonHub({ data, onClose }) {
       setActiveScreen('draft');
     };
     
-    // College Grad FA
+    // College Grad FA (intercept both naming conventions)
     window._reactShowCGFA = (cgfaDataFromController) => {
       console.log('🎓 [OFFSEASON-HUB] Intercepting CGFA data');
       setCgfaData(cgfaDataFromController);
       setCgfaPhase(cgfaDataFromController?.phase || 'select');
       setActiveScreen('freeagency'); // Show in FA screen since it's similar
+    };
+    window._reactShowCG = (cgfaDataFromController) => {
+      console.log('🎓 [OFFSEASON-HUB] Intercepting CG data (from DraftController)');
+      setCgfaData(cgfaDataFromController);
+      setCgfaPhase(cgfaDataFromController?.phase || 'select');
+      setActiveScreen('freeagency');
     };
     
     // Player Development
@@ -2152,6 +2159,7 @@ export function OffseasonHub({ data, onClose }) {
       window._reactShowUserPick = originals.showUserPick;
       window._reactShowDraftResults = originals.showDraftResults;
       window._reactShowCGFA = originals.showCGFA;
+      window._reactShowCG = originals.showCG;
       window._reactShowDevelopment = originals.showDevelopment;
       window._reactShowContractDecisions = originals.showContractDecisions;
       window._reactShowCompliance = originals.showCompliance;

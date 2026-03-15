@@ -585,6 +585,9 @@ export class DraftController {
     closeCollegeGradAndContinue() {
         const { gameState, helpers } = this.ctx;
 
+        // Mark college FA as complete so it doesn't re-trigger
+        gameState._collegeFAComplete = true;
+
         if (window._reactCloseCG) window._reactCloseCG();
         document.getElementById('collegeGradFAModal').classList.add('hidden');
 

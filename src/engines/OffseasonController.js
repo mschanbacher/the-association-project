@@ -1669,15 +1669,8 @@ export class OffseasonController {
             console.log('🎓 [OFFSEASON] College FA reached — triggering via hub');
             this.setPhase(P.COLLEGE_FA);
             
-            // Generate college grads and send to hub
-            const graduates = engines.DraftEngine?.generateCollegeGraduates?.(40) || [];
-            if (window._reactShowCGFA) {
-                window._reactShowCGFA({
-                    graduates,
-                    userTeamId: helpers.getUserTeam()?.id,
-                    userTier
-                });
-            }
+            // Use DraftController to properly generate and show college grads
+            helpers.startCollegeGraduateFA();
             return;
         }
         

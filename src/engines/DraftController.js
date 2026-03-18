@@ -12,7 +12,6 @@ export class DraftController {
     constructor(ctx) {
         this.ctx = ctx;
         this.currentDraftResults = [];
-        this.collegeGradIdCounter = 800000;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -20,10 +19,13 @@ export class DraftController {
     // ═══════════════════════════════════════════════════════════════════
 
     generateDraftProspects() {
-        const { engines } = this.ctx;
+        const { engines, gameState } = this.ctx;
+        // Reserve 100 IDs from global counter for draft prospects
+        const startId = gameState.getNextPlayerId(100);
         return engines.DraftEngine.generateDraftProspects(
-            this.ctx.gameState.currentSeason,
-            { PlayerAttributes: engines.PlayerAttributes, TeamFactory: engines.TeamFactory }
+            gameState.currentSeason,
+            { PlayerAttributes: engines.PlayerAttributes, TeamFactory: engines.TeamFactory },
+            startId
         );
     }
 
@@ -356,7 +358,7 @@ export class DraftController {
 
     finalizeDraft() {
         const state = window.currentDraftState;
-        const { gameState } = this.ctx;
+        const { gameState, engines } = this.ctx;
 
         console.log(`✅ Draft complete: ${state.results.length} players drafted`);
 
@@ -370,13 +372,22 @@ export class DraftController {
             gameState.freeAgents.push(prospect);
         });
 
-        // Post-draft roster trimming
-        const MAX_ROSTER = 15;
+        // Generate college graduates and add to FA pool.
+        // This replaces the standalone College Grad FA phase — graduates are now
+        // available in the general FA pool for camp invites at any tier.
+        const graduates = this.generateCollegeGraduateClass();
+        graduates.forEach(g => { g.previousTeamId = null; gameState.freeAgents.push(g); });
+        gameState._collegeFAComplete = true;
+        console.log(`🎓 ${graduates.length} college graduates added to FA pool`);
+
+        // Post-draft roster trimming — offseason limit is 20 (expanded for training camp).
+        // Final cutdown to 15 happens at each tier's camp cutdown deadline.
+        const MAX_OFFSEASON_ROSTER = 20;
         const allTeams = [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams];
         allTeams.forEach(team => {
-            if (!team.roster || team.roster.length <= MAX_ROSTER) return;
+            if (!team.roster || team.roster.length <= MAX_OFFSEASON_ROSTER) return;
             team.roster.sort((a, b) => a.rating - b.rating);
-            const excess = team.roster.length - MAX_ROSTER;
+            const excess = team.roster.length - MAX_OFFSEASON_ROSTER;
             const cut = team.roster.splice(0, excess);
             cut.forEach(player => {
                 player.contractYears = player.contractYears || 1;
@@ -470,14 +481,17 @@ export class DraftController {
     // ═══════════════════════════════════════════════════════════════════
 
     generateCollegeGraduate(targetTier) {
-        const { engines } = this.ctx;
-        return engines.TeamFactory.generateCollegeGraduate(targetTier, this.collegeGradIdCounter++, { PlayerAttributes: engines.PlayerAttributes });
+        const { engines, gameState } = this.ctx;
+        const id = gameState.getNextPlayerId(1);
+        return engines.TeamFactory.generateCollegeGraduate(targetTier, id, { PlayerAttributes: engines.PlayerAttributes });
     }
 
     generateCollegeGraduateClass() {
-        const { engines } = this.ctx;
-        const result = engines.TeamFactory.generateCollegeGraduateClass(this.collegeGradIdCounter, { PlayerAttributes: engines.PlayerAttributes });
-        this.collegeGradIdCounter += result.length;
+        const { engines, gameState } = this.ctx;
+        // TeamFactory determines class size internally (90-120 players).
+        // Reserve the max possible (120) from global counter; unused IDs are just a harmless gap.
+        const startId = gameState.getNextPlayerId(120);
+        const result = engines.TeamFactory.generateCollegeGraduateClass(startId, { PlayerAttributes: engines.PlayerAttributes });
         return result;
     }
 

@@ -27,7 +27,7 @@ const OFFSEASON_PHASES = [
   { key: 'postseason', label: 'Playoffs', month: 3, day: 16 },      // Apr 16
   { key: 'promo_rel', label: 'P/R', month: 5, day: 1 },             // Jun 1
   { key: 'draft', label: 'Draft', month: 5, day: 15 },              // Jun 15
-  { key: 'college_fa', label: 'CFA', month: 5, day: 22 },           // Jun 22
+  { key: 'contracts_expire', label: 'Exp', month: 5, day: 30 },     // Jun 30
   { key: 'free_agency', label: 'FA', month: 6, day: 1 },            // Jul 1
   { key: 'development', label: 'Dev', month: 7, day: 1 },           // Aug 1
   { key: 'training_camp', label: 'Camp', month: 7, day: 16 },       // Aug 16

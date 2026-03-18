@@ -38,6 +38,13 @@ class GameState {
         // === FREE AGENCY ===
         this._freeAgents = [];
         
+        // === PLAYER ID SYSTEM ===
+        // Monotonically increasing counter for all player generation.
+        // Replaces range-based schemes (teamId*1000, 100000+season*1000, 800000+)
+        // that could collide across seasons. Seeded at 2000000 to avoid overlap
+        // with any legacy IDs from existing saves.
+        this._nextPlayerId = 2000000;
+        
         // === TRADING ===
         this._pendingTradeProposal = null;
         
@@ -175,6 +182,20 @@ class GameState {
     set tier3Schedule(value) { this._tier3Schedule = value; }
     get freeAgents() { return this._freeAgents; }
     set freeAgents(value) { this._freeAgents = value; }
+    get nextPlayerId() { return this._nextPlayerId; }
+    set nextPlayerId(value) { this._nextPlayerId = value; }
+    
+    /**
+     * Get the next unique player ID and increment the counter.
+     * All player generation should use this instead of range-based IDs.
+     * @param {number} [count=1] - Number of IDs to reserve (returns the first)
+     * @returns {number} The first reserved ID
+     */
+    getNextPlayerId(count = 1) {
+        const id = this._nextPlayerId;
+        this._nextPlayerId += count;
+        return id;
+    }
     get draftPickOwnership() { return this._draftPickOwnership; }
     set draftPickOwnership(value) { this._draftPickOwnership = value; }
     get promotedToT1() { return this._promotedToT1; }
@@ -819,6 +840,7 @@ class GameState {
             promotedToT1: this._promotedToT1,
             relegatedFromT1: this._relegatedFromT1,
             freeAgents: (this._freeAgents || []).map(compressPlayer),
+            nextPlayerId: this._nextPlayerId,
             pendingTradeProposal: this._pendingTradeProposal,
             seasonHistory: this._seasonHistory,
             championshipHistory: this._championshipHistory,
@@ -958,6 +980,30 @@ class GameState {
         state._promotedToT1 = data.promotedToT1 || [];
         state._relegatedFromT1 = data.relegatedFromT1 || [];
         state._freeAgents = isV2 ? (data.freeAgents || []).map(decompressPlayer) : (data.freeAgents || []);
+        
+        // Player ID counter: load from save, or compute safe default for legacy saves
+        if (data.nextPlayerId) {
+            state._nextPlayerId = data.nextPlayerId;
+        } else {
+            // Legacy save — scan all existing player IDs to find a safe starting point
+            let maxId = 2000000;
+            const scanRoster = (teams) => {
+                teams.forEach(t => {
+                    (t.roster || []).forEach(p => {
+                        if (p.id && p.id > maxId) maxId = p.id;
+                    });
+                });
+            };
+            scanRoster(state._tier1Teams);
+            scanRoster(state._tier2Teams);
+            scanRoster(state._tier3Teams);
+            (state._freeAgents || []).forEach(p => {
+                if (p.id && p.id > maxId) maxId = p.id;
+            });
+            state._nextPlayerId = maxId + 1000; // 1000 buffer above highest existing ID
+            console.log(`[GameState] Legacy save: computed _nextPlayerId = ${state._nextPlayerId} (maxId found: ${maxId})`);
+        }
+        
         state._pendingTradeProposal = data.pendingTradeProposal || null;
         state._seasonHistory = data.seasonHistory || [];
         state._championshipHistory = data.championshipHistory || [];

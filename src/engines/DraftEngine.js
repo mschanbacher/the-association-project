@@ -26,14 +26,16 @@ export class DraftEngine {
 
     /**
      * Generate a draft class of 100 prospects.
-     * @param {number} seasonId - Current season (for unique IDs)
+     * @param {number} seasonId - Current season (for logging)
      * @param {Object} deps - { PlayerAttributes, TeamFactory }
+     * @param {number} [startId] - Starting player ID (from gameState.getNextPlayerId). Falls back to legacy scheme if not provided.
      * @returns {Array} Sorted by rating descending
      */
-    static generateDraftProspects(seasonId, deps) {
+    static generateDraftProspects(seasonId, deps, startId) {
         const { PlayerAttributes: PA, TeamFactory: TF } = deps;
         const prospects = [];
-        const startId = 100000 + seasonId * 1000;
+        // Use global ID counter if provided, otherwise fall back to legacy range scheme
+        const baseId = startId != null ? startId : (100000 + seasonId * 1000);
 
         for (let i = 0; i < 100; i++) {
             const firstName = TF.randomFirst();
@@ -62,7 +64,7 @@ export class DraftEngine {
             const attrData = PA.generateFromRating(position, rating, 1, age);
 
             prospects.push({
-                id: startId + i,
+                id: baseId + i,
                 name: `${firstName} ${lastName}`,
                 position, rating: attrData.rating,
                 offRating: attrData.offRating, defRating: attrData.defRating,

@@ -1,6 +1,6 @@
 # The Association Project -- Offseason Flow Alignment
 
-Last updated: 2026-03-17 (end of OffseasonHub Phase 2 session)
+Last updated: 2026-03-18 (Training Camp prep session)
 
 This document is the single source of truth for offseason architecture, flow, and status.
 New sessions should start by reading this file before making any changes.
@@ -13,14 +13,12 @@ New sessions should start by reading this file before making any changes.
 | Apr 12   | `seasonEnd`            | Regular season ends for all tiers                         | Complete     |
 | Apr 16   | `playoffsStart`        | Playoff brackets generated, PlayoffHub opens              | Complete     |
 | Jun 1    | `seasonOfficialEnd`    | Promo/rel executes, OffseasonHub opens                    | Complete     |
-| Jun 8    | `draftLottery`         | Lottery balls drawn (T1 only, date stored but not yet a separate trigger) | Complete |
-| Jun 15   | `draftDay`             | T1 Draft -- lottery modal, user pick, AI picks            | Complete     |
-| Jun 22   | `collegeFA`            | College Grad FA -- T2/T3 sign undrafted college players   | Complete     |
+| Jun 8    | `draftLottery`         | Lottery balls drawn (T1 only)                             | Complete     |
+| Jun 15   | `draftDay`             | T1 Draft + college grads generated + undrafted to FA pool | Complete     |
+| Jun 22   | ~~`collegeFA`~~        | **REMOVED** -- college grads now generated at draft time  | Eliminated   |
 | Jun 30   | `contractExpiration`   | All contracts decremented; expired players move to FA pool | Complete    |
 | Jul 1    | `freeAgencyStart`      | FA opens -- user signs FAs, then AI signing phase runs    | Complete     |
-| Jul 15   | `freeAgencyEnd`        | (Not currently a trigger -- FA ends when user clicks "Return to Dashboard") | N/A |
 | Aug 1    | `playerDevelopment`    | Ratings change, aging, retirements, injury heal, fatigue reset | Complete |
-| Aug 10   | `ownerDecisions`       | (Legacy phase -- now handled inline via Finances tab)     | Integrated   |
 | Aug 16   | `trainingCamp`         | Roster compliance check, then season setup                | Placeholder  |
 | Oct ~15  | Season start           | New season begins (3rd Tue of Oct for T1)                 | Complete     |
 
@@ -47,13 +45,15 @@ New sessions should start by reading this file before making any changes.
 - Triggered by `_checkDateTriggers()` when date >= Jun 15
 - Guard flags: `_draftStarted` (prevents re-trigger), `_draftComplete` (marks done)
 - Flow: Generate draft class -> Run lottery -> Show lottery modal -> User pick -> AI picks -> Results
+- **At draft finalization**: undrafted prospects go to FA pool, college graduate class is generated and added to FA pool, `_collegeFAComplete` set to true
+- Post-draft roster trim is now 20 (offseason expanded limit), not 15
 - OffseasonHub intercepts `_reactShowLottery`, `_reactShowUserPick`, `_reactShowDraftResults` and renders inline in Draft screen
 
-### College Grad FA (T2/T3, Jun 22)
-- Triggered by `_checkDateTriggers()` when date >= Jun 22 and userTier > 1
-- Guard flags: `_collegeFAStarted`, `_collegeFAComplete`
-- Uses `DraftController.startCollegeGraduateFA()` 
-- OffseasonHub intercepts `_reactShowCGFA` / `_reactShowCG` and renders in Free Agency screen
+### College Grad FA -- ELIMINATED
+- **No longer a standalone phase.** College graduates are generated at draft finalization (`finalizeDraft()`) and added directly to `gameState.freeAgents`.
+- The `collegeFA` date (Jun 22) remains in `CalendarEngine.getSeasonDates()` for backward compatibility but is no longer a trigger.
+- Graduates are available to any tier as camp invites or during Free Agency.
+- For T2/T3 users: the draft runs silently, and college grads still flow to FA pool at that time.
 
 ### Contract Expiration (Jun 30) -- NEW
 - Triggered by `_checkDateTriggers()` when date >= Jun 30
@@ -187,15 +187,27 @@ These flags are all cleared implicitly when `continueToSeasonSetup()` increments
 
 7. **PlayoffHub approved mockup**: Single-screen hub with left sidebar (series card, arc win probability gauge, Game/Watch/Series buttons, Sim to Championship, game log) and full bracket tree always visible in main area. No modals. Needs fresh-session rebuild.
 
+8. **College grads flow to FA at draft time**: College graduates are no longer a standalone phase. They are generated in `finalizeDraft()` and added directly to `gameState.freeAgents`. Available to any tier as camp invites or FA signings. The `collegeFA` date in CalendarEngine is kept for backward compatibility but no longer triggers an event.
+
+9. **Global player ID counter**: `gameState._nextPlayerId` (seeded at 2,000,000) replaces all range-based ID schemes. All player generation (draft prospects, college grads) calls `gameState.getNextPlayerId(count)`. Legacy saves compute a safe starting point by scanning all existing player IDs.
+
+10. **Offseason roster limit is 20**: Post-draft roster trim raised from 15 to 20. The real cutdown to 15 will happen at each tier's training camp deadline. This allows promoted teams to draft 3 players without immediate forced cuts.
+
+11. **Staggered training camp (planned)**: T1 camp ~Oct 1-19, T2 camp ~Oct 20-Nov 3, T3 camp ~Nov 10-30. Each tier's cuts flow to FA pool for the next tier's camp invites. Mirrors NBA's ~3 week camp duration.
+
 
 ## What's Placeholder / Not Yet Built
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Training Camp gameplay | Placeholder | "Coming Soon" screen. Planned: expanded roster limits (18-20), preseason games, cutdown mechanics |
+| Training Camp gameplay | Placeholder | "Coming Soon" screen. Planned: staggered 3-week camps per tier, camp invites (expand to 20), development focuses, 4 preseason games, cutdown to 15 |
+| Development Focuses | Design phase | Player-chosen training areas, outcomes based on intangibles + coach quality + age. Will replace `applyPlayerDevelopment()` one-shot system |
+| Camp Invite Signing | Design phase | Mini-FA at camp open: browse FA pool, sign up to 5 camp invitees to fill 20-man roster |
+| Preseason Games | Design phase | 4 exhibition games during camp, reuse WatchGameModal, results influence development |
 | Awards presentation | Not started | Deferred from SeasonEndModal. Planned for future OffseasonHub iteration |
 | Promo/rel info display | Not started | Deferred from SeasonEndModal. Planned for OffseasonHub |
 | PlayoffHub stable build | Needs rebuild | Approved mockup exists (session 8). Start from static mockup in fresh session |
+| Persistent college pool | Hook ready | `gameState.getNextPlayerId()` ensures stable IDs. Future: `gameState.collegePool` array with multi-year tracking |
 | League-wide news system | Not started | Data infrastructure exists via `tradeHistory`. High-leverage next feature |
 | Hall of Fame | Not started | Requires accumulated historical data. IndexedDB storage ready |
 | 2D match visualization | Long-term | Rendering layer on top of GamePipeline. Confirmed achievable without sim changes |

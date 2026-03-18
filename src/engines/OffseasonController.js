@@ -125,16 +125,15 @@ export class OffseasonController {
                 this.proceedToDraftOrDevelopment();
                 break;
             case P.DRAFT:
-                // Draft is interactive and one-time; if resuming, skip to college FA or development
-                if (this.ctx.gameState.currentTier === 1) {
-                    this.setPhase(P.COLLEGE_FA);
-                    this.ctx.helpers.startCollegeGraduateFA();
-                } else {
-                    this.proceedToPlayerDevelopment();
-                }
+                // Draft is interactive and one-time; if resuming, it already ran.
+                // College grads are now generated at draft finalization and added to FA pool.
+                // Skip to free agency (via development if needed).
+                this.proceedToPlayerDevelopment();
                 break;
             case P.COLLEGE_FA:
-                // College FA is one-time; if resuming, skip to development
+                // Legacy phase — college grads now flow to FA at draft time.
+                // If resuming from an old save that was mid-college-FA, skip forward.
+                this.ctx.gameState._collegeFAComplete = true;
                 this.proceedToPlayerDevelopment();
                 break;
             case P.DEVELOPMENT:
@@ -691,9 +690,12 @@ export class OffseasonController {
             this.setPhase(P.DRAFT);
             helpers.runDraft();
         } else {
-            console.log('⏭️ Step 3: User is in Tier ' + gameState.currentTier + ', skipping draft...');
-            this.setPhase(P.COLLEGE_FA);
-            helpers.startCollegeGraduateFA();
+            // T2/T3: no draft, no standalone college FA (grads are in FA pool from draft time).
+            // Skip directly to player development.
+            console.log('⏭️ Step 3: User is in Tier ' + gameState.currentTier + ', skipping draft (college grads already in FA pool)...');
+            gameState._draftComplete = true;
+            gameState._collegeFAComplete = true;
+            this.proceedToPlayerDevelopment();
         }
     }
 
@@ -1611,7 +1613,7 @@ export class OffseasonController {
         // Find next event date after current
         const eventDates = [
             { date: seasonDates.draftDay, phase: 'draft', label: 'Draft Day' },
-            { date: seasonDates.collegeFA, phase: 'college_fa', label: 'College FA' },
+            { date: seasonDates.contractExpiration, phase: 'contract_exp', label: 'Contract Expiration' },
             { date: seasonDates.freeAgencyStart, phase: 'free_agency', label: 'Free Agency' },
             { date: seasonDates.playerDevelopment, phase: 'development', label: 'Development' },
             { date: seasonDates.trainingCamp, phase: 'training_camp', label: 'Training Camp' },
@@ -1684,9 +1686,11 @@ export class OffseasonController {
             
             // Generate draft class if needed
             if (!gameState.draftClass || gameState.draftClass.length === 0) {
+                const startId = gameState.getNextPlayerId(100);
                 gameState.draftClass = engines.DraftEngine.generateDraftProspects(
                     gameState.currentSeason,
-                    { PlayerAttributes: engines.PlayerAttributes, TeamFactory: engines.TeamFactory }
+                    { PlayerAttributes: engines.PlayerAttributes, TeamFactory: engines.TeamFactory },
+                    startId
                 );
             }
             
@@ -1724,14 +1728,11 @@ export class OffseasonController {
         
         // College FA (Jun 22) — trigger for T2/T3
         // Only trigger once - use _collegeFAStarted to track if we've shown the window
-        if (dateGTE(currentDateOnly, seasonDates.collegeFA) && !gameState._collegeFAComplete && !gameState._collegeFAStarted && userTier > 1) {
-            console.log('🎓 [OFFSEASON] College FA reached — triggering via hub');
-            gameState._collegeFAStarted = true;  // Mark as started so we don't re-trigger
-            this.setPhase(P.COLLEGE_FA);
-            
-            // Use DraftController to properly generate and show college grads
-            helpers.startCollegeGraduateFA();
-            return;
+        // College FA phase removed — college graduates are now generated at draft time
+        // and added to the FA pool. They're available as camp invites at any tier.
+        // Mark complete if we pass the old date, for save compatibility.
+        if (dateGTE(currentDateOnly, seasonDates.collegeFA) && !gameState._collegeFAComplete) {
+            gameState._collegeFAComplete = true;
         }
         
         // Contract Expiration (Jun 30) - runs BEFORE Free Agency opens
@@ -1842,9 +1843,11 @@ export class OffseasonController {
         
         // Generate draft class if needed
         if (!gameState.draftClass || gameState.draftClass.length === 0) {
+            const startId = gameState.getNextPlayerId(100);
             gameState.draftClass = engines.DraftEngine.generateDraftProspects(
                 gameState.currentSeason,
-                { PlayerAttributes: engines.PlayerAttributes, TeamFactory: engines.TeamFactory }
+                { PlayerAttributes: engines.PlayerAttributes, TeamFactory: engines.TeamFactory },
+                startId
             );
         }
         
@@ -1894,69 +1897,42 @@ export class OffseasonController {
         
         gameState._draftResults = results;
         gameState._draftComplete = true;
+        
+        // Undrafted prospects go to FA pool
+        const undrafted = prospects.length;
+        prospects.forEach(prospect => {
+            prospect.isDraftProspect = false;
+            gameState.freeAgents.push(prospect);
+        });
         gameState.draftClass = []; // Clear draft class
         
-        console.log(`🎰 [OFFSEASON] Draft complete silently: ${results.length} picks made`);
+        // Generate college graduates and add to FA pool (replaces standalone College FA phase)
+        const cgStartId = gameState.getNextPlayerId(120);
+        const graduates = engines.TeamFactory?.generateCollegeGraduateClass?.(cgStartId, { PlayerAttributes: engines.PlayerAttributes }) || [];
+        graduates.forEach(g => { g.previousTeamId = null; gameState.freeAgents.push(g); });
+        gameState._collegeFAComplete = true;
+        
+        console.log(`🎰 [OFFSEASON] Draft complete silently: ${results.length} picks, ${undrafted} undrafted + ${graduates.length} college grads to FA`);
     }
 
     /**
-     * Run college FA without UI (for quick sim)
-     * T2/T3 teams sign college graduates
+     * Run college FA without UI (for quick sim).
+     * College graduates are now generated at draft time and added to the FA pool.
+     * This method generates them if the draft didn't already, and marks the phase complete.
      */
     runCollegeGradFASilently() {
-        const { gameState, engines, helpers } = this.ctx;
-        const userTier = gameState.currentTier || 1;
+        const { gameState, engines } = this.ctx;
         
-        if (userTier === 1) {
-            gameState._collegeFAComplete = true;
-            return; // T1 doesn't do college FA
-        }
+        if (gameState._collegeFAComplete) return; // Already handled by draft
         
-        // Generate college graduates
-        const graduates = engines.DraftEngine?.generateCollegeGraduates?.(40) || [];
-        
-        // AI teams sign graduates
-        const tierTeams = userTier === 2 ? gameState.tier2Teams : gameState.tier3Teams;
-        const userTeam = helpers.getUserTeam();
-        const aiTeams = tierTeams.filter(t => t.id !== userTeam?.id);
-        
-        // Each AI team signs 1-2 grads based on need
-        aiTeams.forEach(team => {
-            const rosterSize = team.roster?.length || 0;
-            if (rosterSize >= 14 || graduates.length === 0) return;
-            
-            // Sign 1-2 players
-            const toSign = Math.min(2, 15 - rosterSize, graduates.length);
-            for (let i = 0; i < toSign; i++) {
-                graduates.sort((a, b) => b.rating - a.rating);
-                const grad = graduates.shift();
-                if (grad) {
-                    grad.tier = team.tier;
-                    grad.salary = engines.TeamFactory?.generateSalary?.(grad.rating, team.tier) || 500000;
-                    grad.contractYears = 2;
-                    team.roster.push(grad);
-                }
-            }
-        });
-        
-        // User team auto-signs top available grads to fill roster gaps
-        if (userTeam) {
-            const rosterSize = userTeam.roster?.length || 0;
-            const spotsNeeded = Math.max(0, 10 - rosterSize);
-            for (let i = 0; i < spotsNeeded && graduates.length > 0; i++) {
-                graduates.sort((a, b) => b.rating - a.rating);
-                const grad = graduates.shift();
-                if (grad) {
-                    grad.tier = userTeam.tier;
-                    grad.salary = engines.TeamFactory?.generateSalary?.(grad.rating, userTeam.tier) || 500000;
-                    grad.contractYears = 2;
-                    userTeam.roster.push(grad);
-                }
-            }
-        }
+        // If we get here without the draft generating grads (edge case),
+        // generate them now and add to FA pool
+        const cgStartId = gameState.getNextPlayerId(120);
+        const graduates = engines.TeamFactory?.generateCollegeGraduateClass?.(cgStartId, { PlayerAttributes: engines.PlayerAttributes }) || [];
+        graduates.forEach(g => { g.previousTeamId = null; gameState.freeAgents.push(g); });
         
         gameState._collegeFAComplete = true;
-        console.log(`🎓 [OFFSEASON] College FA complete silently`);
+        console.log(`🎓 [OFFSEASON] College grads added to FA pool: ${graduates.length} players`);
     }
 
     /**

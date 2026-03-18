@@ -30,12 +30,12 @@ const OFFSEASON_PHASES = [
   { key: 'contracts_expire', label: 'Exp', month: 5, day: 30 },     // Jun 30
   { key: 'free_agency', label: 'FA', month: 6, day: 1 },            // Jul 1
   { key: 'development', label: 'Dev', month: 7, day: 1 },           // Aug 1
-  { key: 'training_camp', label: 'Camp', month: 7, day: 16 },       // Aug 16
-  { key: 'preseason', label: 'Ready', month: 9, day: 1 },           // Oct 1
+  { key: 'training_camp', label: 'Camp', dynamic: true },            // Tier-specific
+  { key: 'season_start', label: 'Ready', dynamic: true },            // Tier-specific
 ];
 
 // Helper to check if current date has reached a phase date
-function hasReachedPhase(currentDateStr, phaseKey, seasonStartYear) {
+function hasReachedPhase(currentDateStr, phaseKey, seasonStartYear, userTier) {
   if (!currentDateStr || !seasonStartYear) return false;
   const phase = OFFSEASON_PHASES.find(p => p.key === phaseKey);
   if (!phase) return false;
@@ -43,8 +43,44 @@ function hasReachedPhase(currentDateStr, phaseKey, seasonStartYear) {
   // Parse date string manually to avoid UTC vs local timezone issues
   const [year, month, day] = currentDateStr.split('-').map(Number);
   const current = new Date(year, month - 1, day); // month is 0-indexed
+  
+  // Dynamic phases use tier-specific dates from CalendarEngine
+  if (phase.dynamic) {
+    const dates = window.CalendarEngine?.getSeasonDates?.(seasonStartYear);
+    if (!dates) return false;
+    const tier = userTier || 1;
+    if (phaseKey === 'training_camp') {
+      const campOpen = tier === 1 ? dates.t1CampOpen : tier === 2 ? dates.t2CampOpen : dates.t3CampOpen;
+      return current >= campOpen;
+    }
+    if (phaseKey === 'season_start') {
+      const start = tier === 1 ? dates.t1Start : tier === 2 ? dates.t2Start : dates.t3Start;
+      return current >= start;
+    }
+    return false;
+  }
+  
   const phaseDate = new Date(seasonStartYear + 1, phase.month, phase.day);
   return current >= phaseDate;
+}
+
+// Helper to get the display date for a phase (including dynamic ones)
+function getPhaseDateStr(phase, seasonStartYear, userTier) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  if (!phase.dynamic) {
+    return `${months[phase.month]} ${phase.day}`;
+  }
+  const dates = window.CalendarEngine?.getSeasonDates?.(seasonStartYear);
+  if (!dates) return '';
+  const tier = userTier || 1;
+  let d;
+  if (phase.key === 'training_camp') {
+    d = tier === 1 ? dates.t1CampOpen : tier === 2 ? dates.t2CampOpen : dates.t3CampOpen;
+  } else if (phase.key === 'season_start') {
+    d = tier === 1 ? dates.t1Start : tier === 2 ? dates.t2Start : dates.t3Start;
+  }
+  if (!d) return '';
+  return `${months[d.getMonth()]} ${d.getDate()}`;
 }
 
 // ─── Navigation items (mirrors Sidebar but for offseason) ────────────────────
@@ -69,19 +105,19 @@ function OffseasonPhaseTracker({ currentDate, seasonStartYear }) {
   const raw = gameState?._raw || gameState;
   const dateStr = currentDate || raw?.currentDate;
   const startYear = seasonStartYear || raw?.seasonStartYear || raw?.currentSeason;
+  const userTier = raw?.currentTier || raw?.userTeam?.tier || 1;
   
   // Format current date for display
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
-  
-  // Format phase date
-  const formatPhaseDate = (phase, year) => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${months[phase.month]} ${phase.day}`;
-  };
+
+  // Determine if user is in camp mode (for label)
+  const inCamp = hasReachedPhase(dateStr, 'training_camp', startYear, userTier) && 
+                 !hasReachedPhase(dateStr, 'season_start', startYear, userTier);
 
   return (
     <div style={{
@@ -101,19 +137,17 @@ function OffseasonPhaseTracker({ currentDate, seasonStartYear }) {
         marginRight: 14,
         flexShrink: 0,
       }}>
-        <div>Offseason</div>
+        <div>{inCamp ? 'Training Camp' : 'Offseason'}</div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 2 }}>
           {formatDate(dateStr)}
         </div>
       </div>
 
       {OFFSEASON_PHASES.map((phase, i) => {
-        const reached = hasReachedPhase(dateStr, phase.key, startYear);
-        const current = new Date(dateStr);
-        const phaseDate = new Date(startYear + 1, phase.month, phase.day);
+        const reached = hasReachedPhase(dateStr, phase.key, startYear, userTier);
         const nextPhase = OFFSEASON_PHASES[i + 1];
-        const nextPhaseDate = nextPhase ? new Date(startYear + 1, nextPhase.month, nextPhase.day) : null;
-        const isActive = reached && (!nextPhaseDate || current < nextPhaseDate);
+        const nextReached = nextPhase ? hasReachedPhase(dateStr, nextPhase.key, startYear, userTier) : true;
+        const isActive = reached && !nextReached;
 
         return (
           <React.Fragment key={phase.key}>
@@ -166,7 +200,7 @@ function OffseasonPhaseTracker({ currentDate, seasonStartYear }) {
                 fontSize: 7,
                 color: 'var(--color-text-tertiary)',
                 fontFamily: 'var(--font-mono)',
-              }}>{formatPhaseDate(phase, startYear)}</span>
+              }}>{getPhaseDateStr(phase, startYear, userTier)}</span>
             </div>
           </React.Fragment>
         );
@@ -1508,76 +1542,127 @@ function PlaceholderScreen({ title, message }) {
   );
 }
 
-// ─── Training Camp Screen ─────────────────────────────────────────────────────
-function TrainingCampScreen({ onContinue, onNavigate }) {
+// ─── Training Camp Dashboard ─────────────────────────────────────────────────
+function TrainingCampScreen({ campData, onNavigate }) {
+  const { gameState, engines } = useGame();
+  const raw = gameState?._raw || gameState;
+  const userTeam = gameState?.userTeam;
+  if (!userTeam) return null;
+
+  const { SalaryCapEngine, CalendarEngine, LeagueManager } = engines || {};
+
+  // Camp state
+  const currentDate = raw?.currentDate;
+  const seasonStartYear = raw?.seasonStartYear || raw?.currentSeason;
+  const userTier = raw?.currentTier || 1;
+  const dates = CalendarEngine?.getSeasonDates?.(seasonStartYear);
+  const campOpen = dates ? (userTier === 1 ? dates.t1CampOpen : userTier === 2 ? dates.t2CampOpen : dates.t3CampOpen) : null;
+  const cutdown = dates ? (userTier === 1 ? dates.t1Cutdown : userTier === 2 ? dates.t2Cutdown : dates.t3Cutdown) : null;
+
+  const totalCampDays = campOpen && cutdown ? Math.round((cutdown - campOpen) / 86400000) : 21;
+  let campDay = 1;
+  if (campOpen && currentDate) {
+    const [y, m, d] = currentDate.split('-').map(Number);
+    const cur = new Date(y, m - 1, d);
+    campDay = Math.max(1, Math.min(totalCampDays, Math.round((cur - campOpen) / 86400000) + 1));
+  }
+
+  const rosterSize = userTeam.roster?.length || 0;
+  const maxCamp = 20;
+  const focusPool = 25;
+  const focusesUsed = raw?._campFocuses ? Object.values(raw._campFocuses).reduce((s, a) => s + a.length, 0) : 0;
+  const focusesRemaining = focusPool - focusesUsed;
+
+  const totalPlayed = userTeam.wins + userTeam.losses;
+  const pctStr = totalPlayed > 0 ? ((userTeam.wins / totalPlayed) * 100).toFixed(1) : '--';
+
+  const cutdownDateStr = cutdown ? CalendarEngine.toDateString(cutdown) : '';
+  const formatShortDate = (str) => {
+    if (!str) return '';
+    const [y, m, d] = str.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   return (
-    <div style={{
-      maxWidth: 600,
-      margin: '0 auto',
-      padding: 'var(--space-6)',
-    }}>
-      <h2 style={{
-        fontSize: 'var(--text-lg)',
-        fontWeight: 'var(--weight-semi)',
-        marginBottom: 'var(--space-4)',
-      }}>Training Camp</h2>
-      
-      <div style={{
-        padding: 'var(--space-8)',
-        background: 'var(--color-bg-sunken)',
-        border: '1px solid var(--color-border-subtle)',
-        textAlign: 'center',
-        marginBottom: 'var(--space-4)',
-      }}>
-        <div style={{ 
-          fontSize: 'var(--text-xl)', 
-          marginBottom: 'var(--space-4)',
-          color: 'var(--color-text-secondary)',
-        }}>
-          Coming Soon
+    <div style={{ maxWidth: 'var(--content-max)', margin: '0 auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+      {/* Page title */}
+      <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
+        Training Camp
+      </div>
+
+      {/* Metric cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--gap)' }}>
+        <MetricCard label="Record" value={`${userTeam.wins}-${userTeam.losses}`} detail={`${pctStr}% -- Season complete`}
+          valueColor={userTeam.wins > userTeam.losses ? 'var(--color-win)' : userTeam.wins < userTeam.losses ? 'var(--color-loss)' : undefined} />
+        <MetricCard label="Roster" value={`${rosterSize} / ${maxCamp}`} detail={`${maxCamp - rosterSize} camp spots open`} />
+        <MetricCard label="Focuses" value={`${focusesUsed} / ${focusPool}`} detail={`${focusesRemaining} remaining to assign`}
+          valueColor="var(--color-accent)" />
+        <MetricCard label="Camp Day" value={`${campDay} / ${totalCampDays}`} detail={`Cutdown: ${formatShortDate(cutdownDateStr)}`} />
+      </div>
+
+      {/* Two-column layout: actions + schedule/notes */}
+      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 'var(--gap)' }}>
+        {/* Camp actions */}
+        <div style={{ background: 'var(--color-bg-raised)', border: '1px solid var(--color-border-subtle)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column' }}>
+          <CardLabel>Camp Actions</CardLabel>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button onClick={() => onNavigate?.('focuses')} style={{
+              width: '100%', padding: '7px 14px', background: 'var(--color-accent)', border: 'none',
+              fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-inverse)', cursor: 'pointer',
+            }}>Assign Development Focuses</button>
+            <button onClick={() => onNavigate?.('invites')} style={{
+              width: '100%', padding: '7px 14px', background: 'transparent', border: '1px solid var(--color-border)',
+              fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-secondary)', cursor: 'pointer',
+            }}>Sign Camp Invitees</button>
+            <button onClick={() => onNavigate?.('roster')} style={{
+              width: '100%', padding: '7px 14px', background: 'transparent', border: '1px solid var(--color-border)',
+              fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-secondary)', cursor: 'pointer',
+            }}>Manage Roster</button>
+            <div style={{ borderTop: '1px solid var(--color-border-subtle)', marginTop: 4, paddingTop: 10, display: 'flex', gap: 6 }}>
+              <button onClick={() => window._offseasonController?.simOffseasonDay?.()} style={{
+                flex: 1, padding: '6px 12px', background: 'transparent', border: '1px solid var(--color-border)',
+                fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-text-secondary)', cursor: 'pointer',
+              }}>Sim Day</button>
+              <button onClick={() => window._offseasonController?.simOffseasonWeek?.()} style={{
+                flex: 1, padding: '6px 12px', background: 'transparent', border: '1px solid var(--color-border)',
+                fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-text-secondary)', cursor: 'pointer',
+              }}>Sim Week</button>
+            </div>
+            <button onClick={() => window._offseasonController?.simToNextEvent?.()} style={{
+              width: '100%', padding: '6px 12px', background: 'var(--color-accent)', border: 'none',
+              fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-text-inverse)', cursor: 'pointer',
+            }}>Sim to Cutdown Day</button>
+          </div>
         </div>
-        <div style={{ 
-          fontSize: 'var(--text-sm)', 
-          color: 'var(--color-text-tertiary)',
-          lineHeight: 1.6,
-        }}>
-          Training camp will include expanded roster limits, preseason games, 
-          and cutdown decisions before the regular season begins.
+
+        {/* Right column: schedule + notes */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+          {/* Preseason schedule placeholder */}
+          <div style={{ background: 'var(--color-bg-raised)', border: '1px solid var(--color-border-subtle)', padding: 'var(--space-4)' }}>
+            <CardLabel>Preseason Schedule</CardLabel>
+            <div style={{ padding: '6px 0', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
+              Preseason games coming in a future update.
+            </div>
+          </div>
+
+          {/* Camp notes */}
+          <div style={{ background: 'var(--color-bg-raised)', border: '1px solid var(--color-border-subtle)', padding: 'var(--space-4)' }}>
+            <CardLabel>Camp Notes</CardLabel>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
+              {campDay <= 1 ? (
+                <div style={{ padding: '4px 0', color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
+                  Camp has just opened. Assign development focuses and sign camp invitees to get started.
+                </div>
+              ) : (
+                <div style={{ padding: '4px 0', color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
+                  Camp notes will populate as development focuses are assigned and resolved.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-      
-      <div style={{
-        padding: 'var(--space-4)',
-        background: 'var(--color-bg-raised)',
-        border: '1px solid var(--color-border-subtle)',
-        marginBottom: 'var(--space-4)',
-        fontSize: 'var(--text-sm)',
-      }}>
-        <div style={{ fontWeight: 'var(--weight-semi)', marginBottom: 'var(--space-2)' }}>
-          Before continuing:
-        </div>
-        <div style={{ color: 'var(--color-text-secondary)' }}>
-          Visit the <strong>Finances</strong> tab to manage Owner Mode settings 
-          (sponsors, arena, ticket pricing, marketing).
-        </div>
-      </div>
-      
-      <button
-        onClick={onContinue}
-        style={{
-          width: '100%',
-          padding: '14px 20px',
-          background: 'var(--color-accent)',
-          border: 'none',
-          fontFamily: 'var(--font-body)',
-          fontSize: 'var(--text-sm)',
-          fontWeight: 600,
-          color: 'var(--color-text-inverse)',
-          cursor: 'pointer',
-        }}
-      >
-        Continue to Season Setup
-      </button>
     </div>
   );
 }
@@ -2556,11 +2641,8 @@ export function OffseasonHub({ data, onClose }) {
     finances: <FinancesScreen isOffseason={true} onNavigate={setActiveScreen} />,
     history: <HistoryScreen />,
     glossary: <GlossaryScreen />,
-    trainingcamp: <TrainingCampScreen onContinue={() => {
-      // Check roster compliance before starting season
-      window._offseasonController?.checkRosterComplianceAndContinue?.();
-    }} />,
-  }), [gameState, engines, faData, faPhase, cgfaData, cgfaPhase, draftData, draftPhase, devData, contractData, complianceData, currentDate, seasonStartYear]);
+    trainingcamp: <TrainingCampScreen campData={trainingCampData} onNavigate={setActiveScreen} />,
+  }), [gameState, engines, faData, faPhase, cgfaData, cgfaPhase, draftData, draftPhase, devData, contractData, complianceData, trainingCampData, currentDate, seasonStartYear]);
 
   return (
     <div style={{

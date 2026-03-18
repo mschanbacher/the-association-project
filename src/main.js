@@ -50,3 +50,4 @@ export { FreeAgencyController } from './engines/FreeAgencyController.js';
 export { FinanceController } from './engines/FinanceController.js';
 export { CoachManagementController } from './engines/CoachManagementController.js';
 export { SaveLoadController } from './engines/SaveLoadController.js';
+export { TrainingCampEngine } from './engines/TrainingCampEngine.js';

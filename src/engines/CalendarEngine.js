@@ -28,6 +28,16 @@ export class CalendarEngine {
         // Universal trade deadline: March 5
         const tradeDeadline = new Date(startYear + 1, 2, 5); // Mar 5
         
+        // Training camp dates — staggered by tier, ~3 weeks each.
+        // Camp opens 21 days before season start, cutdown is day before season start.
+        // T1 cuts flow to FA pool for T2 camp invites, T2 cuts flow for T3.
+        const t1CampOpen = new Date(t1Start.getTime() - 21 * 86400000);   // ~Oct 1
+        const t1Cutdown = new Date(t1Start.getTime() - 1 * 86400000);     // Day before T1 start
+        const t2CampOpen = new Date(t1Start);                              // T2 camp opens when T1 season starts
+        const t2Cutdown = new Date(t2Start.getTime() - 1 * 86400000);     // Day before T2 start
+        const t3CampOpen = new Date(t2Start);                              // T3 camp opens when T2 season starts
+        const t3Cutdown = new Date(t3Start.getTime() - 1 * 86400000);     // Day before T3 start
+        
         return {
             t1Start,
             t2Start,
@@ -48,7 +58,14 @@ export class CalendarEngine {
             rosterCompliance: new Date(startYear + 1, 6, 16),  // Jul 16
             playerDevelopment: new Date(startYear + 1, 7, 1),  // Aug 1
             ownerDecisions: new Date(startYear + 1, 7, 10),    // Aug 10
-            trainingCamp: new Date(startYear + 1, 7, 16),      // Aug 16
+            trainingCamp: new Date(startYear + 1, 7, 16),      // Aug 16 (legacy: kept for backward compat)
+            // Staggered training camp dates
+            t1CampOpen,
+            t1Cutdown,
+            t2CampOpen,
+            t2Cutdown,
+            t3CampOpen,
+            t3Cutdown,
         };
     }
     

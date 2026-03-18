@@ -48,6 +48,7 @@ import {
   FinanceController,
   CoachManagementController,
   SaveLoadController,
+  TrainingCampEngine,
 } from '../main.js';
 
 // Expose all modules on window for _initGame to access
@@ -94,6 +95,7 @@ Object.assign(window, {
   FinanceController,
   CoachManagementController,
   SaveLoadController,
+  TrainingCampEngine,
 });
 
 console.log('🏀 Modules loaded via Vite bundle');

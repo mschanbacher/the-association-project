@@ -1611,12 +1611,17 @@ export class OffseasonController {
         const seasonDates = engines.CalendarEngine.getSeasonDates(seasonYear);
         
         // Find next event date after current
+        const userTier = gameState.currentTier || 1;
+        const userCampOpen = userTier === 1 ? seasonDates.t1CampOpen : userTier === 2 ? seasonDates.t2CampOpen : seasonDates.t3CampOpen;
+        const userCutdown = userTier === 1 ? seasonDates.t1Cutdown : userTier === 2 ? seasonDates.t2Cutdown : seasonDates.t3Cutdown;
+        
         const eventDates = [
             { date: seasonDates.draftDay, phase: 'draft', label: 'Draft Day' },
             { date: seasonDates.contractExpiration, phase: 'contract_exp', label: 'Contract Expiration' },
             { date: seasonDates.freeAgencyStart, phase: 'free_agency', label: 'Free Agency' },
             { date: seasonDates.playerDevelopment, phase: 'development', label: 'Development' },
-            { date: seasonDates.trainingCamp, phase: 'training_camp', label: 'Training Camp' },
+            { date: userCampOpen, phase: 'camp_open', label: 'Training Camp' },
+            { date: userCutdown, phase: 'cutdown', label: 'Cutdown Day' },
         ];
         
         const nextEvent = eventDates.find(e => e.date > current);
@@ -1626,9 +1631,9 @@ export class OffseasonController {
             console.log(`📅 [OFFSEASON] Simmed to ${nextEvent.label} (${gameState.currentDate})`);
             this._checkDateTriggers(gameState.currentDate);
         } else {
-            // Past all events — go to training camp
-            gameState.currentDate = engines.CalendarEngine.toDateString(seasonDates.trainingCamp);
-            console.log(`📅 [OFFSEASON] Simmed to Training Camp`);
+            // Past all events — go to cutdown
+            gameState.currentDate = engines.CalendarEngine.toDateString(userCutdown);
+            console.log(`📅 [OFFSEASON] Simmed to Cutdown Day`);
             this._checkDateTriggers(gameState.currentDate);
         }
         
@@ -1644,11 +1649,15 @@ export class OffseasonController {
         
         const seasonYear = gameState.seasonStartYear || gameState.currentSeason;
         const seasonDates = engines.CalendarEngine.getSeasonDates(seasonYear);
+        const userTier = gameState.currentTier || 1;
         
-        gameState.currentDate = engines.CalendarEngine.toDateString(seasonDates.trainingCamp);
-        console.log(`📅 [OFFSEASON] Simmed to Training Camp (${gameState.currentDate})`);
+        // Use the user's tier-specific camp open date
+        const userCampOpen = userTier === 1 ? seasonDates.t1CampOpen : userTier === 2 ? seasonDates.t2CampOpen : seasonDates.t3CampOpen;
         
-        // Trigger all remaining phases
+        gameState.currentDate = engines.CalendarEngine.toDateString(userCampOpen);
+        console.log(`📅 [OFFSEASON] Simmed to T${userTier} Training Camp (${gameState.currentDate})`);
+        
+        // Trigger all remaining phases up to camp
         this._runRemainingOffseasonPhases();
         
         helpers.saveGameState();
@@ -1775,25 +1784,109 @@ export class OffseasonController {
             return;
         }
         
-        // Training Camp (Aug 16) — setup new season
-        // For now, just a placeholder - skip directly to roster compliance and season setup
-        if (dateGTE(currentDateOnly, seasonDates.trainingCamp) && gameState.offseasonPhase !== P.SETUP_COMPLETE) {
-            console.log('⛺ [OFFSEASON] Training Camp reached — proceeding to season setup');
+        // ─── STAGGERED TRAINING CAMP ─────────────────────────────────────────
+        // Each tier has its own camp window. Camp opens ~21 days before season.
+        // T1 camp opens first; T1 cuts flow to FA for T2 camp invites, etc.
+        // The user's tier gets the interactive camp; other tiers run silently.
+        
+        // Determine the user's camp dates
+        const campDates = {
+            1: { open: seasonDates.t1CampOpen, cutdown: seasonDates.t1Cutdown },
+            2: { open: seasonDates.t2CampOpen, cutdown: seasonDates.t2Cutdown },
+            3: { open: seasonDates.t3CampOpen, cutdown: seasonDates.t3Cutdown },
+        };
+        const userCamp = campDates[userTier] || campDates[1];
+        
+        // Run earlier tiers' camps silently when their dates pass
+        // T1 camp runs silently for T2/T3 users
+        if (userTier > 1 && dateGTE(currentDateOnly, seasonDates.t1CampOpen) && !gameState._t1CampComplete) {
+            console.log('⛺ [OFFSEASON] T1 camp running silently for AI teams...');
+            this._runAICampForTier(1);
+            gameState._t1CampComplete = true;
+        }
+        // T2 camp runs silently for T3 users
+        if (userTier > 2 && dateGTE(currentDateOnly, seasonDates.t2CampOpen) && !gameState._t2CampComplete) {
+            console.log('⛺ [OFFSEASON] T2 camp running silently for AI teams...');
+            this._runAICampForTier(2);
+            gameState._t2CampComplete = true;
+        }
+        
+        // User's tier camp opens
+        if (dateGTE(currentDateOnly, userCamp.open) && !gameState._userCampStarted && gameState.offseasonPhase !== P.SETUP_COMPLETE) {
+            console.log(`⛺ [OFFSEASON] Training Camp opened for user (T${userTier})`);
             
-            // Mark all phases complete (they should be by now, but just in case)
+            // Mark all prior phases complete (they should be by now)
             gameState._draftComplete = true;
             gameState._collegeFAComplete = true;
             gameState._freeAgencyComplete = true;
             gameState._developmentComplete = true;
+            gameState._userCampStarted = true;
             
-            // Show training camp placeholder in hub, then continue
+            // Calculate camp day and total days
+            const campOpenDate = userCamp.open;
+            const cutdownDate = userCamp.cutdown;
+            const totalCampDays = Math.round((cutdownDate - campOpenDate) / 86400000);
+            const campDayNum = Math.max(1, Math.round((currentDateOnly - campOpenDate) / 86400000) + 1);
+            
+            // Show training camp dashboard in hub
             if (window._reactShowTrainingCamp) {
-                window._reactShowTrainingCamp({ placeholder: true });
-            } else {
-                // No React handler, just continue directly
-                this.checkRosterComplianceAndContinue();
+                window._reactShowTrainingCamp({
+                    tier: userTier,
+                    campDay: campDayNum,
+                    totalCampDays,
+                    cutdownDate: engines.CalendarEngine.toDateString(cutdownDate),
+                    campOpenDate: engines.CalendarEngine.toDateString(campOpenDate),
+                });
             }
+            return;
         }
+        
+        // User's tier cutdown day reached — trigger compliance and season setup
+        if (gameState._userCampStarted && dateGTE(currentDateOnly, userCamp.cutdown) && !gameState._userCampComplete && gameState.offseasonPhase !== P.SETUP_COMPLETE) {
+            console.log(`⛺ [OFFSEASON] Cutdown day reached for user (T${userTier}) — proceeding to season setup`);
+            gameState._userCampComplete = true;
+            
+            // Run AI camp for user's tier (non-user teams)
+            this._runAICampForTier(userTier, true);
+            
+            this.checkRosterComplianceAndContinue();
+        }
+    }
+
+    /**
+     * Run training camp silently for all teams in a tier.
+     * Includes AI focus assignment, camp resolution, and cutdown.
+     * @param {number} tier - Tier to process
+     * @param {boolean} [skipUserTeam=false] - Skip user's team (they handle camp interactively)
+     */
+    _runAICampForTier(tier, skipUserTeam = false) {
+        const { gameState, engines, helpers } = this.ctx;
+        const TCE = engines.TrainingCampEngine;
+        if (!TCE) {
+            console.warn('⚠️ TrainingCampEngine not available, skipping AI camp');
+            return;
+        }
+        
+        const tierTeams = tier === 1 ? gameState.tier1Teams : tier === 2 ? gameState.tier2Teams : gameState.tier3Teams;
+        const userTeam = helpers.getUserTeam();
+        
+        let totalImproved = 0;
+        let totalCut = 0;
+        
+        tierTeams.forEach(team => {
+            if (skipUserTeam && team.id === userTeam?.id) return;
+            
+            // Run camp (AI assigns focuses and resolves)
+            const campResult = TCE.simulateAICamp(team, { PlayerAttributes: engines.PlayerAttributes });
+            totalImproved += campResult.summary.improved;
+            
+            // Cutdown to 15
+            const cutPlayers = TCE.aiCutdown(team, gameState.freeAgents);
+            totalCut += cutPlayers.length;
+        });
+        
+        console.log(`⛺ [OFFSEASON] T${tier} AI camp complete: ${totalImproved} players improved, ${totalCut} players cut to FA pool`);
+        helpers.saveGameState();
     }
 
     /**

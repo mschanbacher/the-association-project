@@ -15,7 +15,7 @@
                 OffseasonController, TradeController, DraftController,
                 GameSimController, FinanceController, RosterController,
                 FreeAgencyController, DashboardController, CoachManagementController,
-                SaveLoadController, UIHelpers, UIRenderer } = window;
+                SaveLoadController, TrainingCampEngine, UIHelpers, UIRenderer } = window;
 
         // ============================================
         // 🏀 REFACTORED ARCHITECTURE - INCREMENTAL APPROACH
@@ -29,7 +29,7 @@
             if (!_offseasonController) {
                 _offseasonController = new window.OffseasonController({
                     gameState, eventBus, GameEvents,
-                    engines: { PlayoffEngine, CalendarEngine, CoachEngine, StatEngine, FinanceEngine, FreeAgencyEngine, StorageEngine, PlayerDevelopmentEngine, PlayerAttributes, TeamFactory, LeagueManager, SalaryCapEngine, DivisionManager, DraftEngine },
+                    engines: { PlayoffEngine, CalendarEngine, CoachEngine, StatEngine, FinanceEngine, FreeAgencyEngine, StorageEngine, PlayerDevelopmentEngine, PlayerAttributes, TeamFactory, LeagueManager, SalaryCapEngine, DivisionManager, DraftEngine, TrainingCampEngine },
                     helpers: {
                         getUserTeam, getTeamById, formatCurrency, getRatingColor,
                         getEffectiveCap, calculateTeamSalary, getRemainingCap, getSalaryCap,

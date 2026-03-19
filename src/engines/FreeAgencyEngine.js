@@ -98,6 +98,10 @@ export class FreeAgencyEngine {
         // Shuffle for fairness
         const shuffled = [...aiTeams].sort(() => Math.random() - 0.5);
 
+        // AI teams sign to ~13 during FA (not 15), leaving 2+ spots for camp invites.
+        // This preserves the FA pool so camp has meaningful invite candidates.
+        const FA_ROSTER_TARGET = 13;
+
         shuffled.forEach(team => {
             const cap = getEffectiveCap(team);
             const currentSalary = calculateTeamSalary(team);
@@ -107,7 +111,8 @@ export class FreeAgencyEngine {
             const hasCapRoom = currentSalary < cap * 0.85;
             if (!needsDepth && !hasCapRoom) return;
 
-            const maxToSign = needsDepth ? (12 - rosterSize) : Math.min(3, 15 - rosterSize);
+            const maxToSign = needsDepth ? (12 - rosterSize) : Math.min(2, FA_ROSTER_TARGET - rosterSize);
+            if (maxToSign <= 0) return;
             let signed = 0;
 
             const sortedFAs = [...freeAgentPool].sort((a, b) => b.rating - a.rating);

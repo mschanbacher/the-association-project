@@ -514,7 +514,9 @@ export class TeamFactory {
         let id = startId;
 
         for (let i = 0; i < classSize; i++) {
-            const targetTier = Math.random() < 0.30 ? 2 : 3;
+            // 10% T1-caliber (the rare undrafted gems), 25% T2, 65% T3
+            const roll = Math.random();
+            const targetTier = roll < 0.10 ? 1 : roll < 0.35 ? 2 : 3;
             graduates.push(TeamFactory.generateCollegeGraduate(targetTier, id++, deps));
         }
 

@@ -1301,31 +1301,12 @@ export class OffseasonController {
         const isOverMaximum = rosterSize > 15;
 
         if (isOverCap || isUnderMinimum || isOverMaximum) {
-            console.log(`⚠️ Roster compliance issue: overCap=${isOverCap}, underMin=${isUnderMinimum}, overMax=${isOverMaximum}`);
+            console.log(`Roster compliance issue: overCap=${isOverCap}, underMin=${isUnderMinimum}, overMax=${isOverMaximum}`);
 
-            // Auto-fix by releasing lowest-rated players if over max
-            if (isOverMaximum) {
-                console.log(`🔧 Auto-fixing: Releasing ${rosterSize - 15} lowest-rated players`);
-                const sorted = [...userTeam.roster].sort((a, b) => a.rating - b.rating);
-                while (userTeam.roster.length > 15) {
-                    const released = sorted.shift();
-                    const idx = userTeam.roster.findIndex(p => p.id === released.id);
-                    if (idx !== -1) {
-                        userTeam.roster.splice(idx, 1);
-                        gameState.freeAgents.push(released);
-                        console.log(`  Released ${released.name} (${released.rating} OVR)`);
-                    }
-                }
-            }
-
-            // If still non-compliant, show modal/banner
-            const stillOverCap = helpers.calculateTeamSalary(userTeam) > helpers.getEffectiveCap(userTeam);
-            const stillUnderMin = userTeam.roster.length < 12;
-            if (stillOverCap || stillUnderMin) {
-                this.showRosterComplianceModal(stillOverCap, stillUnderMin, false,
-                    helpers.calculateTeamSalary(userTeam), helpers.getEffectiveCap(userTeam), userTeam.roster.length);
-                return;
-            }
+            // Show compliance banner — user decides who to release
+            this.showRosterComplianceModal(isOverCap, isUnderMinimum, isOverMaximum,
+                totalSalary, salaryCap, rosterSize);
+            return;
         }
 
         // Compliant — in hub mode, show success banner; in legacy mode, continue to owner mode

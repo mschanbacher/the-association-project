@@ -2320,8 +2320,8 @@ function CampResultsScreen({ data, onNavigate }) {
   };
 
   const handleContinue = () => {
-    // Proceed to cutdown / compliance
-    window._offseasonController?.checkRosterComplianceAndContinue?.();
+    // Navigate to cutdown screen where user selects who to release
+    onNavigate?.('cutdown');
   };
 
   return (
@@ -2414,6 +2414,228 @@ function CampResultsScreen({ data, onNavigate }) {
           background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
           border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)',
         }}>Continue to Cutdown</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Cutdown Screen (Phase 6) ────────────────────────────────────────────────
+function CutdownScreen({ onNavigate }) {
+  const { gameState, engines, refresh } = useGame();
+  const raw = gameState?._raw || gameState;
+  const userTeam = gameState?.userTeam;
+  const [selectedCuts, setSelectedCuts] = useState(new Set());
+  const [error, setError] = useState(null);
+  const [confirmed, setConfirmed] = useState(false);
+
+  if (!userTeam) return null;
+
+  const TCE = window.TrainingCampEngine;
+  const roster = userTeam.roster || [];
+  const maxSeason = TCE?.MAX_SEASON_ROSTER || 15;
+  const mustCut = Math.max(0, roster.length - maxSeason);
+  const selectedCount = selectedCuts.size;
+  const willResult = roster.length - selectedCount;
+
+  // Already at or below 15 — no cuts needed
+  const alreadyCompliant = roster.length <= maxSeason;
+
+  // Sort by rating ascending — lowest-rated at top as suggestion
+  const sorted = [...roster].sort((a, b) => a.rating - b.rating);
+
+  const togglePlayer = (playerId) => {
+    if (confirmed) return;
+    setError(null);
+    setSelectedCuts(prev => {
+      const next = new Set(prev);
+      if (next.has(playerId)) {
+        next.delete(playerId);
+      } else {
+        next.add(playerId);
+      }
+      return next;
+    });
+  };
+
+  const handleConfirmCuts = () => {
+    if (!TCE) return;
+    const ids = Array.from(selectedCuts);
+    const validation = TCE.validateCutdown(userTeam, ids);
+
+    if (!validation.valid) {
+      setError(validation.errors.join(' '));
+      return;
+    }
+
+    // Execute cuts
+    const freeAgents = raw?.freeAgents || [];
+    const cutPlayers = TCE.executeCutdown(userTeam, ids, freeAgents);
+    console.log(`[CUTDOWN] Released ${cutPlayers.length} players: ${cutPlayers.map(p => `${p.name} (${p.rating})`).join(', ')}`);
+
+    // Also update raw gameState
+    const rawTeam = raw?.tier1Teams?.find(t => t.id === userTeam.id)
+      || raw?.tier2Teams?.find(t => t.id === userTeam.id)
+      || raw?.tier3Teams?.find(t => t.id === userTeam.id);
+    if (rawTeam) {
+      rawTeam.roster = userTeam.roster;
+    }
+
+    window._offseasonController?.ctx?.helpers?.saveGameState?.();
+    setConfirmed(true);
+    if (refresh) refresh();
+  };
+
+  const handleContinue = () => {
+    // Go to compliance check (should now pass since we're at 15)
+    window._offseasonController?.checkRosterComplianceAndContinue?.();
+  };
+
+  const handleSkipIfCompliant = () => {
+    // Already at 15 or fewer, go straight to compliance
+    window._offseasonController?.checkRosterComplianceAndContinue?.();
+  };
+
+  // Camp invite badge
+  const isCampInvite = (player) => player.isCampInvite;
+
+  return (
+    <div style={{ maxWidth: 'var(--content-max)', margin: '0 auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>Roster Cutdown</div>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+          {alreadyCompliant ? (
+            <span>Roster is at <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{roster.length}</span> — no cuts required</span>
+          ) : confirmed ? (
+            <span style={{ color: 'var(--color-win)', fontWeight: 600 }}>Cuts confirmed — roster at {roster.length}</span>
+          ) : (
+            <span>
+              Select <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: selectedCount >= mustCut ? 'var(--color-win)' : 'var(--color-loss)' }}>{mustCut}</span> player{mustCut !== 1 ? 's' : ''} to release
+              {selectedCount > 0 && (
+                <span style={{ marginLeft: 8 }}>
+                  (<span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{selectedCount}</span> selected, roster will be <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{willResult}</span>)
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Info banner */}
+      {!alreadyCompliant && !confirmed && (
+        <div style={{
+          padding: '10px 14px', fontSize: 'var(--text-sm)', lineHeight: 1.5,
+          background: 'var(--color-bg-sunken)', border: '1px solid var(--color-border-subtle)',
+          color: 'var(--color-text-secondary)',
+        }}>
+          Your roster has {roster.length} players. The regular season maximum is {maxSeason}. Select players to release — they will become free agents available to other teams. Camp invites with non-guaranteed contracts are marked.
+        </div>
+      )}
+
+      {/* Error message */}
+      {error && (
+        <div style={{
+          padding: '10px 14px', fontSize: 'var(--text-sm)',
+          background: 'rgba(220, 38, 38, 0.08)', border: '1px solid var(--color-loss)',
+          color: 'var(--color-loss)', fontWeight: 500,
+        }}>{error}</div>
+      )}
+
+      {/* Roster table with checkboxes */}
+      {!alreadyCompliant && (
+        <div style={{ background: 'var(--color-bg-raised)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
+            <thead>
+              <tr>
+                <th style={{ ...thStyle, width: 36 }}></th>
+                <th style={thStyle}>Pos</th>
+                <th style={{ ...thStyle, textAlign: 'left' }}>Player</th>
+                <th style={thStyle}>Age</th>
+                <th style={thStyle}>OVR</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Salary</th>
+                <th style={{ ...thStyle, textAlign: 'left' }}>Contract</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map(player => {
+                const isSelected = selectedCuts.has(player.id);
+                const isInvite = isCampInvite(player);
+                return (
+                  <tr key={player.id}
+                    onClick={() => togglePlayer(player.id)}
+                    style={{
+                      borderBottom: '1px solid var(--color-border-subtle)',
+                      cursor: confirmed ? 'default' : 'pointer',
+                      background: isSelected ? 'rgba(220, 38, 38, 0.06)' : '',
+                      opacity: confirmed ? 0.5 : 1,
+                    }}
+                    onMouseEnter={e => { if (!confirmed && !isSelected) e.currentTarget.style.background = 'var(--color-accent-bg)'; }}
+                    onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = ''; }}
+                  >
+                    <td style={{ ...tdStyle, width: 36 }}>
+                      <div style={{
+                        width: 16, height: 16, border: `2px solid ${isSelected ? 'var(--color-loss)' : 'var(--color-border)'}`,
+                        background: isSelected ? 'var(--color-loss)' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        margin: '0 auto',
+                      }}>
+                        {isSelected && (
+                          <svg width="10" height="10" viewBox="0 0 10 10" style={{ display: 'block' }}>
+                            <path d="M2 5 L4 7 L8 3" stroke="white" strokeWidth="2" fill="none" />
+                          </svg>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ ...tdStyle, fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-text-tertiary)', width: 36 }}>{player.position}</td>
+                    <td style={{ ...tdStyle, fontWeight: 500, textAlign: 'left' }}>
+                      <span style={{ textDecoration: isSelected ? 'line-through' : 'none', color: isSelected ? 'var(--color-loss)' : '' }}>
+                        {player.name}
+                      </span>
+                      {isInvite && (
+                        <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', background: 'var(--color-bg-sunken)', padding: '1px 4px' }}>INV</span>
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', width: 36 }}>{player.age}</td>
+                    <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontWeight: 700, width: 40 }}>{player.rating}</td>
+                    <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textAlign: 'right', width: 80 }}>
+                      {player.salary ? `$${(player.salary / 1e6).toFixed(1)}M` : '--'}
+                    </td>
+                    <td style={{ ...tdStyle, fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', textAlign: 'left', width: 70 }}>
+                      {player.contractYears ? `${player.contractYears}yr` : '--'}
+                      {isInvite && <span style={{ marginLeft: 4, color: 'var(--color-warning)' }}>non-guar</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Action bar */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'center' }}>
+        {alreadyCompliant ? (
+          <button onClick={handleSkipIfCompliant} style={{
+            padding: '8px 20px', fontSize: 'var(--text-sm)', fontWeight: 600,
+            background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
+            border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)',
+          }}>Continue to Season Setup</button>
+        ) : confirmed ? (
+          <button onClick={handleContinue} style={{
+            padding: '8px 20px', fontSize: 'var(--text-sm)', fontWeight: 600,
+            background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
+            border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)',
+          }}>Continue to Season Setup</button>
+        ) : (
+          <button onClick={handleConfirmCuts} disabled={selectedCount < mustCut}
+            style={{
+              padding: '8px 20px', fontSize: 'var(--text-sm)', fontWeight: 600,
+              background: selectedCount >= mustCut ? 'var(--color-loss)' : 'var(--color-bg-sunken)',
+              color: selectedCount >= mustCut ? 'white' : 'var(--color-text-tertiary)',
+              border: 'none', cursor: selectedCount >= mustCut ? 'pointer' : 'not-allowed',
+              fontFamily: 'var(--font-body)',
+            }}>Confirm Cuts ({selectedCount}/{mustCut})</button>
+        )}
       </div>
     </div>
   );
@@ -3412,6 +3634,7 @@ export function OffseasonHub({ data, onClose }) {
     invites: <CampInvitesScreen onNavigate={setActiveScreen} />,
     focuses: <FocusAssignmentScreen onNavigate={setActiveScreen} />,
     campresults: <CampResultsScreen data={campResultsData} onNavigate={setActiveScreen} />,
+    cutdown: <CutdownScreen onNavigate={setActiveScreen} />,
   }), [gameState, engines, faData, faPhase, cgfaData, cgfaPhase, draftData, draftPhase, devData, contractData, complianceData, trainingCampData, campResultsData, currentDate, seasonStartYear]);
 
   return (

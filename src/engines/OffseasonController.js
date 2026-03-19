@@ -1788,6 +1788,7 @@ export class OffseasonController {
         // Each tier has its own camp window. Camp opens ~21 days before season.
         // T1 camp opens first; T1 cuts flow to FA for T2 camp invites, etc.
         // The user's tier gets the interactive camp; other tiers run silently.
+        // ALL tiers must process at the correct time, regardless of user tier.
         
         // Determine the user's camp dates
         const campDates = {
@@ -1797,21 +1798,30 @@ export class OffseasonController {
         };
         const userCamp = campDates[userTier] || campDates[1];
         
-        // Run earlier tiers' camps silently when their dates pass
-        // T1 camp runs silently for T2/T3 users
-        if (userTier > 1 && dateGTE(currentDateOnly, seasonDates.t1CampOpen) && !gameState._t1CampComplete) {
-            console.log('⛺ [OFFSEASON] T1 camp running silently for AI teams...');
+        // ── Run non-user tiers' camps silently at their correct dates ──
+        // T1 AI camp (runs at T1 cutdown date for non-T1 users, or at T1 cutdown for T1 user via the cutdown trigger below)
+        if (userTier !== 1 && dateGTE(currentDateOnly, seasonDates.t1Cutdown) && !gameState._t1CampComplete) {
+            console.log('⛺ [OFFSEASON] T1 camp running silently (AI teams)...');
             this._runAICampForTier(1);
             gameState._t1CampComplete = true;
+            // Don't return — check if T2/T3 also need to fire
         }
-        // T2 camp runs silently for T3 users
-        if (userTier > 2 && dateGTE(currentDateOnly, seasonDates.t2CampOpen) && !gameState._t2CampComplete) {
-            console.log('⛺ [OFFSEASON] T2 camp running silently for AI teams...');
+        
+        // T2 AI camp (runs at T2 cutdown date for non-T2 users)
+        if (userTier !== 2 && dateGTE(currentDateOnly, seasonDates.t2Cutdown) && !gameState._t2CampComplete) {
+            console.log('⛺ [OFFSEASON] T2 camp running silently (AI teams)...');
             this._runAICampForTier(2);
             gameState._t2CampComplete = true;
         }
         
-        // User's tier camp opens
+        // T3 AI camp (runs at T3 cutdown date for non-T3 users)
+        if (userTier !== 3 && dateGTE(currentDateOnly, seasonDates.t3Cutdown) && !gameState._t3CampComplete) {
+            console.log('⛺ [OFFSEASON] T3 camp running silently (AI teams)...');
+            this._runAICampForTier(3);
+            gameState._t3CampComplete = true;
+        }
+        
+        // ── User's tier camp opens ──
         if (dateGTE(currentDateOnly, userCamp.open) && !gameState._userCampStarted && gameState.offseasonPhase !== P.SETUP_COMPLETE) {
             console.log(`⛺ [OFFSEASON] Training Camp opened for user (T${userTier})`);
             
@@ -1846,8 +1856,13 @@ export class OffseasonController {
             console.log(`⛺ [OFFSEASON] Cutdown day reached for user (T${userTier}) — proceeding to season setup`);
             gameState._userCampComplete = true;
             
-            // Run AI camp for user's tier (non-user teams)
+            // Run AI camp for user's tier (non-user teams) — invites, focuses, resolution, cutdown
             this._runAICampForTier(userTier, true);
+            
+            // Mark user's tier camp as globally complete (so the silent tier check doesn't re-run it)
+            if (userTier === 1) gameState._t1CampComplete = true;
+            else if (userTier === 2) gameState._t2CampComplete = true;
+            else if (userTier === 3) gameState._t3CampComplete = true;
             
             this.checkRosterComplianceAndContinue();
         }

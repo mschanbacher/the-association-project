@@ -98,10 +98,14 @@ export class FreeAgencyEngine {
         // Shuffle for fairness
         const shuffled = [...aiTeams].sort(() => Math.random() - 0.5);
 
-        // During FA, AI teams sign only to reach the 12-player roster minimum.
-        // Additional roster spots (13-20) are filled during each tier's training
-        // camp via camp invites. This preserves the FA pool so T1 camp gets first
-        // pick, T2 gets T1 cuts + remaining pool, T3 gets the rest.
+        // During July FA, AI teams sign only VETERAN free agents (players whose
+        // contracts expired — identified by having a previousTeamId). College
+        // graduates and undrafted draft prospects are NOT available here; they
+        // enter the league through training camp invites during the staggered
+        // camp cascade (T1 camp -> T1 cuts -> T2 camp -> T2 cuts -> T3 camp).
+        // This preserves the pool so each tier's camp sees fresh talent.
+        const veteranFAs = freeAgentPool.filter(p => p.previousTeamId != null);
+
         const FA_ROSTER_MIN = 12;
 
         shuffled.forEach(team => {
@@ -115,9 +119,9 @@ export class FreeAgencyEngine {
             const maxToSign = FA_ROSTER_MIN - rosterSize;
             let signed = 0;
 
-            const sortedFAs = [...freeAgentPool].sort((a, b) => b.rating - a.rating);
+            const sortedVets = [...veteranFAs].sort((a, b) => b.rating - a.rating);
 
-            for (const player of sortedFAs) {
+            for (const player of sortedVets) {
                 if (signed >= maxToSign) break;
                 if (!FreeAgencyEngine.isTierMatch(player, team.tier)) continue;
 
@@ -127,6 +131,9 @@ export class FreeAgencyEngine {
                 const idx = freeAgentPool.findIndex(p => p.id === player.id);
                 if (idx !== -1) {
                     freeAgentPool.splice(idx, 1);
+                    // Also remove from our working copy so two teams don't target the same player
+                    const vetIdx = veteranFAs.findIndex(v => v.id === player.id);
+                    if (vetIdx !== -1) veteranFAs.splice(vetIdx, 1);
                     player.salary = tierSalary;
                     player.tier = team.tier;
                     delete player.preRelegationSalary;
@@ -137,6 +144,7 @@ export class FreeAgencyEngine {
             }
         });
 
+        console.log(`[AI FA] Signed ${totalSigned} veterans. Pool: ${freeAgentPool.length} total (${freeAgentPool.filter(p => p.previousTeamId != null).length} vets, ${freeAgentPool.filter(p => p.isCollegeGrad).length} college grads, ${freeAgentPool.filter(p => p.isDraftProspect).length} undrafted prospects)`);
         return totalSigned;
     }
 
@@ -173,8 +181,10 @@ export class FreeAgencyEngine {
                 ? Math.min(4, 12 - rosterSize)
                 : Math.min(2, 15 - rosterSize);
 
+            // July FA: AI teams only target veteran free agents (previousTeamId set).
+            // College grads and undrafted prospects enter through camp invites.
             const suitable = freeAgents
-                .filter(p => FreeAgencyEngine.isTierMatch(p, team.tier))
+                .filter(p => p.previousTeamId != null && FreeAgencyEngine.isTierMatch(p, team.tier))
                 .sort((a, b) => b.rating - a.rating)
                 .slice(0, numTargets);
 

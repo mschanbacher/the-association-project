@@ -1260,7 +1260,7 @@ export class OffseasonController {
         const { gameState, engines, helpers } = this.ctx;
 
         try {
-            console.log('🤖 Running AI free agent signing...');
+            console.log(`[AI FA] Running AI free agent signing... Pool: ${gameState.freeAgents.length} players`);
             const userTeam = helpers.getUserTeam();
             const allTeams = [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams];
             const aiTeams = allTeams.filter(t => t.id !== userTeam.id);
@@ -1270,12 +1270,11 @@ export class OffseasonController {
                 { TeamFactory: engines.TeamFactory, getEffectiveCap: helpers.getEffectiveCap, calculateTeamSalary: helpers.calculateTeamSalary }
             );
 
-            console.log(`✅ AI signing phase complete: ${totalSigned} total signings across all teams`);
-            console.log(`📋 Free agent pool remaining: ${gameState.freeAgents.length} players`);
+            console.log(`[AI FA] Complete: ${totalSigned} veterans signed. Pool remaining: ${gameState.freeAgents.length}`);
 
             this.checkRosterComplianceAndContinue();
         } catch (err) {
-            console.error('❌ Error in runAISigningAndContinue:', err);
+            console.error('Error in runAISigningAndContinue:', err);
             alert('Error during AI signing phase: ' + err.message + '\n\nCheck console for details.');
         }
     }
@@ -1878,7 +1877,7 @@ export class OffseasonController {
         const { gameState, engines, helpers } = this.ctx;
         const TCE = engines.TrainingCampEngine;
         if (!TCE) {
-            console.warn('⚠️ TrainingCampEngine not available, skipping AI camp');
+            console.warn('TrainingCampEngine not available, skipping AI camp');
             return;
         }
         
@@ -1886,8 +1885,13 @@ export class OffseasonController {
         const userTeam = helpers.getUserTeam();
         const skipId = skipUserTeam ? userTeam?.id : null;
         
+        const poolBefore = gameState.freeAgents.length;
+        console.log(`[CAMP T${tier}] Pool before invites: ${poolBefore} (${gameState.freeAgents.filter(p => p.isCollegeGrad).length} college, ${gameState.freeAgents.filter(p => p.isDraftProspect).length} undrafted, ${gameState.freeAgents.filter(p => p.previousTeamId != null).length} vets)`);
+        
         // AI teams sign camp invites first (expand to 17-19 players)
         const invitesSigned = TCE.aiSignCampInvites(tierTeams, gameState.freeAgents, { TeamFactory: engines.TeamFactory }, skipId);
+        
+        const poolAfterInvites = gameState.freeAgents.length;
         
         let totalImproved = 0;
         let totalCut = 0;
@@ -1904,7 +1908,7 @@ export class OffseasonController {
             totalCut += cutPlayers.length;
         });
         
-        console.log(`⛺ [OFFSEASON] T${tier} AI camp: ${invitesSigned} invites signed, ${totalImproved} players improved, ${totalCut} players cut to FA pool`);
+        console.log(`[CAMP T${tier}] ${invitesSigned} invites signed (pool ${poolBefore} -> ${poolAfterInvites}), ${totalCut} cut back to pool (now ${gameState.freeAgents.length}), ${totalImproved} players improved`);
         helpers.saveGameState();
     }
 

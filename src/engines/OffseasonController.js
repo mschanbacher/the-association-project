@@ -1602,24 +1602,27 @@ export class OffseasonController {
         const userCutdown = userTier === 1 ? seasonDates.t1Cutdown : userTier === 2 ? seasonDates.t2Cutdown : seasonDates.t3Cutdown;
         
         const eventDates = [
-            { date: seasonDates.draftDay, phase: 'draft', label: 'Draft Day' },
-            { date: seasonDates.contractExpiration, phase: 'contract_exp', label: 'Contract Expiration' },
-            { date: seasonDates.freeAgencyStart, phase: 'free_agency', label: 'Free Agency' },
-            { date: seasonDates.playerDevelopment, phase: 'development', label: 'Development' },
-            { date: userCampOpen, phase: 'camp_open', label: 'Training Camp' },
-            { date: userCutdown, phase: 'cutdown', label: 'Cutdown Day' },
+            { date: seasonDates.draftDay, label: 'Draft Day', done: !!gameState._draftComplete },
+            { date: seasonDates.contractExpiration, label: 'Contract Expiration', done: !!gameState._contractExpirationComplete },
+            { date: seasonDates.freeAgencyStart, label: 'Free Agency', done: !!gameState._freeAgencyComplete },
+            { date: seasonDates.playerDevelopment, label: 'Development', done: !!gameState._developmentComplete },
+            { date: userCampOpen, label: 'Training Camp', done: !!gameState._userCampStarted },
+            { date: userCutdown, label: 'Cutdown Day', done: !!gameState._userCampComplete },
         ];
         
-        const nextEvent = eventDates.find(e => e.date > current);
+        // Find next event that is not yet completed and on or after current date
+        const nextEvent = eventDates.find(e => !e.done && e.date >= current);
         
         if (nextEvent) {
             gameState.currentDate = engines.CalendarEngine.toDateString(nextEvent.date);
-            console.log(`📅 [OFFSEASON] Simmed to ${nextEvent.label} (${gameState.currentDate})`);
+            console.log(`[OFFSEASON] Simmed to ${nextEvent.label} (${gameState.currentDate})`);
+            this._autoSimPreseasonGames(gameState.currentDate);
             this._checkDateTriggers(gameState.currentDate);
         } else {
             // Past all events — go to cutdown
             gameState.currentDate = engines.CalendarEngine.toDateString(userCutdown);
-            console.log(`📅 [OFFSEASON] Simmed to Cutdown Day`);
+            console.log(`[OFFSEASON] Simmed to Cutdown Day`);
+            this._autoSimPreseasonGames(gameState.currentDate);
             this._checkDateTriggers(gameState.currentDate);
         }
         

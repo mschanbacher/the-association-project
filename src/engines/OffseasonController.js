@@ -2145,12 +2145,9 @@ export class OffseasonController {
         }
         
         // Run lottery silently
-        const lotteryTeams = gameState.tier1Teams
-            .filter(t => !gameState.playoffTeams?.includes(t.id))
-            .sort((a, b) => a.wins - b.wins)
-            .slice(0, 14);
-        
-        const lotteryResults = engines.DraftEngine.runLottery(lotteryTeams);
+        const promotedTeamIds = gameState.postseasonResults?.promoted?.toT1?.map(t => t.id) || [];
+        const lotteryData = engines.DraftEngine.simulateDraftLottery(gameState.tier1Teams, promotedTeamIds);
+        const lotteryResults = lotteryData.lotteryResults;
         gameState._lotteryResults = lotteryResults;
         
         // Run full draft - AI makes all picks (user's picks go to best available)

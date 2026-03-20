@@ -1602,9 +1602,9 @@ export class OffseasonController {
         const userCutdown = userTier === 1 ? seasonDates.t1Cutdown : userTier === 2 ? seasonDates.t2Cutdown : seasonDates.t3Cutdown;
         
         const eventDates = [
-            { date: seasonDates.draftDay, label: 'Draft Day', done: !!gameState._draftComplete },
+            { date: seasonDates.draftDay, label: 'Draft Day', done: !!(gameState._draftStarted || gameState._draftComplete) },
             { date: seasonDates.contractExpiration, label: 'Contract Expiration', done: !!gameState._contractExpirationComplete },
-            { date: seasonDates.freeAgencyStart, label: 'Free Agency', done: !!gameState._freeAgencyComplete },
+            { date: seasonDates.freeAgencyStart, label: 'Free Agency', done: !!(gameState._freeAgencyStarted || gameState._freeAgencyComplete) },
             { date: seasonDates.playerDevelopment, label: 'Development', done: !!gameState._developmentComplete },
             { date: userCampOpen, label: 'Training Camp', done: !!gameState._userCampStarted },
             { date: userCutdown, label: 'Cutdown Day', done: !!gameState._userCampComplete },

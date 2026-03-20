@@ -1602,7 +1602,8 @@ export class OffseasonController {
         const userCutdown = userTier === 1 ? seasonDates.t1Cutdown : userTier === 2 ? seasonDates.t2Cutdown : seasonDates.t3Cutdown;
         
         const eventDates = [
-            { date: seasonDates.draftDay, label: 'Draft Day', done: !!(gameState._draftStarted || gameState._draftComplete) },
+            // Draft is interactive for T1 only; for T2/T3 it runs silently, skip it
+            ...(userTier === 1 ? [{ date: seasonDates.draftDay, label: 'Draft Day', done: !!(gameState._draftStarted || gameState._draftComplete) }] : []),
             { date: seasonDates.contractExpiration, label: 'Contract Expiration', done: !!gameState._contractExpirationComplete },
             { date: seasonDates.freeAgencyStart, label: 'Free Agency', done: !!(gameState._freeAgencyStarted || gameState._freeAgencyComplete) },
             { date: seasonDates.playerDevelopment, label: 'Development', done: !!gameState._developmentComplete },
@@ -1736,7 +1737,13 @@ export class OffseasonController {
         // Contract Expiration (Jun 30) - runs BEFORE Free Agency opens
         // Decrements contract years and moves expired contracts to FA pool
         if (dateGTE(currentDateOnly, seasonDates.contractExpiration) && !gameState._contractExpirationComplete) {
-            console.log('📋 [OFFSEASON] Contract Expiration Day — processing expired contracts');
+            // For non-T1 users, run the draft silently first if it hasn't happened yet
+            // (T1 users have the interactive draft which runs earlier)
+            if (!gameState._draftComplete) {
+                console.log('[OFFSEASON] Running draft silently before contract expiration...');
+                this.runDraftSilently();
+            }
+            console.log('[OFFSEASON] Contract Expiration Day — processing expired contracts');
             this.runContractExpiration();
             gameState._contractExpirationComplete = true;
             // Don't return - allow FA to trigger on same sim if it's Jul 1+

@@ -129,14 +129,16 @@ export class RosterController {
 
         const droppedPlayer = userTeam.roster[playerIndex];
         userTeam.roster.splice(playerIndex, 1);
+        // Create new array reference so React detects the mutation
+        userTeam.roster = [...userTeam.roster];
         helpers.applyDropPenalty(userTeam, droppedPlayer);
         gameState.freeAgents.push(droppedPlayer);
 
         console.log(`Dropped ${droppedPlayer.name} (${helpers.formatCurrency(droppedPlayer.salary)}) from roster`);
 
         this.updateRosterDisplay();
-        helpers.displayFreeAgents();
         helpers.saveGameState();
+        if (window._notifyReact) window._notifyReact();
     }
 
     signPlayer(playerId) {
@@ -176,8 +178,8 @@ export class RosterController {
         });
 
         this.updateRosterDisplay();
-        helpers.displayFreeAgents();
         helpers.saveGameState();
+        if (window._notifyReact) window._notifyReact();
     }
 
     // ═══════════════════════════════════════════════════════════════════

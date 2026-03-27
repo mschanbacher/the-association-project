@@ -12,6 +12,7 @@
                 DivisionManager, CalendarEngine, StatEngine, PlayoffEngine,
                 TradeEngine, DraftEngine, ChemistryEngine, InjuryEngine,
                 FatigueEngine, GMMode, ScoutingEngine, OwnerEngine,
+                LoanEngine,
                 OffseasonController, TradeController, DraftController,
                 GameSimController, PlayoffSimController, FinanceController, RosterController,
                 FreeAgencyController, DashboardController, CoachManagementController,
@@ -57,6 +58,16 @@
                         },
                         advanceFinancialTransitions,
                         healAllInjuries: (team) => InjuryEngine.healAllInjuries(team),
+                        returnAllLoans: () => {
+                            if (!LoanEngine || !gameState.activeLoans || gameState.activeLoans.length === 0) return [];
+                            const allTeams = [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams];
+                            return LoanEngine.returnAllLoans({
+                                activeLoans: gameState.activeLoans,
+                                allTeams,
+                                currentDate: gameState.currentDate || 'season-end',
+                                initializePlayerChemistry,
+                            });
+                        },
                         resetAllFatigue: (teams) => FatigueEngine.resetAll(teams),
                         clearMarketValueCache: (players) => TeamFactory.clearMarketValueCache(players),
                         runDraft: () => getDraftController().runDraft(),
@@ -1131,6 +1142,7 @@
                     dpeEligible = injury.allowsDPE && player.salary > getDPEThreshold(team.tier);
                     dpeAmount = dpeEligible ? Math.min(player.salary * 0.5, getDPEAmount(team.tier)) : 0;
                     if (dpeEligible) grantDPE(team, player);
+                    console.log(`[DPE Check] ${player.name}: allowsDPE=${injury.allowsDPE}, salary=${player.salary}, threshold=${getDPEThreshold(team.tier)}, eligible=${dpeEligible}, amount=${dpeAmount}`);
                 } else if (isUserTeam && injury.canPlayThrough) {
                     // User team, playable-through — check settings for auto-handling
                     const injSetting = window._gameSettings?.injuryDecisions;
@@ -1153,23 +1165,42 @@
                     }
                 }
 
-                // Set up callback for when React modal closes
-                window._injuryDecisionCallback = (decision) => {
-                    // For user playthrough injuries, apply the decision now
-                    if (isUserTeam && injury.canPlayThrough && decision) {
-                        InjuryEngine.applyInjury(player, injury, decision);
-                    }
-                    // Advance queue
+                // Capture DPE state for the callback closure
+                const _dpeEligible = dpeEligible;
+                const _dpeAmount = dpeAmount;
+                const _injuredPlayer = player;
+                const _injuredTeam = team;
+
+                // Helper: advance injury queue and resume sim
+                const advanceQueue = () => {
                     if (gameState.pendingInjuries && gameState.pendingInjuries.length > 0) {
                         gameState.pendingInjuries.shift();
                     }
                     pendingInjuryDecision = null;
-                    // Show next injury if any, otherwise resume sim if finish season was active
                     if (gameState.pendingInjuries && gameState.pendingInjuries.length > 0) {
                         showNextInjuryModal();
                     } else if (window._resumeAfterInjuries) {
                         window._resumeAfterInjuries();
                     }
+                };
+
+                // Set up callback for when React injury modal closes
+                window._injuryDecisionCallback = (decision) => {
+                    console.log(`[DPE Callback] decision=${decision}, _dpeEligible=${_dpeEligible}, isUserTeam=${isUserTeam}, _dpeAmount=${_dpeAmount}, hasReactShow=${!!window._reactShowDPEReplacement}, hasLoanEngine=${!!LoanEngine}`);
+                    // For user playthrough injuries, apply the decision now
+                    if (isUserTeam && injury.canPlayThrough && decision) {
+                        InjuryEngine.applyInjury(player, injury, decision);
+                    }
+
+                    // If DPE was granted for user team, show DPE Replacement Modal
+                    if (_dpeEligible && isUserTeam && _dpeAmount > 0 && window._reactShowDPEReplacement && LoanEngine) {
+                        console.log(`[DPE] Opening DPE Replacement Modal for ${_injuredPlayer.name}`);
+                        _showDPEReplacementModal(_injuredTeam, _injuredPlayer, _dpeAmount, advanceQueue);
+                        return;
+                    }
+
+                    // No DPE — advance queue normally
+                    advanceQueue();
                 };
 
                 window._reactShowInjury({
@@ -1178,6 +1209,120 @@
                 });
                 return;
             }
+        }
+
+        /**
+         * Show the DPE Replacement Modal after a DPE-eligible injury.
+         * Chains into the sim resume flow via onCompleteCallback.
+         */
+        function _showDPEReplacementModal(team, injuredPlayer, dpeAmount, onCompleteCallback) {
+            const allTeams = [...gameState.tier1Teams, ...gameState.tier2Teams, ...gameState.tier3Teams];
+            const borrowingTier = team.tier;
+
+            // Determine lower-tier teams for loan candidates
+            let lowerTierTeams = [];
+            if (borrowingTier === 1) lowerTierTeams = gameState.tier2Teams;
+            else if (borrowingTier === 2) lowerTierTeams = gameState.tier3Teams;
+
+            // Get loan candidates
+            const loanCandidates = LoanEngine.getAvailableLoanPlayers(
+                borrowingTier, lowerTierTeams, gameState.activeLoans
+            );
+
+            // Get affordable free agents
+            const affordableFAs = LoanEngine.getAffordableFreeAgents(
+                gameState.freeAgents, dpeAmount, borrowingTier
+            );
+
+            // Calculate games remaining for the user team
+            const totalGamesMap = { 1: 82, 2: 60, 3: 40 };
+            const totalGames = totalGamesMap[borrowingTier] || 82;
+            const gamesPlayed = (team.wins || 0) + (team.losses || 0);
+            const gamesRemaining = Math.max(1, totalGames - gamesPlayed);
+
+            // Set up the completion callback
+            window._dpeReplacementCallback = (action, details) => {
+                console.log(`[DPE] Replacement complete: ${action}`, details || '');
+                saveGameState();
+                getDashboardController().refresh();
+                // Resume the injury queue / sim
+                onCompleteCallback();
+            };
+
+            // Open the React modal
+            window._reactShowDPEReplacement({
+                injuredPlayer,
+                team,
+                dpeAmount,
+                borrowingTier,
+                loanCandidates,
+                freeAgents: affordableFAs,
+                activeLoans: gameState.activeLoans,
+                generateSalary: TeamFactory.generateSalary,
+                gamesRemaining,
+                totalGames,
+                currentDate: gameState.currentDate,
+                // Pass engine functions for the modal to call
+                calculateLoanTerms: LoanEngine.calculateLoanTerms,
+                evaluateLoanOffer: LoanEngine.evaluateLoanOffer,
+                executeLoan: (params) => LoanEngine.executeLoan({
+                    ...params,
+                    activeLoans: gameState.activeLoans,
+                }),
+                signFreeAgentViaDPE: LoanEngine.signFreeAgentViaDPE,
+                initializePlayerChemistry: (p) => { p.chemistry = 50; p.gamesWithTeam = 0; },
+                _freeAgentsRef: gameState.freeAgents, // mutable ref for FA pool modification
+            });
+        }
+
+        /**
+         * Show the Inbound Loan Request Modal when an AI higher-tier team
+         * wants to borrow a player from the user's team.
+         */
+        function _showInboundLoanRequest() {
+            const request = gameState.pendingLoanRequest;
+            if (!request || !window._reactShowInboundLoan || !LoanEngine) {
+                // Can't show modal — clear request and let AI try elsewhere
+                gameState.pendingLoanRequest = null;
+                if (window._resumeAfterLoanRequest) window._resumeAfterLoanRequest();
+                return;
+            }
+
+            // Set up the response callback
+            window._inboundLoanCallback = (response) => {
+                const req = gameState.pendingLoanRequest;
+                gameState.pendingLoanRequest = null;
+
+                if (response === 'accept' && req) {
+                    const userTeam = getUserTeam();
+                    // Execute the loan: player moves from user team to borrowing team
+                    LoanEngine.executeLoan({
+                        player: req.requestedPlayer,
+                        originalTeam: userTeam,
+                        borrowingTeam: req.borrowingTeam,
+                        injuredPlayer: req.injuredPlayer,
+                        loanFee: req.offerAmount,
+                        proratedSalary: req.proratedSalary,
+                        currentDate: req.currentDate || gameState.currentDate,
+                        activeLoans: gameState.activeLoans,
+                        initializePlayerChemistry: (p) => ChemistryEngine.initializePlayer(p),
+                    });
+                    console.log(`[Inbound Loan] Accepted: ${req.requestedPlayer.name} loaned to ${req.borrowingTeam.city} ${req.borrowingTeam.name} for ${SalaryCapEngine.formatCurrency(req.offerAmount)}`);
+                    saveGameState();
+                    getDashboardController().refresh();
+                } else {
+                    console.log(`[Inbound Loan] Declined: ${req?.requestedPlayer?.name || 'unknown'}`);
+                    // AI will try other players from non-user teams on next sim tick
+                }
+
+                // Resume sim
+                if (window._resumeAfterLoanRequest) {
+                    window._resumeAfterLoanRequest();
+                }
+            };
+
+            // Open the React modal
+            window._reactShowInboundLoan(request);
         }
         
         // selectInjuryOption removed — React InjuryModal handles option selection
@@ -1373,6 +1518,10 @@
                     },
                     applyTradePenalty: (team, tradedPlayer) => ChemistryEngine.applyTradePenalty(team, tradedPlayer),
                     initializePlayerChemistry: (player) => ChemistryEngine.initializePlayer(player),
+                    checkLoanReturns: LoanEngine ? (params) => LoanEngine.checkLoanReturns(params) : null,
+                    LoanEngine,
+                    generateSalary,
+                    showInboundLoanRequest: () => _showInboundLoanRequest(),
                     tradeDraftPick: (fromTeamId, toTeamId, originalTeamId, year, round) => {
                         if (!gameState.draftPickOwnership) return;
                         const key = `${originalTeamId}_${year}_${round}`;

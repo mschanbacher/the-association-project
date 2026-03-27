@@ -147,6 +147,14 @@ export class GMMode {
                 return; // User deals with proposal before continuing
             }
 
+            // Check for pending inbound loan request
+            if (this.gameState.pendingLoanRequest) {
+                this.deps.saveGameState();
+                this.deps.updateUI();
+                this.deps.showInboundLoanRequest();
+                return;
+            }
+
             // Process AI-AI trades
             const notable = this.processAiToAiTrades(currentDate);
             if (notable) {
@@ -278,6 +286,19 @@ export class GMMode {
                 }
             }
 
+            // Check for pending inbound loan request
+            if (this.gameState.pendingLoanRequest) {
+                this.gameState.currentDate = this.deps.CalendarEngine.addDays(simDate, 1);
+                this.deps.saveGameState();
+                this.deps.updateUI();
+                window._resumeAfterLoanRequest = () => {
+                    delete window._resumeAfterLoanRequest;
+                    this._resumeSimWeek(this.gameState.currentDate, endDate);
+                };
+                this.deps.showInboundLoanRequest();
+                return;
+            }
+
             if (notable) {
                 // Notable AI-AI trade — pause for Breaking News, then resume
                 this.gameState.currentDate = this.deps.CalendarEngine.addDays(simDate, 1);
@@ -345,6 +366,16 @@ export class GMMode {
                     this.deps.showAiTradeProposal();
                     return;
                 }
+            }
+            if (this.gameState.pendingLoanRequest) {
+                this.gameState.currentDate = this.deps.CalendarEngine.addDays(simDate, 1);
+                this.deps.saveGameState(); this.deps.updateUI();
+                window._resumeAfterLoanRequest = () => {
+                    delete window._resumeAfterLoanRequest;
+                    this._resumeSimWeek(this.gameState.currentDate, endDate);
+                };
+                this.deps.showInboundLoanRequest();
+                return;
             }
             if (notable) {
                 this.gameState.currentDate = this.deps.CalendarEngine.addDays(simDate, 1);
@@ -480,6 +511,22 @@ export class GMMode {
                 this.deps.updateInjuries(homeTeam);
                 this.deps.updateInjuries(awayTeam);
                 
+                // Check loan returns (after injuries tick down so healed players trigger returns)
+                if (this.deps.checkLoanReturns && this.gameState.activeLoans && this.gameState.activeLoans.length > 0) {
+                    const allTeams = [...this.gameState.tier1Teams, ...this.gameState.tier2Teams, ...this.gameState.tier3Teams];
+                    const loanReturns = this.deps.checkLoanReturns({
+                        activeLoans: this.gameState.activeLoans,
+                        allTeams,
+                        currentDate: dateStr,
+                        initializePlayerChemistry: this.deps.initializePlayerChemistry,
+                    });
+                    if (loanReturns.length > 0) {
+                        loanReturns.forEach(r => {
+                            console.log(`[Loan] Returned: ${r.loan?.playerName} (${r.reason})`);
+                        });
+                    }
+                }
+                
                 // Check injuries
                 if (isUserGame) {
                     const userGamesPlayed = userTeam ? (userTeam.wins + userTeam.losses) : 0;
@@ -491,6 +538,8 @@ export class GMMode {
                     aiTeamInjuries.forEach(({team, player, injury}) => {
                         const aiDecision = injury.canPlayThrough && Math.random() < 0.3 ? 'playThrough' : 'rest';
                         this.deps.applyInjury(player, injury, aiDecision);
+                        // AI-to-AI loan: if DPE-eligible, attempt a loan
+                        this._processAiDPELoan(team, player, injury, dateStr);
                     });
                     
                     if (userTeamInjuries.length > 0) {
@@ -511,6 +560,8 @@ export class GMMode {
                     injuries.forEach(({team, player, injury}) => {
                         const aiDecision = injury.canPlayThrough && Math.random() < 0.3 ? 'playThrough' : 'rest';
                         this.deps.applyInjury(player, injury, aiDecision);
+                        // AI-to-AI loan: if DPE-eligible, attempt a loan
+                        this._processAiDPELoan(team, player, injury, dateStr);
                     });
                 }
             }
@@ -715,6 +766,18 @@ export class GMMode {
                     this.deps.showAiTradeProposal();
                     return;
                 }
+            }
+
+            // Interrupt for inbound loan request
+            if (this.gameState.pendingLoanRequest) {
+                this.deps.saveGameState();
+                this.deps.updateUI();
+                window._resumeAfterLoanRequest = () => {
+                    delete window._resumeAfterLoanRequest;
+                    this.finishSeasonBatch();
+                };
+                this.deps.showInboundLoanRequest();
+                return;
             }
 
             // Interrupt for notable AI-AI trade (Breaking News)
@@ -1027,6 +1090,153 @@ export class GMMode {
         });
     }
     
+    // ============================================
+    // AI-TO-AI LOAN PROCESSING
+    // ============================================
+
+    /**
+     * Check if an AI team's injury qualifies for DPE and attempt a loan.
+     * Called immediately after an AI injury is applied.
+     * @param {Object} team - The injured team
+     * @param {Object} player - The injured player
+     * @param {Object} injury - The injury object
+     * @param {string} dateStr - Current date
+     */
+    _processAiDPELoan(team, player, injury, dateStr) {
+        // Only process DPE-eligible injuries
+        if (!injury.allowsDPE) return;
+
+        const LoanEngine = this.deps.LoanEngine;
+        if (!LoanEngine) return;
+
+        // Check salary threshold
+        const dpeThresholds = { 1: 6000000, 2: 600000, 3: 75000 };
+        const dpeAmounts = { 1: 6000000, 2: 600000, 3: 75000 };
+        const threshold = dpeThresholds[team.tier] || dpeThresholds[3];
+        const maxDPE = dpeAmounts[team.tier] || dpeAmounts[3];
+
+        if (!player.salary || player.salary <= threshold) return;
+
+        const dpeAmount = Math.min(player.salary * 0.5, maxDPE);
+
+        // Grant DPE to team
+        if (!team.dpe) team.dpe = [];
+        team.dpe.push({ player: player.name, amount: dpeAmount, expires: this.gameState.currentSeason });
+
+        // Determine lower-tier teams
+        let lowerTierTeams = [];
+        if (team.tier === 1) lowerTierTeams = this.gameState.tier2Teams;
+        else if (team.tier === 2) lowerTierTeams = this.gameState.tier3Teams;
+
+        if (team.tier > 2 || lowerTierTeams.length === 0) {
+            // T3 or no lower tier — try FA only
+            this._aiSignFAViaDPE(team, player, dpeAmount, LoanEngine);
+            return;
+        }
+
+        const totalGamesMap = { 1: 82, 2: 60, 3: 40 };
+        const totalGames = totalGamesMap[team.tier] || 82;
+        const gamesPlayed = (team.wins || 0) + (team.losses || 0);
+        const gamesRemaining = Math.max(1, totalGames - gamesPlayed);
+        const generateSalary = this.deps.generateSalary || window.generateSalary;
+
+        // ── Check if user team is in the lending pool ──
+        const userTeam = this.deps.getUserTeam();
+        if (userTeam) {
+            const userTier = userTeam.tier;
+            const lendingTier = team.tier === 1 ? 2 : 3;
+
+            if (userTier === lendingTier) {
+                // User team is in the lending pool — find best candidate from user roster
+                const candidates = LoanEngine.getAvailableLoanPlayers(
+                    team.tier, [userTeam], this.gameState.activeLoans
+                );
+
+                // Filter to injured player's position + adjacent
+                const targetPos = player.position;
+                const adjacent = { 'PG': ['SG'], 'SG': ['PG','SF'], 'SF': ['SG','PF'], 'PF': ['SF','C'], 'C': ['PF'] };
+                const posSet = new Set([targetPos, ...(adjacent[targetPos] || [])]);
+                const posCandidates = candidates.filter(c => posSet.has(c.player.position));
+                const bestCandidate = (posCandidates.length > 0 ? posCandidates : candidates)[0];
+
+                if (bestCandidate) {
+                    const terms = LoanEngine.calculateLoanTerms(
+                        bestCandidate.player, team.tier, gamesRemaining, totalGames, generateSalary
+                    );
+
+                    // AI offers at the asking price (they're desperate — DPE injury)
+                    const valuation = LoanEngine._calculateAiValuation(
+                        userTeam, bestCandidate.player, bestCandidate.teamContext,
+                        terms.adjustedSalary, this.gameState.activeLoans
+                    );
+
+                    // Only propose if the player isn't an auto-decline
+                    if (!valuation.declineReason) {
+                        const offerAmount = valuation.askingPrice;
+                        const totalCost = offerAmount + terms.proratedSalary;
+
+                        if (totalCost <= dpeAmount) {
+                            // Store pending loan request for the user
+                            this.gameState.pendingLoanRequest = {
+                                borrowingTeam: team,
+                                injuredPlayer: player,
+                                requestedPlayer: bestCandidate.player,
+                                dpeAmount,
+                                offerAmount,
+                                proratedSalary: terms.proratedSalary,
+                                adjustedSalary: terms.adjustedSalary,
+                                gamesRemaining,
+                                totalGames,
+                                currentDate: dateStr,
+                            };
+                            console.log(`[Inbound Loan] ${team.city} ${team.name} wants to borrow ${bestCandidate.player.name} from ${userTeam.city} ${userTeam.name} for ${offerAmount}`);
+                            return; // Sim loop will interrupt and show modal
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── No user team candidate — proceed with AI-to-AI loan ──
+        const loanResult = LoanEngine.processAiLoan({
+            team, injuredPlayer: player, dpeAmount,
+            lowerTierTeams,
+            activeLoans: this.gameState.activeLoans,
+            allTeams: [...this.gameState.tier1Teams, ...this.gameState.tier2Teams, ...this.gameState.tier3Teams],
+            currentDate: dateStr,
+            generateSalary,
+            gamesRemaining, totalGames,
+            initializePlayerChemistry: this.deps.initializePlayerChemistry,
+        });
+
+        if (loanResult) {
+            console.log(`[AI Loan] ${team.city} ${team.name} loaned ${loanResult.playerName} from ${loanResult.originalTeamName} (fee: ${loanResult.loanFee})`);
+            return;
+        }
+
+        // Fallback: FA
+        this._aiSignFAViaDPE(team, player, dpeAmount, LoanEngine);
+    }
+
+    /**
+     * AI fallback: sign a free agent via DPE.
+     */
+    _aiSignFAViaDPE(team, injuredPlayer, dpeAmount, LoanEngine) {
+        const affordableFAs = LoanEngine.getAffordableFreeAgents(
+            this.gameState.freeAgents, dpeAmount, team.tier
+        );
+        const posMatch = affordableFAs.find(fa => fa.position === injuredPlayer.position);
+        const bestFA = posMatch || affordableFAs[0];
+        if (bestFA) {
+            LoanEngine.signFreeAgentViaDPE({
+                player: bestFA, team,
+                freeAgents: this.gameState.freeAgents,
+                initializePlayerChemistry: this.deps.initializePlayerChemistry,
+            });
+            console.log(`[AI DPE FA] ${team.city} ${team.name} signed FA ${bestFA.name} (${bestFA.rating} OVR) via DPE`);
+        }
+    }
+
     // ============================================
     // SAVE / LOAD
     // ============================================

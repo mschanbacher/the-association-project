@@ -31,8 +31,6 @@ import { CoachModal } from './screens/CoachModal.jsx';
 import { RosterModal } from './screens/RosterModal.jsx';
 import { FinanceDashboardModal } from './screens/FinanceDashboardModal.jsx';
 import { OwnerModeModal } from './screens/OwnerModeModal.jsx';
-import { ChampionshipPlayoffModal } from './screens/ChampionshipPlayoffModal.jsx';
-import { PlayoffModal } from './screens/PlayoffModal.jsx';
 import { FreeAgencyModal } from './screens/FreeAgencyModal.jsx';
 import { CollegeGradFAModal } from './screens/CollegeGradFAModal.jsx';
 import { BracketViewerModal } from './screens/BracketViewerModal.jsx';
@@ -72,8 +70,6 @@ function AppContent() {
   const [rosterData, setRosterData] = useState(null);
   const [financeDashData, setFinanceDashData] = useState(null);
   const [ownerModeData, setOwnerModeData] = useState(null);
-  const [championshipData, setChampionshipData] = useState(null);
-  const [playoffData, setPlayoffData] = useState(null);
   const [faData, setFaData] = useState(null);
   const [cgData, setCgData] = useState(null);
   const [bracketData, setBracketData] = useState(null);
@@ -138,10 +134,6 @@ function AppContent() {
     window._reactShowFinanceDashboard = (data) => setFinanceDashData(data);
     window._reactShowOwnerMode = (data) => setOwnerModeData(data);
     window._reactCloseOwnerMode = () => setOwnerModeData(null);
-    window._reactShowChampionship = (data) => setChampionshipData({...data});
-    window._reactCloseChampionship = () => setChampionshipData(null);
-    window._reactShowPlayoff = (data) => setPlayoffData({...data});
-    window._reactClosePlayoff = () => setPlayoffData(null);
     window._reactShowFA = (data) => setFaData({...data});
     window._reactCloseFA = () => setFaData(null);
     window._reactShowCG = (data) => setCgData({...data});
@@ -218,10 +210,6 @@ function AppContent() {
       delete window._reactShowFinanceDashboard;
       delete window._reactShowOwnerMode;
       delete window._reactCloseOwnerMode;
-      delete window._reactShowChampionship;
-      delete window._reactCloseChampionship;
-      delete window._reactShowPlayoff;
-      delete window._reactClosePlayoff;
       delete window._reactShowFA;
       delete window._reactCloseFA;
       delete window._reactShowCG;
@@ -485,16 +473,6 @@ function AppContent() {
         isOpen={!!financeDashData}
         data={financeDashData}
         onClose={() => setFinanceDashData(null)}
-      />
-      <ChampionshipPlayoffModal
-        isOpen={!!championshipData}
-        data={championshipData}
-        onClose={() => setChampionshipData(null)}
-      />
-      <PlayoffModal
-        isOpen={!!playoffData}
-        data={playoffData}
-        onClose={() => setPlayoffData(null)}
       />
       <FreeAgencyModal
         isOpen={!!faData}

@@ -6,7 +6,7 @@
 //   Owner Mode → Season Setup
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { UIRenderer } from './UIRenderer.js';
+
 
 /**
  * OffseasonController orchestrates the entire offseason flow.
@@ -37,11 +37,6 @@ export class OffseasonController {
     constructor(ctx) {
         this.ctx = ctx;
         this.playerDevelopmentInProgress = false;
-        this.contractDecisionsState = {
-            expiringPlayers: [],
-            developmentLog: [],
-            decisions: {}
-        };
         this.coachMarketPool = [];
     }
 
@@ -105,14 +100,19 @@ export class OffseasonController {
                 this.ctx.helpers.getGameSimController().showSeasonEnd();
                 break;
             case P.POSTSEASON:
-                // If using the new hub and it's registered, resume into it.
-                // Otherwise fall through to the legacy path (continueAfterPostseason).
-                if (this.ctx.gameState._usePlayoffHub && window._reactShowPlayoffHub) {
+                // Resume into PlayoffHub if registered, otherwise continue to promo/rel.
+                if (window._reactShowPlayoffHub) {
+                    const gs = this.ctx.gameState;
                     window._reactShowPlayoffHub({
-                        action: this.ctx.gameState.userPlayoffResult || 'stay',
-                        postseasonResults: this.ctx.gameState.postseasonResults,
-                        userTier: this.ctx.gameState.currentTier,
-                        userTeamId: this.ctx.gameState.userTeamId,
+                        action: gs.userPlayoffResult || 'stay',
+                        userTier: gs.currentTier,
+                        userTeamId: gs.userTeamId,
+                        userInPlayoffs: gs.userInPlayoffs,
+                        userSeriesId: gs.userSeriesId,
+                        playoffData: gs.playoffData,
+                        playoffSchedule: gs.playoffSchedule,
+                        currentDate: gs.currentDate,
+                        postseasonResults: gs.postseasonResults,
                         onComplete: () => this.continueAfterPostseason(),
                     });
                 } else {
@@ -190,8 +190,6 @@ export class OffseasonController {
         });
 
         // Close any open modals
-        document.getElementById('seasonEndModal')?.classList.add('hidden');
-        document.getElementById('playoffModal')?.classList.add('hidden');
         if (window._reactCloseSeasonEnd) window._reactCloseSeasonEnd();
 
         gameState.userPlayoffResult = action;
@@ -316,69 +314,9 @@ export class OffseasonController {
             });
         } else {
             console.error('❌ PlayoffHub not available - window._reactShowPlayoffHub not registered');
-            // Fallback: run old simulation path
-            console.warn('⚠️ Falling back to legacy playoff simulation...');
-            const postseasonResults = engines.PlayoffEngine.simulateFullPostseason(gameState);
-            gameState.postseasonResults = postseasonResults;
-            this._legacyPlayoffFlow(action, postseasonResults);
-        }
-    }
-
-    /**
-     * Legacy playoff modal chain — kept intact while PlayoffHub is built.
-     * Called by advanceToNextSeason() when _usePlayoffHub is false,
-     * and as a safety fallback if the hub component isn't mounted.
-     * DO NOT modify this method during PlayoffHub development.
-     */
-    _legacyPlayoffFlow(action, postseasonResults) {
-        const { gameState, engines, helpers } = this.ctx;
-
-        // If user is in T1 championship playoffs, enter interactive round-by-round flow
-        if (action === 'championship') {
-            console.log('🏆 User qualifies for T1 Championship — entering interactive playoff flow...');
-            const gameSim = helpers.getGameSimController();
-            gameSim.runTier1ChampionshipPlayoffs();
-            return;
-        }
-
-        // If user is in T2 division playoffs, enter interactive T2 playoff flow
-        if (action === 't2-championship') {
-            console.log('🏆 User qualifies for T2 Division Playoffs — entering interactive playoff flow...');
-            const gameSim = helpers.getGameSimController();
-            gameSim.runTier2DivisionPlayoffs();
-            return;
-        }
-
-        // If user is in T3 metro playoffs, enter interactive T3 playoff flow
-        if (action === 't3-championship') {
-            console.log('🏆 User qualifies for T3 Metro Playoffs — entering interactive playoff flow...');
-            const gameSim = helpers.getGameSimController();
-            gameSim.runTier3MetroPlayoffs();
-            return;
-        }
-
-        // Otherwise show static postseason results summary
-        if (window._reactShowChampionship) {
-            // Wire the continue button callback
-            window.advanceFromPostseason = () => this.continueAfterPostseason();
-
-            window._reactShowChampionship({
-                mode: 'postseason',
-                t1Champion: postseasonResults.t1?.champion || null,
-                t2Champion: postseasonResults.t2?.champion || null,
-                t3Champion: postseasonResults.t3?.champion || null,
-                t1Finals: postseasonResults.t1?.rounds?.[3]?.[0] || null,
-                promotedToT1: postseasonResults.promoted?.toT1 || [],
-                promotedToT2: postseasonResults.promoted?.toT2 || [],
-                relegatedFromT1: postseasonResults.relegated?.fromT1 || [],
-                relegatedFromT2: postseasonResults.relegated?.fromT2 || [],
-                t1Relegation: postseasonResults.t1Relegation || null,
-                t2Relegation: postseasonResults.t2Relegation || null,
-            });
-        } else {
-            // [LEGACY REMOVED] const html = engines.PlayoffEngine.generatePostseasonHTML(postseasonResults, gameState.userTeamId);
-            // [LEGACY REMOVED] document.getElementById('championshipPlayoffContent').innerHTML = UIRenderer.postseasonContinue({ resultsHTML: html });
-            // [LEGACY DOM] document.getElementById('championshipPlayoffModal').classList.remove('hidden');
+            // No legacy fallback — skip directly to offseason
+            console.warn('⚠️ Skipping playoffs, proceeding to offseason...');
+            this.continueAfterPostseason();
         }
     }
 
@@ -390,8 +328,6 @@ export class OffseasonController {
         const { gameState, eventBus, GameEvents, engines, helpers } = this.ctx;
         const P = OffseasonController.PHASES;
 
-        if (window._reactCloseChampionship) window._reactCloseChampionship();
-        // Close the PlayoffHub screen — we're now entering offseason flow
         if (window._reactClosePlayoffHub) window._reactClosePlayoffHub();
 
         // Open OffseasonHub — this will stay open throughout the entire offseason
@@ -404,7 +340,6 @@ export class OffseasonController {
             });
         }
 
-        // [LEGACY DOM] document.getElementById('championshipPlayoffModal').classList.add('hidden');
         this.setPhase(P.PROMO_REL);
 
         // ═══ CAPTURE SEASON HISTORY SNAPSHOT ═══
@@ -669,10 +604,6 @@ export class OffseasonController {
             window._reactShowFinancialTransition(briefingData);
             return;
         }
-
-        // [LEGACY REMOVED] document.getElementById('financialTransitionContent').innerHTML = UIRenderer.financialTransitionBriefing(briefingData);
-
-        document.getElementById('financialTransitionModal').classList.remove('hidden');
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -899,44 +830,6 @@ export class OffseasonController {
         return { developmentLog: userTeamLog };
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // Development Summary Display
-    // ═══════════════════════════════════════════════════════════════════
-
-    showDevelopmentAndFreeAgency(developmentLog, expiredContracts) {
-        const { gameState, helpers } = this.ctx;
-        const improvements = developmentLog.filter(log => log.change > 0);
-        const declines = developmentLog.filter(log => log.change < 0);
-        const userTeam = helpers.getUserTeam();
-
-        let expiredContractsHTML = '';
-        if (expiredContracts && expiredContracts.length > 0) {
-            // [LEGACY REMOVED] expired contract card generation
-            const cardsHTML = '';
-            // [LEGACY REMOVED] expiredContractsHTML = UIRenderer.expiredContractsSection({ count: expiredContracts.length, cardsHTML });
-        }
-
-        let improvementsHTML = '';
-        if (improvements.length > 0) {
-            // [LEGACY REMOVED] improvementsHTML = `<div style="margin-bottom: 30px;"><h2 style="color: #34a853; margin-bottom: 15px;">⬆️ Player Improvements (${improvements.length})</h2>${improvements.map((log, i) => UIRenderer.ratingChangeRow(log, i)).join('')}</div>`;
-        }
-        let declinesHTML = '';
-        if (declines.length > 0) {
-            // [LEGACY REMOVED] declinesHTML = `<div><h2 style="color: #ea4335; margin-bottom: 15px;">⬇️ Player Declines (${declines.length})</h2>${declines.map((log, i) => UIRenderer.ratingChangeRow(log, i)).join('')}</div>`;
-        }
-
-        const hasContent = improvements.length > 0 || declines.length > 0 || (expiredContracts && expiredContracts.length > 0);
-
-        // [LEGACY REMOVED] document.getElementById('developmentSummary').innerHTML = UIRenderer.developmentAndFreeAgencyPage({
-        //     expiredContractsHTML, improvementsHTML, declinesHTML, hasContent
-        // });
-        // [LEGACY DOM] document.getElementById('developmentModal').classList.remove('hidden');
-
-        if (!gameState.pendingExpiredDecisions) {
-            gameState.pendingExpiredDecisions = expiredContracts ? expiredContracts.map(p => p.id) : [];
-        }
-    }
-
     showDevelopmentSummaryOnly(developmentLog) {
         const { gameState } = this.ctx;
         const improvements = developmentLog.filter(log => log.change > 0);
@@ -966,255 +859,21 @@ export class OffseasonController {
             // allRetirementsCount: allRetirements.length
         // });
 
-        // [LEGACY DOM] document.getElementById('developmentSummary').innerHTML = html;
-        // [LEGACY DOM] document.getElementById('developmentModal').classList.remove('hidden');
+        // Development summary now rendered by React DevelopmentModal via _reactShowDevelopment
     }
 
     closeDevelopmentSummary() {
-        // [LEGACY DOM] document.getElementById('developmentModal').classList.add('hidden');
         this.startFreeAgencyPeriod();
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // Expired Contract Decisions (old flow — kept for compatibility)
     // ═══════════════════════════════════════════════════════════════════
-
-    resignExpiredPlayer(playerId) {
-        const { gameState, helpers } = this.ctx;
-        const userTeam = helpers.getUserTeam();
-        const player = userTeam.roster.find(p => p.id === playerId);
-        if (!player) { console.error('Player not found:', playerId); return; }
-
-        player.contractYears = helpers.determineContractLength(player.age, player.rating);
-        player.originalContractLength = player.contractYears;
-        player.contractExpired = false;
-
-        const oldSalary = player.salary;
-        player.salary = helpers.generateSalary(player.rating, userTeam.tier);
-        player.tier = userTeam.tier;
-        delete player.preRelegationSalary;
-
-        const salaryChange = player.salary - oldSalary;
-        const changeLabel = salaryChange < 0 ? `↓ ${helpers.formatCurrency(Math.abs(salaryChange))}` : salaryChange > 0 ? `↑ ${helpers.formatCurrency(salaryChange)}` : 'unchanged';
-        console.log(`✅ Re-signed ${player.name} for ${player.contractYears} year(s) at ${helpers.formatCurrency(player.salary)} (${changeLabel})`);
-
-        this._removeExpiredDecision(playerId);
-
-        const element = document.getElementById(`expired_${playerId}`);
-        if (element) {
-            element.style.opacity = '0.5';
-            // [LEGACY REMOVED] element.innerHTML = UIRenderer.expiredContractDecisionResult({
-                // playerName: player.name, decision: 'resign',
-                // contractYears: player.contractYears, salary: player.salary, formatCurrency: helpers.formatCurrency
-            // });
-        }
-
-        this._checkAllExpiredDecisionsMade();
-    }
-
-    releaseExpiredPlayer(playerId) {
-        const { gameState, helpers } = this.ctx;
-        const userTeam = helpers.getUserTeam();
-        const player = userTeam.roster.find(p => p.id === playerId);
-        if (!player) { console.error('Player not found:', playerId); return; }
-
-        const index = userTeam.roster.findIndex(p => p.id === playerId);
-        if (index !== -1) userTeam.roster.splice(index, 1);
-
-        player.previousTeamId = userTeam.id;
-        player.contractYears = helpers.determineContractLength(player.age, player.rating);
-        player.originalContractLength = player.contractYears;
-        player.contractExpired = false;
-        gameState.freeAgents.push(player);
-
-        console.log(`❌ Released ${player.name} to free agency`);
-
-        this._removeExpiredDecision(playerId);
-
-        const element = document.getElementById(`expired_${playerId}`);
-        if (element) {
-            element.style.opacity = '0.5';
-            // [LEGACY REMOVED] element.innerHTML = UIRenderer.expiredContractDecisionResult({
-                // playerName: player.name, decision: 'release',
-                // contractYears: 0, salary: 0, formatCurrency: helpers.formatCurrency
-            // });
-        }
-
-        this._checkAllExpiredDecisionsMade();
-    }
-
-    _removeExpiredDecision(playerId) {
-        const { gameState } = this.ctx;
-        if (gameState.pendingExpiredDecisions) {
-            const index = gameState.pendingExpiredDecisions.indexOf(playerId);
-            if (index !== -1) gameState.pendingExpiredDecisions.splice(index, 1);
-        }
-    }
-
-    _checkAllExpiredDecisionsMade() {
-        const { gameState } = this.ctx;
-        if (gameState.pendingExpiredDecisions && gameState.pendingExpiredDecisions.length === 0) {
-            console.log('✅ All expired contract decisions made!');
-            const statusDiv = document.getElementById('expiredContractsStatus');
-            if (statusDiv) {
- statusDiv.innerHTML = '<strong style="color: #34a853;">All decisions made! Close this window to continue.</strong>';
-            }
-        }
-    }
-
+    // Contract Decisions — MIGRATED Session F
+    // Old interactive resign/release flow replaced by automated
+    // runContractExpiration() + React ContractsScreen in OffseasonHub.
+    // 9 getElementById calls removed. Business logic lives in
+    // runContractExpiration() above.
     // ═══════════════════════════════════════════════════════════════════
-    // Contract Decisions Modal (new flow)
-    // ═══════════════════════════════════════════════════════════════════
-
-    showContractDecisionsModal(expiredContracts, developmentLog) {
-        const { helpers } = this.ctx;
-        const state = this.contractDecisionsState;
-        state.expiringPlayers = expiredContracts;
-        state.developmentLog = developmentLog || [];
-        state.decisions = {};
-
-        const userTeam = helpers.getUserTeam();
-        const currentSalary = helpers.calculateTeamSalary(userTeam);
-        const cap = helpers.getEffectiveCap(userTeam);
-        const expiredSalary = expiredContracts.reduce((sum, p) => sum + p.salary, 0);
-        const remainingCap = cap - (currentSalary - expiredSalary);
-
-        if (window._reactShowContractDecisions) {
-            const self = this;
-            window._contractDecisionsConfirmCallback = (decisions) => {
-                state.decisions = decisions;
-                self.confirmContractDecisions();
-            };
-            window._reactShowContractDecisions({
-                players: expiredContracts,
-                capSpace: remainingCap,
-                rosterCount: userTeam.roster.length - expiredContracts.length,
-                formatCurrency: helpers.formatCurrency,
-                getRatingColor: helpers.getRatingColor,
-                determineContractLength: helpers.determineContractLength
-            });
-            return;
-        }
-
-        // [LEGACY REMOVED] document.getElementById('contractDecisionsSummary').innerHTML = UIRenderer.contractDecisionsSummary({
-            // expiredCount: expiredContracts.length,
-            // availableCap: remainingCap,
-            // rosterCount: { value: userTeam.roster.length - expiredContracts.length, label: 'Current Roster' },
-            // formatCurrency: helpers.formatCurrency, capColor: '#34a853'
-        // });
-
-        const playersHtml = expiredContracts.map(player => {
-            const canAfford = player.salary <= remainingCap;
-            const newContract = helpers.determineContractLength(player.age, player.rating);
-            // [LEGACY REMOVED] return UIRenderer.contractDecisionCard({
-                // player, canAfford, newContractYears: newContract, ratingColor: helpers.getRatingColor(player.rating)
-            // });
-        }).join('');
-        document.getElementById('expiringContractsList').innerHTML = playersHtml;
-
-        document.getElementById('contractDecisionsConfirmBtn').onclick = () => this.confirmContractDecisions();
-        this.updateContractDecisionsButton();
-        document.getElementById('contractDecisionsModal').classList.remove('hidden');
-    }
-
-    makeContractDecision(playerId, decision) {
-        const state = this.contractDecisionsState;
-        state.decisions[playerId] = decision;
-
-        const resignBtn = document.getElementById(`resign_${playerId}`);
-        const releaseBtn = document.getElementById(`release_${playerId}`);
-        const card = document.getElementById(`contract_${playerId}`);
-        const status = document.getElementById(`decision_status_${playerId}`);
-
-        if (decision === 'resign') {
-            card.style.border = '2px solid #34a853';
-            resignBtn.style.background = 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)';
-            releaseBtn.style.background = '';
- status.textContent = 'Re-signing';
-            status.style.color = '#34a853';
-        } else {
-            card.style.border = '2px solid #ea4335';
-            releaseBtn.style.background = 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)';
-            resignBtn.style.background = '';
- status.textContent = 'Releasing';
-            status.style.color = '#ea4335';
-        }
-
-        this.updateAvailableCapDisplay();
-        this.updateContractDecisionsButton();
-    }
-
-    updateAvailableCapDisplay() {
-        const { helpers } = this.ctx;
-        const state = this.contractDecisionsState;
-        const userTeam = helpers.getUserTeam();
-        const currentSalary = helpers.calculateTeamSalary(userTeam);
-        const cap = helpers.getEffectiveCap(userTeam);
-        const expiredContracts = state.expiringPlayers;
-
-        const expiredSalary = expiredContracts.reduce((sum, p) => sum + p.salary, 0);
-        const resignedSalary = expiredContracts
-            .filter(p => state.decisions[p.id] === 'resign')
-            .reduce((sum, p) => sum + p.salary, 0);
-
-        const availableCap = cap - (currentSalary - expiredSalary + resignedSalary);
-        const remainingRoster = userTeam.roster.length - expiredContracts.length +
-            Object.values(state.decisions).filter(d => d === 'resign').length;
-
-        // [LEGACY REMOVED] document.getElementById('contractDecisionsSummary').innerHTML = UIRenderer.contractDecisionsSummary({
-            // expiredCount: expiredContracts.length,
-            // availableCap,
-            // rosterCount: { value: remainingRoster, label: 'Remaining Roster' },
-            // formatCurrency: helpers.formatCurrency,
-            // capColor: availableCap < 0 ? '#ea4335' : '#34a853'
-        // });
-    }
-
-    updateContractDecisionsButton() {
-        const state = this.contractDecisionsState;
-        const totalPlayers = state.expiringPlayers.length;
-        const decidedPlayers = Object.keys(state.decisions).length;
-        const btn = document.getElementById('contractDecisionsConfirmBtn');
-        if (btn) {
-            btn.disabled = decidedPlayers < totalPlayers;
-            btn.textContent = decidedPlayers < totalPlayers
-                ? `Decide on all players (${decidedPlayers}/${totalPlayers})`
- : 'Confirm All Decisions';
-        }
-    }
-
-    confirmContractDecisions() {
-        const { gameState, helpers } = this.ctx;
-        const state = this.contractDecisionsState;
-        const userTeam = helpers.getUserTeam();
-
-        state.expiringPlayers.forEach(player => {
-            const decision = state.decisions[player.id];
-            if (decision === 'resign') {
-                player.contractYears = helpers.determineContractLength(player.age, player.rating);
-                player.originalContractLength = player.contractYears;
-                delete player.contractExpired;
-                console.log(`✅ Re-signed ${player.name} to ${player.contractYears} year contract (${helpers.formatCurrency(player.salary)}/yr)`);
-            } else if (decision === 'release') {
-                const index = userTeam.roster.findIndex(p => p.id === player.id);
-                if (index !== -1) userTeam.roster.splice(index, 1);
-
-                player.contractYears = helpers.determineContractLength(player.age, player.rating);
-                player.originalContractLength = player.contractYears;
-                delete player.contractExpired;
-                gameState.freeAgents.push(player);
-                console.log(`❌ Released ${player.name} to free agency (${player.rating} OVR, ${helpers.formatCurrency(player.salary)}/yr)`);
-            }
-        });
-
-        document.getElementById('contractDecisionsModal').classList.add('hidden');
-
-        if (state.developmentLog.length > 0) {
-            this.showDevelopmentSummaryOnly(state.developmentLog);
-        } else {
-            this.runAISigningAndContinue();
-        }
-    }
 
     // ═══════════════════════════════════════════════════════════════════
     // Free Agency Period
@@ -1353,10 +1012,7 @@ export class OffseasonController {
             return;
         }
 
-        // [LEGACY REMOVED] document.getElementById('complianceModalContent').innerHTML = UIRenderer.rosterComplianceModal({
-            // isOverCap, isUnderMinimum, isOverMaximum, totalSalary, salaryCap, rosterSize, tier, formatCurrency: helpers.formatCurrency
-        // });
-        // [LEGACY DOM] document.getElementById('complianceModal').classList.remove('hidden');
+        // Compliance modal now rendered by React ComplianceModal via _reactShowCompliance
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -1403,10 +1059,8 @@ export class OffseasonController {
         console.log(`   Spending Limit: ${helpers.formatCurrency(engines.FinanceEngine.getSpendingLimit(team))}`);
         console.log('═══════════════════════════════════════════════════════');
 
-        // Close modal (React or legacy)
+        // Close modal
         if (window._reactCloseOwnerMode) window._reactCloseOwnerMode();
-        const legacyModal = document.getElementById('financeDashboardModal');
-        if (legacyModal) legacyModal.classList.add('hidden');
 
         helpers.saveGameState();
         this.continueToSeasonSetup();
@@ -1502,11 +1156,7 @@ export class OffseasonController {
 
         helpers.saveGameState();
 
-        // Re-enable sim buttons (legacy DOM may not exist when React UI is active)
-        for (const id of ['simNextBtn', 'simDayBtn', 'simWeekBtn', 'finishBtn']) {
-            const el = document.getElementById(id);
-            if (el) el.disabled = false;
-        }
+        // Sim button states managed by React SimControls component
 
         console.log('✅ Step 5 complete: New season ready!');
         console.log('Current game:', gameState.currentGame);
@@ -2013,7 +1663,7 @@ export class OffseasonController {
             simController._watchAwayName = away.name;
             simController._watchDate = game.date;
             simController._watchPaused = false;
-            simController._watchSpeed = 1;
+            simController._watchSpeed = window._gameSettings?.watchGameSpeed || 1;
             simController._isPreseasonWatch = true;
         }
 

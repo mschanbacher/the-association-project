@@ -39,6 +39,7 @@ import {
   // Controllers
   SimulationController,
   GameSimController,
+  PlayoffSimController,
   OffseasonController,
   DashboardController,
   RosterController,
@@ -50,6 +51,7 @@ import {
   SaveLoadController,
   TrainingCampEngine,
 } from '../main.js';
+import { SettingsManager } from '../engines/SettingsManager.js';
 
 // Expose all modules on window for _initGame to access
 Object.assign(window, {
@@ -86,6 +88,7 @@ Object.assign(window, {
   // Controllers
   SimulationController,
   GameSimController,
+  PlayoffSimController,
   OffseasonController,
   DashboardController,
   RosterController,
@@ -119,7 +122,8 @@ export function mountReactApp() {
   return reactRoot;
 }
 
-// Initialize: load storage, then mount React, then init game
+// Initialize: load storage + settings, then mount React, then init game
+SettingsManager.init();
 StorageEngine.init().then(() => {
   mountReactApp();
   if (typeof window._initGame === 'function') {
